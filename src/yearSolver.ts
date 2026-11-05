@@ -10,7 +10,7 @@ export type TeacherPreference={
 export type PracticeBlock={
  id:string;group:string;kind:'college'|'company';title:string;teacher:string;
  startWeek:number;durationWeeks:number;days:number[];fromSlot:number;toSlot:number;
- room:string;
+ room:string;requiresComputers?:boolean;
 };
 export type PracticeAudit={blockId:string;group:string;week:number;reason:string};
 export type AnnualConfig={
@@ -111,8 +111,8 @@ export function practiceReservations(cfg:AnnualConfig,events:CalendarEvent[],wee
    if(!room||!cfg.activeRooms.includes(block.room)||!room.active){
     issues.push({blockId:block.id,group:block.group,week,reason:'Закреплённый кабинет практики закрыт или не существует'});continue;
    }
-   if(room.capacity<group.count){
-    issues.push({blockId:block.id,group:block.group,week,reason:'В закреплённом кабинете не хватает мест для '+group.count+' студентов'});continue;
+   if(room.capacity<group.count||(block.requiresComputers&&room.pc<group.count)){
+    issues.push({blockId:block.id,group:block.group,week,reason:block.requiresComputers&&room.pc<group.count?'Не хватает компьютеров для непрерывной практики: '+group.count+' студентов, '+room.pc+' ПК':'В закреплённом кабинете не хватает мест для '+group.count+' студентов'});continue;
    }
   }
   for(const day of block.days){
