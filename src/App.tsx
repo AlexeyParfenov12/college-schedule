@@ -5,7 +5,7 @@ import { DAYS, TIMES, GROUPS, TEACHERS, SUBJECTS, ROOMS, TYPES, MODES, INITIAL, 
 import type { Lesson, Type, Mode } from './data';
 import AdvancedWorkflows from './AdvancedWorkflows';
 import LessonQuickActions from './LessonQuickActions';
-import { moveOptions, explainCandidate, readBlockedRooms } from './scheduleAssist';
+import { moveOptions, explainCandidate, readBlockedRooms, swapOptions } from './scheduleAssist';
 import type { MoveOption } from './scheduleAssist';
 import { validate } from './demoLogic';
 
@@ -71,7 +71,7 @@ export default function App(){
  const [sideMode,setSideMode]=useState<'assistant'|'edit'>('assistant');
  const [moveMode,setMoveMode]=useState(false);
  const [preview,setPreview]=useState<MoveOption|null>(null);
- const [lastChange,setLastChange]=useState<{before:Item|null;afterId:string}|null>(null);
+ const [lastChange,setLastChange]=useState<{before:Item[];changedIds:string[]}|null>(null);
  const [hoverMove,setHoverMove]=useState<MoveOption|null>(null);
  const [view,setView]=useState<View>('group');
  const [group,setGroup]=useState('П-21');
@@ -112,7 +112,7 @@ export default function App(){
   if(items.find(y=>y.id===x.id)?.status==='held'){setNotice('Проведённое занятие нельзя изменить без процедуры исправления');return false}
   const errors=explainCandidate(x,items,readBlockedRooms());
   if(errors.length){setNotice('Не сохранено: '+errors[0]);return false}
-  setLastChange({before:items.find(y=>y.id===x.id)||null,afterId:x.id});
+  setLastChange({before:items.filter(y=>y.id===x.id),changedIds:[x.id]});
   setItems(v=>[...v.filter(y=>y.id!==x.id),x]);
   setSelected(null);setMoveMode(false);setPreview(null);setStatus('draft');
   setNotice('Изменение сохранено · можно отменить последнее действие');
@@ -121,13 +121,13 @@ export default function App(){
  const remove=(key:string)=>{
   const existing=items.find(x=>x.id===key);
   if(existing?.status==='held'){setNotice('Проведённое занятие нельзя удалить');return}
-  setLastChange({before:existing||null,afterId:key});
+  setLastChange({before:existing?[existing]:[],changedIds:[key]});
   setItems(v=>v.filter(x=>x.id!==key));
   setSelected(null);setMoveMode(false);setPreview(null);setStatus('draft');setNotice('Занятие удалено из черновика');
  };
  const undo=()=>{
   if(!lastChange)return;
-  setItems(v=>[...v.filter(x=>x.id!==lastChange.afterId),...(lastChange.before?[lastChange.before]:[])]);
+  setItems(v=>[...v.filter(x=>!lastChange.changedIds.includes(x.id)),...lastChange.before]);
   setLastChange(null);setStatus('draft');setSelected(null);setMoveMode(false);setPreview(null);setNotice('Последнее изменение отменено');
  };
  const inspectTarget=(day:number,slot:number)=>{
@@ -140,6 +140,18 @@ export default function App(){
  const confirmMove=()=>{
   if(!selected||!preview)return;
   save({...selected,day:preview.day,slot:preview.slot});
+ };
+ const performSwap=(other:Item)=>{
+  if(!selected)return;
+  const allowed=swapOptions(selected,current,readBlockedRooms()).find(x=>x.lesson.id===other.id);
+  if(!allowed?.available){setNotice('Обмен недоступен: '+(allowed?.reason||'Нет подходящего варианта'));return}
+  if(!window.confirm('Обменять '+selected.subject+' ('+DAYS[selected.day]+', '+selected.slot+' пара) и '+other.subject+' ('+DAYS[other.day]+', '+other.slot+' пара)?'))return;
+  const first={...selected,day:other.day,slot:other.slot};
+  const second={...other,day:selected.day,slot:selected.slot};
+  const remaining=items.filter(x=>x.id!==selected.id&&x.id!==other.id);
+  if(explainCandidate(first,[...remaining,second],readBlockedRooms()).length||explainCandidate(second,[...remaining,first],readBlockedRooms()).length){setNotice('Обмен отменён: расписание успело измениться');return}
+  setLastChange({before:[selected,other],changedIds:[selected.id,other.id]});
+  setItems([...remaining,first,second]);setStatus('draft');setSelected(null);setMoveMode(false);setPreview(null);setNotice('Занятия обменены местами · доступна отмена');
  };
  const closeSelected=()=>{setSelected(null);setMoveMode(false);setPreview(null);setHoverMove(null)};
  const move=(key:string,day:number,slot:number)=>{
@@ -219,7 +231,7 @@ export default function App(){
    {sideMode==='assistant'&&items.some(x=>x.id===selected.id)
     ?<LessonQuickActions lesson={selected} current={current} blocked={blockedRooms} isMoveMode={moveMode}
       onMoveMode={()=>{setMoveMode(v=>!v);setPreview(null)}}
-      onPreviewMove={inspectTarget}
+      onPreviewMove={inspectTarget} onSwap={performSwap}
       onTeacher={name=>{if(window.confirm('Заменить '+selected.teacher+' на '+name+' в '+selected.subject+'?'))save({...selected,teacher:name,replacementFor:selected.teacher,notes:(selected.notes||'')+'; Замена через подсказку'})}}
       onRoom={id=>{if(window.confirm('Изменить кабинет для '+selected.subject+' на '+id+'?'))save({...selected,room:id})}}
       onEdit={()=>{setSideMode('edit');setMoveMode(false);setPreview(null)}} onClose={closeSelected}/>
