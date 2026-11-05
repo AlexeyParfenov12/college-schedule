@@ -309,7 +309,7 @@ export default function AdvancedWorkflows(p:Props){
   <Panel title="Дистанционные занятия за неделю"><Rows heads={['Группа','День','Пара','Дисциплина','Формат','']} rows={curr.filter(x=>x.mode!=='offline').slice(0,70).map(x=>[x.groups.join(', '),DAYS[x.day],x.slot,x.subject,<Pill color="blue">{MODES[x.mode]}</Pill>,<MiniButton onClick={()=>ifOpen(x)}>Открыть</MiniButton>])}/></Panel></div>;
  };
  const makeWorkload=()=>{
-  const teachers=TEACHERS.map(t=>({...workload:workload(p.items,t,p.week),name:t,plan:12}));
+  const teachers=TEACHERS.map(t=>({workload:workload(p.items,t,p.week),name:t,plan:12}));
   const assigned=teachers.reduce((s,t)=>s+t.workload.assigned,0),held=teachers.reduce((s,t)=>s+t.workload.held,0);
   return <div className="studio-stack"><div className="studio-stats"><BaseStat value={assigned+' ч'} label="Назначено за неделю"/><BaseStat value={held+' ч'} label="Подтверждено в демо"/><BaseStat value={(assigned-held)+' ч'} label="Ожидает подтверждения"/><BaseStat value={teachers.filter(t=>t.workload.assigned>0).length} label="Задействовано преподавателей"/></div>
   <Panel title="Нагрузка по преподавателям">
