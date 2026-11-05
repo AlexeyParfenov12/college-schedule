@@ -27,14 +27,14 @@ export const MODES:Record<Mode,string>={offline:'Очно',online:'Онлайн'
 const make=(id:string,day:number,slot:number,subject:string,teacher:string,groups:string[],room:string,type:Type='regular',mode:Mode='offline',week=0):Lesson=>({id,day,slot,subject,teacher,groups,room,type,mode,week,hours:2});
 export const INITIAL:Lesson[]=[
  make('demo-01',0,1,'Математика',TEACHERS[1],['П-21'],'107'),
- make('demo-02',0,2,'Программирование',TEACHERS[2],['П-21'],'101 / 102','subgroup'),
+ make('demo-02',0,2,'Программирование',TEACHERS[2],['П-21'],'102 / 107','subgroup'),
  make('demo-03',0,3,'Компьютерные сети',TEACHERS[0],['П-21','П-22'],'105 + онлайн','parallel','hybrid'),
  make('demo-04',0,4,'Практика',TEACHERS[2],['П-21'],'101'),
  make('demo-05',1,1,'Английский язык',TEACHERS[1],['П-21'],'106'),
  make('demo-06',1,2,'Базы данных',TEACHERS[5],['П-21','П-23'],'101','stream'),
  make('demo-07',1,3,'Компьютерные сети',TEACHERS[0],['П-21','П-22'],'105 + онлайн','parallel','hybrid'),
  make('demo-08',2,1,'Математика',TEACHERS[1],['П-21'],'107'),
- make('demo-09',2,2,'Программирование',TEACHERS[2],['П-21'],'101 / 102','subgroup'),
+ make('demo-09',2,2,'Программирование',TEACHERS[2],['П-21'],'102 / 107','subgroup'),
  make('demo-10',2,3,'Лабораторная работа',TEACHERS[3],['П-21'],'103'),
  make('demo-11',2,4,'Английский язык',TEACHERS[1],['П-21'],'106'),
  make('demo-12',3,1,'Физика',TEACHERS[3],['П-21'],'103'),
@@ -42,7 +42,7 @@ export const INITIAL:Lesson[]=[
  make('demo-14',3,3,'Общая лекция',TEACHERS[0],['П-21','П-23'],'101','stream'),
  make('demo-15',3,4,'Консультация',TEACHERS[1],['П-21'],'107'),
  make('demo-16',4,1,'Математика',TEACHERS[1],['П-21'],'107'),
- make('demo-17',4,2,'Компьютерные сети',TEACHERS[0],['П-21'],'101 / 102','subgroup'),
+ make('demo-17',4,2,'Компьютерные сети',TEACHERS[0],['П-21'],'102 / 107','subgroup'),
  make('demo-18',4,3,'Практика',TEACHERS[2],['П-21'],'102'),
  make('demo-19',4,4,'Базы данных',TEACHERS[5],['П-21'],'105')
 ];
