@@ -41,7 +41,6 @@ const weekOpts=Array.from({length:16},(_,i)=>({id:i,label:'Учебная нед
 function Pill({children,color='gray'}:{children:ReactNode;color?:'gray'|'green'|'red'|'amber'|'blue'|'lime'}){return <span className={'studio-pill '+color}>{children}</span>}
 function Rows({heads,rows}:{heads:string[];rows:ReactNode[][]}){
  const [query,setQuery]=useState('');
- const [groupFilter,setGroupFilter]=useState('');
  const [page,setPage]=useState(0);
  const [pageSize,setPageSize]=useState(12);
  const filtered=rows.filter(row=>row.some(v=>(typeof v==='string'||typeof v==='number')&&String(v).toLowerCase().includes(query.trim().toLowerCase())));
@@ -72,6 +71,7 @@ export default function AdvancedWorkflows(p:Props){
  const curr=p.items.filter(x=>(x.week||0)===p.week);
  const [proposal,setProposal]=useState<ReturnType<typeof findFree>[number]|null>(null);
  const [query,setQuery]=useState('');
+ const [groupFilter,setGroupFilter]=useState('');
  const [subject,setSubject]=useState('Программирование');
  const [day,setDay]=useState(1);
  const [slot,setSlot]=useState(2);
