@@ -1,14 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent, ReactNode, DragEvent } from 'react';
 import { CalendarDays, LayoutDashboard, ArrowLeftRight, Users, Building2, Settings2, FileText, Clock3, Plus, Search, Download, Check, AlertTriangle, ChevronLeft, ChevronRight, Menu, BookOpen, Monitor, Network, GitFork, WandSparkles, Save, X, Pencil, Trash2, Copy, Bell, Layers3, BarChart3, RotateCcw, Eye, SlidersHorizontal, Send, School, Filter } from 'lucide-react';
-import { DAYS, TIMES, GROUPS, TEACHERS, SUBJECTS, ROOMS, TYPES, MODES, INITIAL, NAV } from './data';
+import { DAYS, TIMES, GROUPS, TEACHERS, SUBJECTS, ROOMS, TYPES, MODES, INITIAL, NAV, buildSeed } from './data';
 import type { Lesson, Type, Mode } from './data';
+import AdvancedWorkflows from './AdvancedWorkflows';
+import { validate } from './demoLogic';
+import './studio.css';
 
 type Item = Lesson & {week?:number};
 type View = 'group'|'teacher'|'room';
 type Screen = typeof NAV[number][0];
 const iconSet=[LayoutDashboard,CalendarDays,CalendarDays,Layers3,WandSparkles,ArrowLeftRight,Users,Network,GitFork,Building2,Monitor,BarChart3,Send,FileText,School,Settings2,BookOpen,BookOpen];
-const start=()=>{try{const saved=localStorage.getItem('college-schedule-v2'); if(saved){const parsed=JSON.parse(saved);if(Array.isArray(parsed))return parsed as Item[]}}catch{}return INITIAL as Item[]};
+const BASE=buildSeed(16) as Item[];
+const BASE_MAP=new Map(BASE.map(x=>[x.id,JSON.stringify(x)]));
+const start=():Item[]=>{try{
+ const raw=localStorage.getItem('college-schedule-edits-v3');
+ if(raw){const edits=JSON.parse(raw) as {updated:Item[],removed:string[]};const deleted=new Set(edits.removed);const updates=new Map(edits.updated.map(x=>[x.id,x]));return [...BASE.filter(x=>!deleted.has(x.id)).map(x=>updates.get(x.id)||x),...edits.updated.filter(x=>!BASE_MAP.has(x.id))]}
+}catch{}return BASE};
+
 const id=()=>String(Date.now())+'-'+Math.random().toString(36).slice(2,7);
 const download=(name:string,content:string)=>{const blob=new Blob(['\ufeff'+content],{type:'text/csv;charset=utf-8'});const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)};
 const cellConflict=(x:Item,all:Item[])=>all.filter(y=>y.id!==x.id&&(y.week||0)===(x.week||0)&&y.day===x.day&&y.slot===x.slot&&(x.groups.some(g=>y.groups.includes(g))||x.teacher===y.teacher||(x.mode!=='online'&&y.mode!=='online'&&x.room===y.room)));
@@ -56,7 +65,7 @@ export default function App(){
  const [view,setView]=useState<View>('group');
  const [group,setGroup]=useState('П-21');
  const [teacher,setTeacher]=useState(TEACHERS[0]);
- const [room,setRoom]=useState('405');
+ const [room,setRoom]=useState('102');
  const [week,setWeek]=useState(0);
  const [density,setDensity]=useState<'compact'|'standard'>('compact');
  const [days,setDays]=useState(6);
@@ -66,17 +75,23 @@ export default function App(){
  const [replacement,setReplacement]=useState('Петров М. С.');
  const [genPreference,setGenPreference]=useState(true);
  const [studentsGroup,setStudentsGroup]=useState('П-21');
- useEffect(()=>{localStorage.setItem('college-schedule-v2',JSON.stringify(items))},[items]);
+ useEffect(()=>{try{
+ const existing=new Set(items.map(x=>x.id));
+ const updated=items.filter(x=>BASE_MAP.get(x.id)!==JSON.stringify(x));
+ const removed=BASE.filter(x=>!existing.has(x.id)).map(x=>x.id);
+ localStorage.setItem('college-schedule-edits-v3',JSON.stringify({updated,removed}));
+}catch(e){console.warn('Не удалось сохранить демо-изменения:',e)}},[items]);
  useEffect(()=>{if(notice){const timer=setTimeout(()=>setNotice(''),3500);return ()=>clearTimeout(timer)}},[notice]);
  const current=items.filter(x=>(x.week||0)===week);
+ const resetSeed=()=>{if(window.confirm('Сбросить все изменения в расписании? Синтетическая база останется, черновики будут удалены.')){localStorage.removeItem('college-schedule-edits-v3');setItems(buildSeed(16));setSelected(null);setStatus('draft');setNotice('Демонстрационное расписание восстановлено')}};
  const visible=current.filter(x=>view==='group'?x.groups.includes(group):view==='teacher'?x.teacher===teacher:x.room.includes(room));
  const collisions=selected?cellConflict(selected,current):[];
  const issueCount=current.filter(x=>cellConflict(x,current).length>0).length;
  const displayName=NAV.find(x=>x[0]===screen)?.[1]||'Расписание';
- const make=(day=0,slot=1)=>{const created:Item={id:id(),day,slot,week,subject:SUBJECTS[0],teacher:TEACHERS[0],groups:[group],room:'405',type:'regular',mode:'offline'};setSelected(created)};
- const save=(x:Item)=>{const conflicts=cellConflict(x,items); if(conflicts.length&&x.type==='regular'){setNotice('Есть пересечения: проверь занятость преподавателя, группы и аудитории');return} setItems(v=>[...v.filter(y=>y.id!==x.id),x]);setSelected(null);setStatus('draft');setNotice('Изменение сохранено локально')};
+ const make=(day=0,slot=1)=>{const created:Item={id:id(),day,slot,week,subject:SUBJECTS[0],teacher:TEACHERS[0],groups:[group],room:'102',type:'regular',mode:'offline'};setSelected(created)};
+ const save=(x:Item)=>{const errors=validate(x,items).filter(y=>y.hard); if(errors.length){setNotice('Не сохранено: '+errors[0].message);return} setItems(v=>[...v.filter(y=>y.id!==x.id),x]);setSelected(null);setStatus('draft');setNotice('Изменение сохранено локально')};
  const remove=(key:string)=>{setItems(v=>v.filter(x=>x.id!==key));setSelected(null);setStatus('draft');setNotice('Занятие удалено из черновика')};
- const move=(key:string,day:number,slot:number)=>{const l=items.find(x=>x.id===key);if(!l)return;const next={...l,day,slot};if(cellConflict(next,items).length){setNotice('Перенос отменён: найдено пересечение');return}save(next)};
+ const move=(key:string,day:number,slot:number)=>{const l=items.find(x=>x.id===key);if(!l)return;const next={...l,day,slot};if(validate(next,items).some(y=>y.hard)){setNotice('Перенос отменён: найдено пересечение');return}save(next)};
  const exportCSV=(dataset=current)=>download('college-schedule.csv',['День;Пара;Группа;Дисциплина;Преподаватель;Аудитория;Организация;Формат',...dataset.map(x=>[DAYS[x.day],x.slot,names(x.groups),x.subject,x.teacher,x.room,TYPES[x.type],MODES[x.mode]].join(';'))].join('\n'));
  const show=(to:Screen)=>{setScreen(to);setSelected(null)};
  const sideGroups=view==='group'?GROUPS.map(g=>g.id):view==='teacher'?TEACHERS:ROOMS.map(r=>r.id);
@@ -96,6 +111,7 @@ export default function App(){
  const exportReports=()=>cards([{title:'Расписание групп',desc:'Занятия на выбранной неделе · CSV',action:()=>exportCSV()},{title:'Расписание преподавателей',desc:'Распределение занятий по преподавателям · CSV',action:()=>exportCSV()},{title:'Занятость аудиторий',desc:'Занятия с аудиториями · CSV',action:()=>exportCSV()},{title:'Лист замен',desc:'Примерный документ для согласования',tag:'Демо'},{title:'Выполнение учебного плана',desc:'Источником фактических часов будет электронный журнал',tag:'Интеграция'}]);
  const month=<div className="calendar-grid">{['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(v=><b key={v}>{v}</b>)}{Array.from({length:6},(_,i)=><span key={'o'+i}/>)}{Array.from({length:30},(_,i)=><button className={i+1>=9&&i+1<=14?'week-day':''} key={i}>{i+1}</button>)}</div>;
  const render=()=>{
+ if(screen!=='schedule') return <AdvancedWorkflows screen={screen} items={items} setItems={setItems} week={week} setWeek={setWeek} group={group} setGroup={setGroup} teacher={teacher} setTeacher={setTeacher} room={room} setRoom={setRoom} onNavigate={show} onEdit={setSelected} notify={setNotice} markDraft={()=>setStatus('draft')} status={status} setStatus={setStatus} density={density} setDensity={setDensity} days={days} setDays={setDays}/>;
  switch(screen){
  case 'schedule':return <>{weekHeader}{schedule}</>;
  case 'overview':return <div className="stack">{stats}<div className="col-2"><Panel title="Требует внимания">{cards([{title:'Замены преподавателя',desc:'Есть нерешённые заявки на замены',action:()=>show('substitutions'),tag:'6 занятий'},{title:'Конфликты расписания',desc:'Проверить пересечения по группе, преподавателю и аудитории',action:()=>show('schedule'),tag:String(issueCount)},{title:'Неопубликованные изменения',desc:'Черновик расписания требует проверки',action:()=>show('publication'),tag:status==='draft'?'Черновик':'Готово'}])}</Panel><Panel title="Быстрые действия"><div className="button-list"><Action onClick={()=>{show('schedule');addRow()}}><Plus size={15}/> Создать занятие</Action><Action onClick={()=>show('substitutions')}><ArrowLeftRight size={15}/> Оформить замену</Action><Action onClick={()=>show('generator')}><WandSparkles size={15}/> Автосоставление</Action><Action onClick={()=>show('publication')}><Send size={15}/> Опубликовать</Action></div></Panel></div>{metricsTable}</div>;
@@ -125,9 +141,9 @@ export default function App(){
    <div className="nav-footer"><School size={17}/>{!collapsed&&<span>Демо · Диспетчер</span>}</div>
   </aside>
   <div className="main">
-   <header className="main-head"><div className="page-title"><CalendarDays size={22}/><div><h1>{displayName}</h1><p>ИТ-отделение · II семестр 2026/2027</p></div></div><div className="head-actions"><Tag tone="muted">Демонстрационный проект</Tag><button className="icon-btn" onClick={()=>setNotice('Все изменения сохраняются только в браузере')} title="Уведомления"><Bell size={17}/></button><Action onClick={()=>{setScreen('publication');setSelected(null)}} primary><Check size={15}/> Публикация</Action></div></header>
+   <header className="main-head"><div className="page-title"><CalendarDays size={22}/><div><h1>{displayName}</h1><p>ИТ-отделение · II семестр 2026/2027</p></div></div><div className="head-actions"><Tag tone="muted">Колледж · Демостенд</Tag><button className="icon-btn" onClick={()=>setNotice('Все изменения сохраняются только в браузере')} title="Уведомления"><Bell size={17}/></button><Action onClick={()=>{setScreen('publication');setSelected(null)}} primary><Check size={15}/> Публикация</Action></div></header>
    <main className="workspace">{render()}</main>
-   <footer className="app-foot"><span>College Schedule · React prototype</span><span>Без API и персональных данных</span></footer>
+   <footer className="app-foot"><span>College Schedule · тестовый стенд · {GROUPS.length} групп, {TEACHERS.length} преподавателя, {ROOMS.length} аудиторий · {items.length.toLocaleString('ru-RU')} занятий</span><button type="button" className="reset-button" onClick={resetSeed}>Сбросить демоданные</button></footer>
   </div>
   {notice&&<div role="status" className="toast"><AlertTriangle size={16}/>{notice}<button onClick={()=>setNotice('')}><X size={15}/></button></div>}
  </div>;
