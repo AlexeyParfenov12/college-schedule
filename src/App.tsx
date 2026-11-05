@@ -196,15 +196,16 @@ export default function App(){
   <div className="slot"><b>{row+1}</b><small>{tm}</small></div>
   {DAYS.slice(0,days).map((d,day)=>{
    const target=targetByCell.get(day+':'+(row+1));
+   const cellLessons=visible.filter(x=>x.day===day&&x.slot===row+1);
    return <div key={d} className={'slot-cell '+(moveMode&&selected&&target?'slot-'+target.kind:'')} title={moveMode&&target?target.reason:undefined}
     onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();const key=e.dataTransfer.getData('lessonId');if(key)move(key,day,row+1)}}
     onMouseEnter={()=>{if(moveMode&&target)setHoverMove(target)}}
     onMouseLeave={()=>setHoverMove(null)}>
-    {visible.filter(x=>x.day===day&&x.slot===row+1).map(x=><button draggable={!preview} key={x.id}
+    {cellLessons.map(x=><button draggable={!preview} key={x.id}
       className={'lesson '+x.type+(selected?.id===x.id?' picked':'')}
       onDragStart={(e:DragEvent<HTMLButtonElement>)=>{e.dataTransfer.setData('lessonId',x.id);choose(x)}}
-      onClick={()=>{if(moveMode&&selected&&target&&target.kind!=='current'){inspectTarget(day,row+1)}else choose(x)}}>{lessonLabel(x)}</button>)}
-    {moveMode&&selected&&target
+      onClick={()=>choose(x)} onContextMenu={e=>rightClick(e,x)} aria-label={'Открыть занятие: '+x.subject+', '+x.groups.join(' + ')}>{lessonLabel(x)}</button>)}
+    {moveMode&&selected&&target&&cellLessons.length===0
      ? <button type="button" className={'target-overlay '+target.kind} data-testid={'target-'+day+'-'+(row+1)}
        onClick={()=>inspectTarget(day,row+1)} title={target.reason}
        aria-label={(target.kind==='available'?'Доступен перенос: ':target.kind==='blocked'?'Недоступен перенос: ':'Исходное занятие: ')+target.label+' — '+target.reason}>
@@ -236,11 +237,21 @@ export default function App(){
       onPreviewMove={inspectTarget} onSwap={performSwap}
       onTeacher={name=>{if(window.confirm('Заменить '+selected.teacher+' на '+name+' в '+selected.subject+'?'))save({...selected,teacher:name,replacementFor:selected.teacher,notes:(selected.notes||'')+'; Замена через подсказку'})}}
       onRoom={id=>{if(window.confirm('Изменить кабинет для '+selected.subject+' на '+id+'?'))save({...selected,room:id})}}
-      onEdit={()=>{setSideMode('edit');setMoveMode(false);setPreview(null)}} onClose={closeSelected}/>
-    : <SmartLessonEditor key={selected.id} item={selected} save={save} remove={remove} cancel={closeSelected} all={current} catalog={items} view={view} contextGroup={view==='group'?group:undefined} contextTeacher={view==='teacher'?teacher:undefined} contextRoom={view==='room'?room:undefined} existing={items.some(x=>x.id===selected.id)}/>}
+      onEdit={()=>{setSideMode('edit');setMoveMode(false);setPreview(null)}} onClose={closeSelected}
+       onDelete={()=>askRemove(selected.id)} onWeekMove={()=>setWeekMoving(selected)}/>
+    : <SmartLessonEditor key={selected.id} item={selected} save={save} remove={askRemove} cancel={closeSelected} all={current} catalog={items} view={view} contextGroup={view==='group'?group:undefined} contextTeacher={view==='teacher'?teacher:undefined} contextRoom={view==='room'?room:undefined} existing={items.some(x=>x.id===selected.id)}/>}
  </div>}
  </div>
- {preview&&selected&&<div className="move-preview" role="dialog" aria-label="Подтверждение переноса">
+ {contextMenu&&<div role="menu" aria-label="Действия с занятием" className="lesson-context-menu" style={{left:contextMenu.x,top:contextMenu.y}} onClick={e=>e.stopPropagation()}>
+    <div className="lesson-context-title">{contextMenu.lesson.subject}<small>{contextMenu.lesson.groups.join(' + ')} · {DAYS[contextMenu.lesson.day]}, {contextMenu.lesson.slot}-я</small></div>
+    <button role="menuitem" onClick={()=>{setSelected(contextMenu.lesson);setSideMode('edit');setContextMenu(null)}}><Pencil size={14}/> Изменить занятие</button>
+    <button role="menuitem" disabled={contextMenu.lesson.status==='held'} onClick={()=>{choose(contextMenu.lesson);setMoveMode(true)}}><ArrowLeftRight size={14}/> Перенести в этой неделе</button>
+    <button role="menuitem" disabled={contextMenu.lesson.status==='held'} onClick={()=>{setWeekMoving(contextMenu.lesson);setContextMenu(null)}}><CalendarDays size={14}/> Перенести на другую неделю</button>
+    <div className="lesson-context-separator"/>
+    <button role="menuitem" className="danger" disabled={contextMenu.lesson.status==='held'} onClick={()=>{setContextMenu(null);askRemove(contextMenu.lesson.id)}}><Trash2 size={14}/> Удалить занятие</button>
+   </div>}
+  {weekMoving&&<LessonWeekMove key={weekMoving.id} lesson={weekMoving} lessons={items} blockedRooms={blockedRooms} onCancel={()=>setWeekMoving(null)} onMove={moveAcrossWeeks}/>}
+  {preview&&selected&&<div className="move-preview" role="dialog" aria-label="Подтверждение переноса">
    <div className="preview-title"><ArrowLeftRight size={16}/><strong>Подтвердить перенос</strong><button onClick={()=>setPreview(null)} aria-label="Закрыть предпросмотр"><X size={15}/></button></div>
    <div className="preview-route"><div><small>Сейчас</small><b>{DAYS[selected.day]}, {selected.slot}-я пара</b></div><ChevronRight size={18}/><div><small>Будет</small><b>{DAYS[preview.day]}, {preview.slot}-я пара</b></div></div>
    <div className="preview-detail">{selected.subject} · {selected.groups.join(' + ')} · {selected.teacher} · {selected.room}</div>
