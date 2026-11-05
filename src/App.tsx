@@ -77,7 +77,7 @@ export default function App(){
  const issueCount=current.filter(x=>cellConflict(x,current).length>0).length;
  const displayName=NAV.find(x=>x[0]===screen)?.[1]||'Расписание';
  const choose=(x:Item)=>{setSelected(x);setSideMode('assistant');setMoveMode(x.status!=='held');setPreview(null);setHoverMove(null)};
- const make=(day=0,slot=1)=>{const created:Item={id:id(),day,slot,week,subject:SUBJECTS[0],teacher:TEACHERS[0],groups:[group],room:'109',type:'regular',mode:'offline'};setSelected(created);setSideMode('edit');setMoveMode(false);setPreview(null)};
+ const make=(day=0,slot=1)=>{const created:Item={id:id(),day,slot,week,subject:'',teacher:view==='teacher'?teacher:'',groups:view==='group'?[group]:[],room:view==='room'?room:'',type:'regular',mode:'offline'};setSelected(created);setSideMode('edit');setMoveMode(false);setPreview(null)};
 
  const save=(x:Item)=>{
   if(items.find(y=>y.id===x.id)?.status==='held'){setNotice('Проведённое занятие нельзя изменить без процедуры исправления');return false}
@@ -206,7 +206,7 @@ export default function App(){
       onTeacher={name=>{if(window.confirm('Заменить '+selected.teacher+' на '+name+' в '+selected.subject+'?'))save({...selected,teacher:name,replacementFor:selected.teacher,notes:(selected.notes||'')+'; Замена через подсказку'})}}
       onRoom={id=>{if(window.confirm('Изменить кабинет для '+selected.subject+' на '+id+'?'))save({...selected,room:id})}}
       onEdit={()=>{setSideMode('edit');setMoveMode(false);setPreview(null)}} onClose={closeSelected}/>
-    : <SmartLessonEditor key={selected.id} item={selected} save={save} remove={remove} cancel={closeSelected} all={current} catalog={items} view={view} existing={items.some(x=>x.id===selected.id)}/>}
+    : <SmartLessonEditor key={selected.id} item={selected} save={save} remove={remove} cancel={closeSelected} all={current} catalog={items} view={view} contextGroup={view==='group'?group:undefined} contextTeacher={view==='teacher'?teacher:undefined} contextRoom={view==='room'?room:undefined} existing={items.some(x=>x.id===selected.id)}/>}
  </div>}
  </div>
  {preview&&selected&&<div className="move-preview" role="dialog" aria-label="Подтверждение переноса">
