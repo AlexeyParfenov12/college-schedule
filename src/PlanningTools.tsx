@@ -54,8 +54,9 @@ export function CalendarStudio({events,lessons,group,week,setWeek,add,remove}:Ca
  </div>;
 }
 
-type TemplateProps={lessons:Lesson[];calendar:CalendarEvent[];group:string;week:number;blocked:string[];onApply:(next:Lesson[],count:number)=>void;onSave:(name:string,sourceWeek:number,group:string,cycle:number)=>void};
-export function TemplateStudio({lessons,calendar,group,week,blocked,onApply,onSave}:TemplateProps){
+type SavedCycle={id:string;name:string;week:number;group:string;weeks:number;locked:boolean};
+type TemplateProps={lessons:Lesson[];calendar:CalendarEvent[];group:string;week:number;blocked:string[];saved:SavedCycle[];onApply:(next:Lesson[],count:number)=>void;onSave:(name:string,sourceWeek:number,group:string,cycle:number)=>void};
+export function TemplateStudio({lessons,calendar,group,week,blocked,saved,onApply,onSave}:TemplateProps){
  const [startMode,setStartMode]=useState(group);
  const [sourceWeek,setSourceWeek]=useState(week);
  const [cycle,setCycle]=useState<1|2|3|4>(1);
@@ -79,6 +80,7 @@ export function TemplateStudio({lessons,calendar,group,week,blocked,onApply,onSa
  const toPreview=preview?preview.accepted.filter(x=>x.after.week===targetStart).map(x=>x.after):[];
  return <div className="plan-page" data-testid="template-studio">
   <div className="plan-intro"><div><strong>Шаблон — повторяющийся цикл, а не одна таблица на год</strong><p>Сначала составь эталонную неделю (или цикл А/Б), затем разверни его на семестр или выбранные недели. Разовые замены и праздники остаются отдельными изменениями.</p></div><Copy size={24}/></div>
+  <div className="plan-saved"><strong>Сохранённые циклы</strong><div>{saved.map(x=><button key={x.id} type="button" onClick={()=>{setStartMode(x.group);setSourceWeek(x.week);setCycle(Math.min(4,Math.max(1,x.weeks)) as 1|2|3|4);setName(x.name);setPreview(null)}}><Copy size={13}/><span>{x.name}</span><small>{x.group} · {x.weeks} нед.</small></button>)}</div></div>
   <div className="plan-flow"><span><b>1</b> Неделя-образец</span><ArrowRight size={15}/><span><b>2</b> Цикл и период</span><ArrowRight size={15}/><span><b>3</b> Предпросмотр</span><ArrowRight size={15}/><span><b>4</b> Применить</span></div>
   <div className="plan-columns">
    <section className="plan-pane">
@@ -110,8 +112,8 @@ export function TemplateStudio({lessons,calendar,group,week,blocked,onApply,onSa
  </div>;
 }
 
-type GeneratorProps={lessons:Lesson[];calendar:CalendarEvent[];week:number;group:string;onGroup:(v:string)=>void;blocked:string[];onApply:(next:Lesson[],count:number)=>void};
-export function GeneratorStudio({lessons,calendar,week,group,onGroup,blocked,onApply}:GeneratorProps){
+type GeneratorProps={lessons:Lesson[];calendar:CalendarEvent[];week:number;group:string;onGroup:(v:string)=>void;blocked:string[];onApply:(next:Lesson[],count:number)=>void;onSubgroups:()=>void};
+export function GeneratorStudio({lessons,calendar,week,group,onGroup,blocked,onApply,onSubgroups}:GeneratorProps){
  const offerings=useMemo(()=>deriveOffers(lessons),[lessons]);
  const available=offerings.filter(o=>o.group===group);
  const [offerKey,setOfferKey]=useState('');
@@ -146,7 +148,7 @@ export function GeneratorStudio({lessons,calendar,week,group,onGroup,blocked,onA
       <Field name="Дни"><select value={dayLimit} onChange={e=>setDayLimit(Number(e.target.value))}><option value={5}>Понедельник–пятница</option><option value={6}>Понедельник–суббота</option></select></Field>
       <Field name="До какой пары"><select value={slotLimit} onChange={e=>setSlotLimit(Number(e.target.value))}>{TIMES.map((x,i)=><option key={x} value={i+1}>До {i+1}-й пары</option>)}</select></Field>
      </div>
-     {selected&&needsComputers(selected.subject)&&<div className="plan-current"><Layers3 size={14}/> Компьютерный кабинет обязателен. Для группы без достаточного количества ПК используй подгруппы.</div>}
+     {selected&&needsComputers(selected.subject)&&<div className="plan-current"><Layers3 size={14}/> Для практики нужен компьютерный кабинет. Если мест недостаточно, создай подгруппы. <button type="button" className="plan-inline-link" onClick={onSubgroups}>Настроить подгруппы</button></div>}
      <Cmd disabled={!hasSelection} onClick={()=>setPreview(build())}><Sparkles size={14}/> Показать предложенный вариант</Cmd>
     </div>
    </section>
