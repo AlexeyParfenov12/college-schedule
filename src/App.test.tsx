@@ -34,10 +34,12 @@ describe('React interface smoke checks',()=>{
   expect(document.querySelectorAll('.lesson').length).toBeGreaterThan(5);
   fireEvent.click(document.querySelectorAll<HTMLButtonElement>('.lesson')[0]);
   expect(screen.getByTestId('lesson-assistant')).toBeTruthy();
+  expect(document.querySelector('.timetable-scroll.move-active')).toBeNull();
+  fireEvent.click(screen.getByRole('button',{name:'Перенести'}));
   expect(document.querySelector('.timetable-scroll.move-active')).toBeTruthy();
   expect(document.querySelectorAll('.target-overlay.available').length).toBeGreaterThan(0);
   expect(document.querySelectorAll('.target-overlay.blocked').length).toBeGreaterThan(0);
-  fireEvent.click(screen.getByRole('button',{name:'Все поля'}));
+  fireEvent.click(screen.getByRole('button',{name:'Изменить'}));
   expect(screen.getByTestId('smart-lesson-editor')).toBeTruthy();
   expect(screen.getByRole('combobox',{name:'Аудитория занятия'})).toBeTruthy();
   expect(screen.getByRole('button',{name:'Сохранить'})).toBeTruthy();
@@ -45,6 +47,7 @@ describe('React interface smoke checks',()=>{
  it('previews a safe move, confirms it and offers Undo',()=>{
   render(<App/>);
   fireEvent.click(document.querySelectorAll<HTMLButtonElement>('.lesson')[0]);
+  fireEvent.click(screen.getByRole('button',{name:'Перенести'}));
   const candidate=document.querySelector<HTMLButtonElement>('.target-overlay.available');
   expect(candidate).toBeTruthy();
   fireEvent.click(candidate!);
@@ -64,4 +67,32 @@ describe('React interface smoke checks',()=>{
   fireEvent.click(next);
   expect(screen.getAllByText(/13–24 из/).length).toBeGreaterThan(0);
  },15000);
+ it('clicking a scheduled lesson opens a directly accessible delete action',()=>{
+  render(<App/>);
+  const lesson=document.querySelector<HTMLButtonElement>('.lesson');
+  expect(lesson).toBeTruthy();
+  fireEvent.click(lesson!);
+  expect(screen.getByTestId('lesson-assistant')).toBeTruthy();
+  expect(screen.getByRole('button',{name:'Удалить пару'})).toBeTruthy();
+ },20000);
+ it('right click opens edit, delete and inter-week move actions',()=>{
+  render(<App/>);
+  const lesson=document.querySelector<HTMLButtonElement>('.lesson')!;
+  fireEvent.contextMenu(lesson,{clientX:145,clientY:180});
+  expect(screen.getByRole('menu',{name:'Действия с занятием'})).toBeTruthy();
+  expect(screen.getByRole('menuitem',{name:'Удалить занятие'})).toBeTruthy();
+  fireEvent.click(screen.getByRole('menuitem',{name:'Перенести на другую неделю'}));
+  expect(screen.getByRole('dialog',{name:'Перенос занятия на другую неделю'})).toBeTruthy();
+  expect(screen.getByRole('combobox',{name:'Целевая неделя'})).toBeTruthy();
+ },20000);
+ it('keeps existing lessons clickable while another lesson is selected',()=>{
+  render(<App/>);
+  const first=document.querySelectorAll<HTMLButtonElement>('.lesson');
+  fireEvent.click(first[0]);
+  fireEvent.click(screen.getByRole('button',{name:'Перенести'}));
+  const second=document.querySelectorAll<HTMLButtonElement>('.lesson')[1];
+  fireEvent.click(second);
+  expect(screen.getByTestId('lesson-assistant')).toBeTruthy();
+  expect(document.querySelector('.timetable-scroll.move-active')).toBeNull();
+ },20000);
 });
