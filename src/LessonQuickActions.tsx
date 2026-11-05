@@ -1,21 +1,22 @@
 import { useMemo, useState } from 'react';
 import { ArrowLeftRight, CalendarClock, Check, ChevronDown, ChevronUp, DoorOpen, Pencil, Search, ShieldCheck, Users, X } from 'lucide-react';
-import { TYPES } from './data';
+import { DAYS, TYPES } from './data';
 import type { Lesson } from './data';
-import { moveOptions, roomSuggestions, teacherSuggestions, affectedParticipants } from './scheduleAssist';
+import { moveOptions, roomSuggestions, teacherSuggestions, affectedParticipants, swapOptions } from './scheduleAssist';
 
 type Props={
  lesson:Lesson; current:Lesson[]; blocked:string[]; isMoveMode:boolean;
- onMoveMode:()=>void; onPreviewMove:(day:number,slot:number)=>void;
+ onMoveMode:()=>void; onPreviewMove:(day:number,slot:number)=>void; onSwap:(lesson:Lesson)=>void;
  onTeacher:(teacher:string)=>void; onRoom:(room:string)=>void;
  onEdit:()=>void; onClose:()=>void;
 };
-export default function LessonQuickActions({lesson,current,blocked,isMoveMode,onMoveMode,onPreviewMove,onTeacher,onRoom,onEdit,onClose}:Props){
+export default function LessonQuickActions({lesson,current,blocked,isMoveMode,onMoveMode,onPreviewMove,onSwap,onTeacher,onRoom,onEdit,onClose}:Props){
  const [expanded,setExpanded]=useState<'teacher'|'room'|null>(null);
  const [filter,setFilter]=useState('');
  const teachers=useMemo(()=>teacherSuggestions(lesson,current,blocked),[lesson,current,blocked]);
  const rooms=useMemo(()=>roomSuggestions(lesson,current,blocked),[lesson,current,blocked]);
  const slots=useMemo(()=>moveOptions(lesson,current,blocked).filter(x=>x.kind==='available').slice(0,4),[lesson,current,blocked]);
+ const swaps=useMemo(()=>swapOptions(lesson,current,blocked).filter(x=>x.available).slice(0,4),[lesson,current,blocked]);
  const isLocked=lesson.status==='held';
  const showTeacher=(expanded==='teacher'?teachers:teachers.filter(x=>x.available&&x.qualified).slice(0,4))
      .filter(x=>x.name.toLowerCase().includes(filter.toLowerCase()));
@@ -33,6 +34,11 @@ export default function LessonQuickActions({lesson,current,blocked,isMoveMode,on
     {!slots.length&&<div className="assist-empty">Подходящих слотов пока нет</div>}
    </section>
    <section className="assist-section">
+    <div className="assist-title"><span><ArrowLeftRight size={15}/> Обменять парами</span><span className="assist-small">{swaps.length} варианта</span></div>
+    {swaps.map(x=><button className="assist-option" disabled={isLocked} title={x.reason} key={x.lesson.id} onClick={()=>onSwap(x.lesson)}><span>{DAYS[x.lesson.day]}, {x.lesson.slot}-я · {x.lesson.subject}</span><small>{x.lesson.groups.join(' + ')}</small><Check size={13}/></button>)}
+    {!swaps.length&&<div className="assist-empty">Нет безопасных вариантов для обмена на этой неделе</div>}
+   </section>
+   <section className="assist-section">
     <div className="assist-title"><span><Users size={15}/> Кем заменить преподавателя</span><button onClick={()=>{setExpanded(expanded==='teacher'?null:'teacher');setFilter('')}}>{expanded==='teacher'?<ChevronUp size={14}/>:<ChevronDown size={14}/>} {expanded==='teacher'?'Свернуть':'Все варианты'}</button></div>
     {expanded==='teacher'&&<div className="assist-search"><Search size={14}/><input aria-label="Поиск преподавателя на замену" value={filter} placeholder="Поиск преподавателя" onChange={e=>setFilter(e.target.value)}/></div>}
     <div className={'assist-options '+(expanded==='teacher'?'scroll':'')}>
@@ -40,7 +46,7 @@ export default function LessonQuickActions({lesson,current,blocked,isMoveMode,on
      {!showTeacher.length&&<div className="assist-empty">Нет свободных преподавателей с подтверждённой дисциплиной. Открой все варианты, чтобы увидеть причины.</div>}
     </div>
    </section>
-   {(lesson.type==='regular'||lesson.type==='stream')&&
+   {(lesson.type==='regular'||lesson.type==='stream')&&lesson.mode!=='online'&&lesson.mode!=='async'&&
    <section className="assist-section">
     <div className="assist-title"><span><DoorOpen size={15}/> Свободные аудитории</span><button onClick={()=>{setExpanded(expanded==='room'?null:'room');setFilter('')}}>{expanded==='room'?<ChevronUp size={14}/>:<ChevronDown size={14}/>} {expanded==='room'?'Свернуть':'Все варианты'}</button></div>
     {expanded==='room'&&<div className="assist-search"><Search size={14}/><input aria-label="Поиск аудитории для замены" value={filter} placeholder="Номер аудитории" onChange={e=>setFilter(e.target.value)}/></div>}
