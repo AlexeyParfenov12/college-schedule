@@ -270,6 +270,18 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
    unplaced.push({id:d.id,week:cfg.weeks-1,group:d.group,subject:d.subject,teacher:d.teacher,reason:reason+' · остаток '+missing+' пар'});
   }
  }
+ // Calendar-defined practice must have an explicit room/company reservation.
+ for(const event of events.filter(e=>e.kind==='practice')){
+  for(const group of event.groups){
+   const affectedWeeks=Array.from({length:cfg.weeks},(_,w)=>w).filter(w=>
+    event.from<=lessonDate(w,6)&&event.to>=lessonDate(w,0));
+   for(const w of affectedWeeks){
+    const reserved=(cfg.practiceBlocks||[]).some(p=>p.group===group&&practiceWeekActive(p,w));
+    if(!reserved)practiceIssues.push({blockId:'calendar-'+event.id,group,week:w,
+     reason:'Практика «'+event.title+'» есть в учебном календаре, но для недели '+(w+1)+' не закреплены кабинет или предприятие и руководитель'});
+   }
+  }
+ }
  let groupWindows=0,teacherWindows=0;
  const groupMap=new Map<string,Lesson[]>(),teacherMap=new Map<string,Lesson[]>();
  for(const l of placed){
