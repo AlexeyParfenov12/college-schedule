@@ -49,6 +49,7 @@ export default function AdvancedWorkflows(p:Props){
  const put=(update:(prev:Store)=>Store)=>{setDb(v=>{const next=update(v);try{localStorage.setItem(key,JSON.stringify(next))}catch{p.notify('Хранилище браузера заполнено: история может не сохраниться')}return next})};
  const editData=(fn:(prev:Lesson[])=>Lesson[],msg='Изменения сохранены в черновике')=>{p.setItems(fn);p.markDraft();p.notify(msg)};
  const curr=p.items.filter(x=>(x.week||0)===p.week);
+ const [proposal,setProposal]=useState<ReturnType<typeof findFree>[number]|null>(null);
  const [query,setQuery]=useState('');
  const [subject,setSubject]=useState('Программирование');
  const [day,setDay]=useState(1);
@@ -94,7 +95,6 @@ export default function AdvancedWorkflows(p:Props){
  const selectedRoster=db.roster[groupDetails]||[];
  const byTeacher=curr.filter(x=>x.teacher===teacherHours&&x.status!=='cancelled');
  const roomUsages=curr.filter(x=>occupiedRooms(x).includes(selectedRoom));
- const beginWeek=p.week;
  const restoreData=()=>{if(!window.confirm('Восстановить учебные дополнительные настройки и состав подгрупп?'))return;put(()=>defaults());p.notify('Дополнительные настройки восстановлены')};
  const lesson=(type:Lesson['type'],participants?:Participant[]):Lesson=>({id:'new-'+newId(),day,slot,week:p.week,subject,teacher,groups:[...groups],room:selectedRoom,type,mode:'offline',participants,hours:2,notes:type==='parallel'?'Способ организации: '+parallelMethod:undefined});
  const create=(x:Lesson)=>{
@@ -170,7 +170,6 @@ export default function AdvancedWorkflows(p:Props){
  const makeGenerator=()=>{
  const seed:Lesson={id:'proposal',week:p.week,day,slot,subject,teacher,room:selectedRoom,groups:[p.group],mode:'offline',type:'regular'};
  const possible=findFree(seed,curr,6).filter(x=>!db.rooms[x.room]?.blocked);
- const [proposal,setProposal]=useState<(typeof possible)[number]|null>(null);
  const chosen=proposal||possible[0];
  return <div className="studio-columns"><Panel title="Автоматическое составление — тестовый алгоритм"><div className="studio-form">
    <Field title="Группа"><Select value={p.group} onChange={p.setGroup} items={opts(GROUPS.map(g=>g.id))}/></Field>
