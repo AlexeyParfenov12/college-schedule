@@ -49,7 +49,7 @@ export function deriveAnnualDemands(seed:Lesson[],weeks:number,maxSubjects=6):Ye
     pairsPerWeek:o.count>=3?2:1,requiredPairs:(o.count>=3?2:1)*weeks})));
 }
 const seatsFor=(subject:string,room:typeof ROOMS[number])=>needsComputers(subject)?room.pc:room.capacity;
-const location=(l:Lesson)=>l.mode==='online'?'home':'college';
+const location=(l:Lesson)=>l.mode==='online'?'home':l.room==='Предприятие'?'company':'college';
 /** Hard condition for both teacher and every participating group: at most one home/campus switch per day,
  * with a configurable fully vacant travel interval. */
 export function commuteViolations(lessons:Lesson[],commuteGap:number):string[]{
@@ -123,11 +123,14 @@ export function practiceReservations(cfg:AnnualConfig,events:CalendarEvent[],wee
      teacher:block.teacher||'Руководитель практики',room:block.kind==='college'?block.room:'Предприятие',
      mode:'offline',type:'regular',hours:2,notes:'Непрерывный блок практики · '+(block.kind==='college'?'Закреплённый кабинет':'Внешняя организация')};
     const conflicts=hasSlotConflict(state,lesson);
+    const availability=teacherRule(cfg,block.teacher);
+    const unavailable=availability.daysOff.includes(day)||slot<availability.fromSlot||slot>availability.toSlot||
+      availability.forbidden.some(b=>b.day===day&&slot>=b.from&&slot<=b.to);
     // A matching practice period is not a prohibition; vacations and holidays are.
     const vacation=events.some(e=>['holiday','vacation'].includes(e.kind)&&
       e.from<=lessonDate(week,day)&&lessonDate(week,day)<=e.to&&(!e.groups.length||e.groups.includes(block.group)));
-    if(vacation||conflicts){
-     issues.push({blockId:block.id,group:block.group,week,reason:vacation?'Практика пересекается с каникулами или выходным':'Группа, руководитель или кабинет заняты другой практикой/фиксированным занятием'});
+    if(vacation||conflicts||unavailable){
+     issues.push({blockId:block.id,group:block.group,week,reason:vacation?'Практика пересекается с каникулами или выходным':unavailable?'Руководитель практики недоступен в заданный день или пару':'Группа, руководитель или кабинет заняты другой практикой/фиксированным занятием'});
      continue;
     }
     append(state,lesson);created.push(lesson);
@@ -188,8 +191,9 @@ function candidateScore(state:WeekState,l:Lesson,cfg:AnnualConfig,variant:number
 export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:CalendarEvent[],variant:number,locked:Lesson[]=[]):AnnualVariant{
  const label=['Минимум окон у групп','Удобство преподавателей','Равномерный график','Больше дистанта'][variant]||'Вариант';
  const placed:Lesson[]=[],unplaced:Unplaced[]=[];
+ const regularDemands=demands.filter(d=>!((cfg.practiceBlocks||[]).some(p=>p.group===d.group)&&/практик/i.test(d.subject)));
  const quota=new Map<string,number>(),usedOnline=new Map<string,number>();
- for(const d of demands){const limit=quota.get(d.teacher)||0;quota.set(d.teacher,limit+d.requiredPairs)}
+ for(const d of regularDemands){const limit=quota.get(d.teacher)||0;quota.set(d.teacher,limit+d.requiredPairs)}
  for(const [teacher,total] of quota)quota.set(teacher,Math.floor(total*Math.max(0,Math.min(100,teacherRule(cfg,teacher).maxOnlinePct))/100));
  const covered=new Map<string,number>();
  const practiceIssues:PracticeAudit[]=[];
@@ -203,7 +207,7 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
   practiceIssues.push(...reservations.issues);
   placed.push(...reservations.created);
   const tasks:Task[]=[];
-  for(const d of demands){
+  for(const d of regularDemands){
    if(reservations.activeGroups.has(d.group))continue;
    const done=covered.get(d.id)||0;
    const quotaNow=Math.ceil((week+1)*d.requiredPairs/cfg.weeks);
@@ -255,7 +259,7 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
   }
   // Remaining due is carried over into later weeks.
  }
- for(const d of demands){
+ for(const d of regularDemands){
   const missing=d.requiredPairs-(covered.get(d.id)||0);
   if(missing>0){
    const group=GROUPS.find(g=>g.id===d.group);
@@ -278,7 +282,7 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
   n+Math.max(0,Math.min(cfg.weeks,p.startWeek+p.durationWeeks)-p.startWeek)*
   p.days.filter(day=>day<cfg.days).length*
   Math.max(0,Math.min(p.toSlot,cfg.slotsPerDay)-p.fromSlot+1),0);
- const totalPairs=demands.reduce((sum,d)=>sum+d.requiredPairs,0)+totalPracticePairs;
+ const totalPairs=regularDemands.reduce((sum,d)=>sum+d.requiredPairs,0)+totalPracticePairs;
  const placedPairs=placed.reduce((sum,l)=>sum+l.groups.length,0);
  const online=placed.filter(l=>l.mode==='online').length;
  const score=Math.round((placedPairs/Math.max(1,totalPairs))*10000-groupWindows*cfg.groupGapWeight*.22-teacherWindows*cfg.teacherGapWeight*.12);
