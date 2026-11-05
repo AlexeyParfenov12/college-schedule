@@ -98,6 +98,8 @@ export default function AdvancedWorkflows(p:Props){
  const restoreData=()=>{if(!window.confirm('Восстановить учебные дополнительные настройки и состав подгрупп?'))return;put(()=>defaults());p.notify('Дополнительные настройки восстановлены')};
  const lesson=(type:Lesson['type'],participants?:Participant[]):Lesson=>({id:'new-'+newId(),day,slot,week:p.week,subject,teacher,groups:[...groups],room:selectedRoom,type,mode:'offline',participants,hours:2,notes:type==='parallel'?'Способ организации: '+parallelMethod:undefined});
  const create=(x:Lesson)=>{
+  const blocked=occupiedRooms(x).find(room=>db.rooms[room]?.blocked);
+  if(blocked){p.notify('Кабинет '+blocked+' закрыт и не может быть назначен');return}
   const issues=validate(x,curr).filter(y=>y.hard);
   if(issues.length){p.notify('Не создано: '+issues[0].message);return}
   editData(v=>[...v,x],'Создано занятие: '+x.subject+' ('+TYPES[x.type]+')');
@@ -161,9 +163,22 @@ export default function AdvancedWorkflows(p:Props){
    <Notice>Копирование создаёт занятия в другой неделе, не заменяя существующие. Совпадения будут проверены.</Notice>
    <Button primary disabled={targetWeek===p.week} onClick={()=>{
     const source=curr.filter(x=>copyAll||x.groups.includes(p.group));
+    let next:Lesson[]=[];
+    for(const x of p.items){
+      if((x.week||0)!==targetWeek){next.push(x);continue}
+      if(copyAll)continue;
+      if(!x.groups.includes(p.group)){next.push(x);continue}
+      const keep=x.groups.filter(g=>g!==p.group);
+      if(keep.length)next.push({...x,groups:keep,type:keep.length===1?'regular':x.type,participants:x.participants?.filter(v=>v.group!==p.group)});
+    }
     let added=0;
-    editData(old=>{let next=[...old];for(const x of source){const c={...x,id:'copy-'+newId(),week:targetWeek};if(validate(c,next).some(i=>i.hard))continue;next.push(c);added++}return next},'Шаблон скопирован в неделю '+(targetWeek+1));
-    p.notify('Добавлено занятий: '+added);
+    for(const x of source){
+      const c={...x,id:'copy-'+newId(),week:targetWeek};
+      if(validate(c,next).some(i=>i.hard))continue;
+      next.push(c);added++;
+    }
+    editData(()=>next,'Шаблон применён к неделе '+(targetWeek+1));
+    p.notify('Скопировано '+added+' занятий из '+source.length);
    }}><Copy size={15}/> Копировать в неделю {targetWeek+1}</Button>
  </div></Panel></div></div>;
  };
@@ -178,7 +193,7 @@ export default function AdvancedWorkflows(p:Props){
    <Field title="Количество занятий для досоставления"><input type="number" min="1" max="12" value={genNumber} onChange={e=>setGenNumber(Math.max(1,Math.min(12,Number(e.target.value)||1)))}/></Field>
    <div className="studio-note info"><SlidersHorizontal size={15}/> Учитываются жёсткие пересечения преподавателей, групп и аудиторий. Мягкие предпочтения используются при оценке вариантов.</div>
    <Button primary onClick={()=>{
-    let count=0;editData(old=>{const next=[...old];for(let k=0;k<genNumber;k++){const basis={...seed,id:'auto-'+newId()};const variants=findFree(basis,next.filter(x=>(x.week||0)===p.week),6).filter(x=>!db.rooms[x.room]?.blocked);if(!variants.length)break;const best=variants[0];next.push({...basis,day:best.day,slot:best.slot,room:best.room});count++}return next},'Алгоритм дополнил расписание');p.notify('Назначено '+count+' из '+genNumber+' занятий');
+    let count=0;const next=[...p.items];for(let k=0;k<genNumber;k++){const basis={...seed,id:'auto-'+newId()};const variants=findFree(basis,next.filter(x=>(x.week||0)===p.week),6).filter(x=>!db.rooms[x.room]?.blocked);if(!variants.length)break;const best=variants[0];next.push({...basis,day:best.day,slot:best.slot,room:best.room});count++}editData(()=>next,'Алгоритм дополнил расписание');p.notify('Назначено '+count+' из '+genNumber+' занятий');
    }}><WandSparkles size={15}/> Досоставить расписание</Button>
  </div></Panel><Panel title="Найденные свободные варианты" aside={<Pill color="lime">{possible.length}</Pill>}>
  {possible.slice(0,12).map((s,i)=><button key={i} className={'studio-candidate '+(chosen===s?'selected':'')} onClick={()=>setProposal(s)}><b>{DAYS[s.day]} · {s.slot} пара · аудитория {s.room}</b><span>Оценка {s.score} · конфликты: 0</span></button>)}
@@ -383,7 +398,7 @@ export default function AdvancedWorkflows(p:Props){
   return <div className="studio-stack"><div className="studio-inline-filters"><Field title="Группа"><Select value={p.group} onChange={v=>{p.setGroup(v);setStudentIndex(0)}} items={opts(GROUPS.map(x=>x.id))}/></Field><Field title="Студент (синтетические данные)"><Select value={studentIndex} onChange={v=>setStudentIndex(Number(v))} items={members.map((x,i)=>({id:i,label:x.name}))}/></Field><Field title="Неделя"><Select value={p.week} onChange={v=>p.setWeek(Number(v))} items={weekOpts}/></Field></div>
    <div className="studio-stats"><BaseStat value={mine.length} label="Занятий группы"/><BaseStat value={student?.subgroup||'—'} label="Подгруппа"/><BaseStat value={mine.filter(x=>x.mode!=='offline').length} label="Дистанционно"/><BaseStat value={mine.filter(x=>x.type==='stream').length} label="Потоковых лекций"/></div>
    <Panel title="Индивидуальное расписание студента">
-    <Rows heads={['День','Пара','Дисциплина','Преподаватель','Место','Организация']} rows={mine.map(x=>[DAYS[x.day],x.slot,x.subject,x.teacher,x.room,<Pill color={x.type==='subgroup'?'blue':x.type==='stream'?'green':x.type==='parallel'?'lime':'gray'}>{x.type==='subgroup'?'Подгруппа '+(student?.subgroup||1):TYPES[x.type]}</Pill>])}/>
+    <Rows heads={['День','Пара','Дисциплина','Преподаватель','Место','Организация']} rows={mine.map(x=>[DAYS[x.day],x.slot,x.subject,x.teacher,x.type==='subgroup'?x.room.split(/\s*\/\s*/)[(student?.subgroup||1)-1]||x.room:x.room,<Pill color={x.type==='subgroup'?'blue':x.type==='stream'?'green':x.type==='parallel'?'lime':'gray'}>{x.type==='subgroup'?'Подгруппа '+(student?.subgroup||1):TYPES[x.type]}</Pill>])}/>
    </Panel><Notice>Общая группа и принадлежность подгруппе учитываются раздельно. Реальная фильтрация занятий по составу подгруппы будет подключена к Academic Core.</Notice></div>;
  };
  switch(p.screen){
