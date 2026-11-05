@@ -1,6 +1,7 @@
 import { DAYS, ROOMS, TEACHERS } from './data';
 import type { Lesson } from './data';
 import { QUALIFICATIONS, occupiedRooms, validate } from './demoLogic';
+import { calendarIssues, currentDemoCalendar } from './plannerDomain';
 
 export type Position = {day:number;slot:number};
 export type MoveOption = Position & {kind:'current'|'available'|'blocked';reason:string;label:string};
@@ -20,6 +21,7 @@ export function explainCandidate(candidate:Lesson,all:Lesson[],blocked:string[]=
    if(blocked.includes(room))messages.push('Кабинет '+room+' временно закрыт');
  }
  for(const issue of validate(candidate,all))if(issue.hard)messages.push(issue.message);
+ for(const issue of calendarIssues(candidate,currentDemoCalendar()))messages.push(issue);
  return [...new Set(messages)];
 }
 export function moveOptions(source:Lesson,all:Lesson[],blocked:string[]=[],days=6,slots=6):MoveOption[]{
