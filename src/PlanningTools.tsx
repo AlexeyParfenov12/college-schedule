@@ -78,6 +78,8 @@ export function TemplateStudio({lessons,calendar,group,week,blocked,saved,onAppl
   onApply(next,fresh.accepted.length);setPreview(null);
  };
  const toPreview=preview?preview.accepted.filter(x=>x.after.week===targetStart).map(x=>x.after):[];
+ const removedPreviewIds=new Set(preview?.removed.map(x=>x.id)||[]);
+ const comparedLessons=[...lessons.filter(x=>!removedPreviewIds.has(x.id)),...toPreview];
  return <div className="plan-page" data-testid="template-studio">
   <div className="plan-intro"><div><strong>Шаблон — повторяющийся цикл, а не одна таблица на год</strong><p>Сначала составь эталонную неделю (или цикл А/Б), затем разверни его на семестр или выбранные недели. Разовые замены и праздники остаются отдельными изменениями.</p></div><Copy size={24}/></div>
   <div className="plan-saved"><strong>Сохранённые циклы</strong><div>{saved.map(x=><button key={x.id} type="button" onClick={()=>{setStartMode(x.group);setSourceWeek(x.week);setCycle(Math.min(4,Math.max(1,x.weeks)) as 1|2|3|4);setName(x.name);setPreview(null)}}><Copy size={13}/><span>{x.name}</span><small>{x.group} · {x.weeks} нед.</small></button>)}</div></div>
@@ -98,7 +100,7 @@ export function TemplateStudio({lessons,calendar,group,week,blocked,saved,onAppl
    </section>
    <section className="plan-pane">
     <Heading step={3}>Сравни до и после</Heading>
-    <div className="plan-duo"><MiniSchedule week={targetStart} lessons={lessons} group={startMode} title="Сейчас"/><MiniSchedule week={targetStart} lessons={[...lessons,...toPreview]} group={startMode} highlightIds={toPreview.map(x=>x.id)} title="После применения"/></div>
+    <div className="plan-duo"><MiniSchedule week={targetStart} lessons={lessons} group={startMode} title="Сейчас"/><MiniSchedule week={targetStart} lessons={comparedLessons} group={startMode} highlightIds={toPreview.map(x=>x.id)} title="После применения"/></div>
     {preview?<><PlanningSummary total={preview.accepted.length+preview.skipped.length} added={preview.accepted.length} skipped={preview.skipped.length} description={'Затронуто недель: '+preview.targetWeeks.length+'. Будет заменено существующих занятий: '+preview.removed.length+'.'}/>
      {preview.skipped.length>0&&<div className="plan-skips"><strong>Почему некоторые занятия пропущены?</strong>{preview.skipped.slice(0,6).map((x,i)=><small key={i}>Неделя {x.week+1}: {x.source.subject} — {x.reason}</small>)}</div>}
      {preview.calendarWarnings.length>0&&<div className="plan-skips"><strong>Особые периоды:</strong>{preview.calendarWarnings.map(x=><small key={x}>{x}</small>)}</div>}
