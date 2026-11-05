@@ -22,6 +22,8 @@ jobs:
           node-version: '22'
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      - name: Validate schedule rules
+        run: npm test
       - name: Typecheck and build
         run: npm run build
       - name: Upload static site
