@@ -52,3 +52,21 @@ export function roomSuggestions(source:Lesson,all:Lesson[],blocked:string[]=[]):
  }).sort((a,b)=>b.score-a.score||a.id.localeCompare(b.id));
 }
 export function countAvailable(options:MoveOption[]):number{return options.filter(x=>x.kind==='available').length}
+
+export type SwapOption={lesson:Lesson;available:boolean;reason:string};
+/** Validate the two changed lessons as one atomic proposal before offering a swap. */
+export function swapOptions(source:Lesson,all:Lesson[],blocked:string[]=[]):SwapOption[]{
+ return all.filter(other=>other.id!==source.id&&(other.week||0)===(source.week||0)&&
+   !(other.day===source.day&&other.slot===source.slot)&&other.status!=='cancelled').map(other=>{
+   if(source.status==='held'||other.status==='held')return {lesson:other,available:false,reason:'Проведённые занятия нельзя переставлять'};
+   const rest=all.filter(x=>x.id!==source.id&&x.id!==other.id);
+   const a={...source,day:other.day,slot:other.slot};
+   const b={...other,day:source.day,slot:source.slot};
+   const issuesA=explainCandidate(a,[...rest,b],blocked);
+   const issuesB=explainCandidate(b,[...rest,a],blocked);
+   const issues=[...issuesA,...issuesB];
+   return {lesson:other,available:!issues.length,reason:issues[0]||'Оба занятия можно обменять без конфликта'};
+ }).sort((a,b)=>Number(b.available)-Number(a.available)||
+ Number(b.lesson.groups.some(g=>source.groups.includes(g)))-Number(a.lesson.groups.some(g=>source.groups.includes(g)))||
+ a.lesson.day-b.lesson.day||a.lesson.slot-b.lesson.slot);
+}
