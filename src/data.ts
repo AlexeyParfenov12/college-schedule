@@ -26,22 +26,22 @@ export const TYPES:Record<Type,string>={regular:'Обычное',subgroup:'По�
 export const MODES:Record<Mode,string>={offline:'Очно',online:'Онлайн',hybrid:'Гибрид',async:'Асинхронно'};
 const make=(id:string,day:number,slot:number,subject:string,teacher:string,groups:string[],room:string,type:Type='regular',mode:Mode='offline',week=0):Lesson=>({id,day,slot,subject,teacher,groups,room,type,mode,week,hours:2});
 export const INITIAL:Lesson[]=[
- make('demo-01',0,1,'Математика',TEACHERS[1],['П-21'],'107'),
+ make('demo-01',0,1,'Математика',TEACHERS[1],['П-21'],'109'),
  make('demo-02',0,2,'Программирование',TEACHERS[2],['П-21'],'102 / 107','subgroup'),
  make('demo-03',0,3,'Компьютерные сети',TEACHERS[0],['П-21','П-22'],'105 + онлайн','parallel','hybrid'),
- make('demo-04',0,4,'Практика',TEACHERS[2],['П-21'],'101'),
+ make('demo-04',0,4,'Практика',TEACHERS[2],['П-21'],'103'),
  make('demo-05',1,1,'Английский язык',TEACHERS[1],['П-21'],'106'),
  make('demo-06',1,2,'Базы данных',TEACHERS[5],['П-21','П-23'],'101','stream'),
  make('demo-07',1,3,'Компьютерные сети',TEACHERS[0],['П-21','П-22'],'105 + онлайн','parallel','hybrid'),
- make('demo-08',2,1,'Математика',TEACHERS[1],['П-21'],'107'),
+ make('demo-08',2,1,'Математика',TEACHERS[1],['П-21'],'109'),
  make('demo-09',2,2,'Программирование',TEACHERS[2],['П-21'],'102 / 107','subgroup'),
  make('demo-10',2,3,'Лабораторная работа',TEACHERS[3],['П-21'],'103'),
  make('demo-11',2,4,'Английский язык',TEACHERS[1],['П-21'],'106'),
  make('demo-12',3,1,'Физика',TEACHERS[3],['П-21'],'103'),
- make('demo-13',3,2,'Математика',TEACHERS[1],['П-21'],'107'),
+ make('demo-13',3,2,'Математика',TEACHERS[1],['П-21'],'109'),
  make('demo-14',3,3,'Общая лекция',TEACHERS[0],['П-21','П-23'],'101','stream'),
- make('demo-15',3,4,'Консультация',TEACHERS[1],['П-21'],'107'),
- make('demo-16',4,1,'Математика',TEACHERS[1],['П-21'],'107'),
+ make('demo-15',3,4,'Консультация',TEACHERS[1],['П-21'],'109'),
+ make('demo-16',4,1,'Математика',TEACHERS[1],['П-21'],'109'),
  make('demo-17',4,2,'Компьютерные сети',TEACHERS[0],['П-21'],'102 / 107','subgroup'),
  make('demo-18',4,3,'Практика',TEACHERS[2],['П-21'],'102'),
  make('demo-19',4,4,'Базы данных',TEACHERS[5],['П-21'],'105')
@@ -93,11 +93,12 @@ export function buildSeed(weeks=16):Lesson[]{
         let teacherIdx=(g*2+day*3+slot+w)%TEACHERS.length;
         for(let k=0;k<TEACHERS.length&&usedTeachers.has(TEACHERS[teacherIdx]);k++)teacherIdx=(teacherIdx+1)%TEACHERS.length;
         let roomIdx=(g+day*3+slot+w)%ROOMS.length;
-        for(let k=0;k<ROOMS.length&&usedRooms.has(ROOMS[roomIdx].id);k++)roomIdx=(roomIdx+1)%ROOMS.length;
+        for(let k=0;k<ROOMS.length&&(usedRooms.has(ROOMS[roomIdx].id)||ROOMS[roomIdx].capacity<grp.count);k++)roomIdx=(roomIdx+1)%ROOMS.length;
+        if(usedRooms.has(ROOMS[roomIdx].id)||ROOMS[roomIdx].capacity<grp.count)continue;
         const teacher=TEACHERS[teacherIdx], room=ROOMS[roomIdx].id;
         usedTeachers.add(teacher);usedRooms.add(room);
         const mode:Mode=(w===4&&day<3&&g%8===0)?'online':((g+day+w)%31===0?'hybrid':'offline');
-        const type:Type=(subject==='Программирование'&&g%3===0)?'subgroup':'regular';
+        const type:Type='regular';
         base.push(make('seed-'+counter++,day,slot,subject,teacher,[grp.id],room,type,mode,w));
       }
     }
