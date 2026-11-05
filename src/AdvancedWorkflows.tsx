@@ -171,12 +171,12 @@ export default function AdvancedWorkflows(p:Props){
  const makeCalendar=()=> <CalendarStudio events={db.calendar} lessons={p.items} group={p.group} week={p.week} setWeek={p.setWeek}
    add={event=>{put(d=>({...d,calendar:[...d.calendar,event]}));p.notify('Период добавлен в учебный календарь (демо)')}}
    remove={id=>put(d=>({...d,calendar:d.calendar.filter(e=>e.id!==id)}))}/>;
- const makeTemplates=()=> <TemplateStudio lessons={p.items} calendar={db.calendar} group={p.group} week={p.week}
+ const makeTemplates=()=> <TemplateStudio lessons={p.items} calendar={db.calendar} group={p.group} week={p.week} saved={db.templates}
    blocked={Object.entries(db.rooms).filter(([,x])=>x.blocked).map(([id])=>id)}
    onApply={(next,count)=>editData(()=>next,'Шаблон применён: '+count+' занятий добавлено')}
    onSave={(name,sourceWeek,group,cycle)=>{put(d=>({...d,templates:[...d.templates,{id:newId(),name,week:sourceWeek,group,weeks:cycle,locked:false}]}));p.notify('Настройки цикла сохранены')}}/>;
  const makeGenerator=()=> <GeneratorStudio lessons={p.items} calendar={db.calendar} week={p.week} group={p.group}
-   onGroup={p.setGroup} blocked={Object.entries(db.rooms).filter(([,x])=>x.blocked).map(([id])=>id)}
+   onGroup={p.setGroup} onSubgroups={()=>p.onNavigate('groups')} blocked={Object.entries(db.rooms).filter(([,x])=>x.blocked).map(([id])=>id)}
    onApply={(next,count)=>editData(()=>next,'Автосоставление: добавлено '+count+' занятий')}/>;
  const makeGroups=()=>{
  const group=GROUPS.find(x=>x.id===groupDetails)||GROUPS[0];
