@@ -9,6 +9,7 @@ import SmartLessonEditor from './SmartLessonEditor';
 import { moveOptions, explainCandidate, readBlockedRooms, swapOptions } from './scheduleAssist';
 import type { MoveOption } from './scheduleAssist';
 import { validate } from './demoLogic';
+import { lessonDate } from './plannerDomain';
 
 type Item = Lesson & {week?:number};
 type View = 'group'|'teacher'|'room';
@@ -159,7 +160,7 @@ export default function App(){
    {lastChange&&<Action onClick={undo} title="Ctrl+Z — отменить последнее изменение"><RotateCcw size={14}/> Отменить</Action>}
  </div>;
  const grid=<div className={'timetable-scroll '+(moveMode&&selected?'move-active':'')} data-testid="schedule-grid"><div className={'timetable '+density} style={{gridTemplateColumns:'74px repeat('+days+', minmax(140px,1fr))'}}>
- <div className="grid-head">Пара</div>{DAYS.slice(0,days).map((d,i)=><div key={i} className="grid-head">{d}<small>{9+week*7+i}.11</small></div>)}
+ <div className="grid-head">Пара</div>{DAYS.slice(0,days).map((d,i)=><div key={i} className="grid-head">{d}<small>{lessonDate(week,i).slice(8)}.{lessonDate(week,i).slice(5,7)}</small></div>)}
  {bellTimes.map((tm,row)=><div className="grid-fragment" key={row}>
   <div className="slot"><b>{row+1}</b><small>{tm}</small></div>
   {DAYS.slice(0,days).map((d,day)=>{
