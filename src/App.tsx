@@ -5,7 +5,6 @@ import { DAYS, TIMES, GROUPS, TEACHERS, SUBJECTS, ROOMS, TYPES, MODES, INITIAL, 
 import type { Lesson, Type, Mode } from './data';
 import AdvancedWorkflows from './AdvancedWorkflows';
 import { validate } from './demoLogic';
-import './studio.css';
 
 type Item = Lesson & {week?:number};
 type View = 'group'|'teacher'|'room';
