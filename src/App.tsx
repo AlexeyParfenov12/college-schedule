@@ -5,6 +5,7 @@ import { DAYS, TIMES, GROUPS, TEACHERS, SUBJECTS, ROOMS, TYPES, MODES, INITIAL, 
 import type { Lesson, Type, Mode } from './data';
 import AdvancedWorkflows from './AdvancedWorkflows';
 import LessonQuickActions from './LessonQuickActions';
+import SmartLessonEditor from './SmartLessonEditor';
 import { moveOptions, explainCandidate, readBlockedRooms, swapOptions } from './scheduleAssist';
 import type { MoveOption } from './scheduleAssist';
 import { validate } from './demoLogic';
@@ -31,37 +32,6 @@ function Empty({children}:{children:ReactNode}){return <div className="empty">{c
 function Select({value,onChange,options}:{value:string|number;onChange:(v:string)=>void;options:{value:string|number;label:string}[]}){return <select value={value} onChange={e=>onChange(e.target.value)}>{options.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}</select>}
 function Action({onClick,children,primary=false,disabled=false,title}:{onClick:()=>void;children:ReactNode;primary?:boolean;disabled?:boolean;title?:string}){return <button type="button" title={title} disabled={disabled} className={primary?'btn primary':'btn'} onClick={onClick}>{children}</button>}
 function Field({label,children}:{label:string;children:ReactNode}){return <label className="field"><span>{label}</span>{children}</label>}
-
-function Editor({item,save,remove,cancel,all,existing}: {item:Item;existing:boolean;save:(x:Item)=>void;remove:(id:string)=>void;cancel:()=>void;all:Item[]}) {
- const [form,setForm]=useState<Item>(item);
- const [groupSearch,setGroupSearch]=useState('');
- const [showGroups,setShowGroups]=useState(false);
- useEffect(()=>setForm({...item,groups:[...item.groups]}),[item]);
- const patch=(p:Partial<Item>)=>setForm(s=>({...s,...p}));
- const isNew=!existing;
- const n=validate(form,all);
- const submit=(e:FormEvent)=>{e.preventDefault();save(form)};
- return <form className="editor" onSubmit={submit}>
-  <div className="editor-head"><strong>{isNew?'Новое занятие':'Редактирование'}</strong><button type="button" className="icon-btn" onClick={cancel}><X size={16}/></button></div>
-  <div className="editor-scroll">
-   <Field label="Организация занятия"><Select value={form.type} onChange={v=>patch({type:v as Type})} options={Object.entries(TYPES).map(([value,label])=>({value,label}))}/></Field>
-   <Field label="Дисциплина"><Select value={form.subject} onChange={v=>patch({subject:v})} options={SUBJECTS.map(v=>({value:v,label:v}))}/></Field>
-   <div className="two"><Field label="День"><Select value={form.day} onChange={v=>patch({day:Number(v)})} options={DAYS.map((v,i)=>({value:i,label:v}))}/></Field><Field label="Пара"><Select value={form.slot} onChange={v=>patch({slot:Number(v)})} options={TIMES.map((v,i)=>({value:i+1,label:String(i+1)+' · '+v.slice(0,5)}))}/></Field></div>
-   <Field label="Преподаватель"><Select value={form.teacher} onChange={v=>patch({teacher:v})} options={TEACHERS.map(v=>({value:v,label:v}))}/></Field>
-   <Field label="Формат"><Select value={form.mode} onChange={v=>patch({mode:v as Mode})} options={Object.entries(MODES).map(([value,label])=>({value,label}))}/></Field>
-   <Field label="Аудитория / размещение"><input value={form.room} onChange={e=>patch({room:e.target.value})} placeholder="101 / 107 или Онлайн"/></Field>
-   <div className="field"><span>Группы-участники ({form.groups.length})</span><div className="group-control"><span>{form.groups.join(' · ')||'Не выбраны'}</span><button type="button" className="text-button" onClick={()=>setShowGroups(v=>!v)}>{showGroups?'Свернуть':'Изменить'}</button></div>
-    {showGroups&&<div className="group-chooser"><div className="assist-search"><Search size={13}/><input aria-label="Найти группу для занятия" placeholder="Найти группу" value={groupSearch} onChange={e=>setGroupSearch(e.target.value)}/></div><div className="choice-grid">{GROUPS.filter(g=>g.id.toLowerCase().includes(groupSearch.toLowerCase())||form.groups.includes(g.id)).map(g=><label key={g.id} className={'check-item '+(form.groups.includes(g.id)?'active':'')}><input type="checkbox" checked={form.groups.includes(g.id)} onChange={e=>patch({groups:e.target.checked?[...form.groups,g.id]:form.groups.filter(v=>v!==g.id)})}/>{g.id}</label>)}</div></div>}
-   </div>
-   {form.type==='subgroup'&&<div className="hint"><Users size={15}/> Укажи два подходящих помещения (например, 102 / 107). Составы студентов задаются в Academic Core → «Группы и подгруппы».</div>}
-   {form.type==='stream'&&<div className="hint"><Network size={15}/> Общая встреча для выбранных групп. Проверяется вместимость общей аудитории.</div>}
-   {form.type==='parallel'&&<div className="hint"><GitFork size={15}/> Связанные занятия одного преподавателя в разных местах. Укажи размещение и способ организации в примечании.</div>}
-   <Field label="Примечание / особенности"><textarea rows={2} value={form.notes||''} onChange={e=>patch({notes:e.target.value})} placeholder="П-21 — аудитория 405; П-22 — онлайн"/></Field>
-   {n.length>0&&<div className="warning"><AlertTriangle size={15}/> Проверка: {n.slice(0,2).map(x=>x.message).join('; ')}</div>}
-  </div>
-  <div className="editor-actions"><Action onClick={cancel}>Отмена</Action>{!isNew&&<Action onClick={()=>remove(form.id)}><Trash2 size={15}/></Action>}<button className="btn primary" type="submit" disabled={!form.groups.length}><Save size={15}/> Сохранить</button></div>
- </form>;
-}
 
 export default function App(){
  const [screen,setScreen]=useState<Screen>('schedule');
@@ -235,7 +205,7 @@ export default function App(){
       onTeacher={name=>{if(window.confirm('Заменить '+selected.teacher+' на '+name+' в '+selected.subject+'?'))save({...selected,teacher:name,replacementFor:selected.teacher,notes:(selected.notes||'')+'; Замена через подсказку'})}}
       onRoom={id=>{if(window.confirm('Изменить кабинет для '+selected.subject+' на '+id+'?'))save({...selected,room:id})}}
       onEdit={()=>{setSideMode('edit');setMoveMode(false);setPreview(null)}} onClose={closeSelected}/>
-    : <Editor key={selected.id} item={selected} save={save} remove={remove} cancel={closeSelected} all={current} existing={items.some(x=>x.id===selected.id)}/>}
+    : <SmartLessonEditor key={selected.id} item={selected} save={save} remove={remove} cancel={closeSelected} all={current} catalog={items} view={view} existing={items.some(x=>x.id===selected.id)}/>}
  </div>}
  </div>
  {preview&&selected&&<div className="move-preview" role="dialog" aria-label="Подтверждение переноса">
