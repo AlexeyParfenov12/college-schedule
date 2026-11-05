@@ -167,3 +167,11 @@
 .studio-context-visuals .viz-week .viz-legend{margin-top:6px}
 .studio-context-visuals .viz-bar-grid{gap:7px}
 @media(max-width:1160px){.studio-context-visuals{grid-template-columns:minmax(0,1fr)}}
+
+.plan-saved{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid #DFEAE1;border-radius:8px;background:#FFF;padding:9px 10px}
+.plan-saved>strong{font-size:11px;color:#4B7165;white-space:nowrap}
+.plan-saved>div{display:flex;align-items:center;gap:6px;overflow-x:auto;flex:1;min-width:0;scrollbar-width:thin}
+.plan-saved button{display:flex;align-items:center;gap:5px;white-space:nowrap;background:#F2F8F1;border:1px solid #DCEADE;border-radius:5px;padding:7px 9px;font-size:10px;color:#417059;cursor:pointer}
+.plan-saved button:hover{background:#E3F4E0}
+.plan-saved button small{font-size:9px;color:#7F9B86}
+.plan-inline-link{background:transparent;border:0;color:#187C69;text-decoration:underline;font-weight:700;font-size:10.5px;cursor:pointer;padding:3px}
