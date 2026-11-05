@@ -38,7 +38,8 @@ describe('React interface smoke checks',()=>{
   expect(document.querySelectorAll('.target-overlay.available').length).toBeGreaterThan(0);
   expect(document.querySelectorAll('.target-overlay.blocked').length).toBeGreaterThan(0);
   fireEvent.click(screen.getByRole('button',{name:'Все поля'}));
-  expect(screen.getByText('Редактирование')).toBeTruthy();
+  expect(screen.getByTestId('smart-lesson-editor')).toBeTruthy();
+  expect(screen.getByRole('combobox',{name:'Аудитория занятия'})).toBeTruthy();
   expect(screen.getByRole('button',{name:'Сохранить'})).toBeTruthy();
  },20000);
  it('previews a safe move, confirms it and offers Undo',()=>{
