@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import App from './App';
 import { NAV } from './data';
 
@@ -11,15 +11,17 @@ describe('React interface smoke checks',()=>{
  it('renders the compact timetable and exposes all 18 main sections',()=>{
   render(<App/>);
   expect(screen.getByRole('heading',{name:'Расписание'})).toBeTruthy();
+  const nav=within(document.querySelector('aside.nav nav')!);
   for(const [,label] of NAV){
-   expect(screen.getByRole('button',{name:label})).toBeTruthy();
+   expect(nav.getByRole('button',{name:label})).toBeTruthy();
   }
   expect(document.querySelector('.timetable')).toBeTruthy();
  },15000);
  it('navigates all functional screens without rendering errors',()=>{
   render(<App/>);
+  const nav=within(document.querySelector('aside.nav nav')!);
   for(const [key,label] of NAV){
-   fireEvent.click(screen.getByRole('button',{name:label}));
+   fireEvent.click(nav.getByRole('button',{name:label}));
    expect(document.querySelector('.workspace')?.textContent?.length).toBeGreaterThan(30);
    expect(screen.getByRole('heading',{name:label})).toBeTruthy();
    if(key==='streams') expect(screen.getByText('Конструктор потока')).toBeTruthy();
