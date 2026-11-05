@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { ArrowLeftRight, BookOpen, Check, ChevronDown, ChevronUp, CircleAlert, Laptop, MapPin, Plus, Search, Sparkles, Trash2, Users, X } from 'lucide-react';
+import { ArrowLeftRight, BookOpen, CalendarDays, Check, ChevronDown, ChevronUp, CircleAlert, Laptop, MapPin, Plus, Search, Sparkles, Trash2, Users, X } from 'lucide-react';
 import { DAYS, GROUPS, MODES, ROOMS, SUBJECTS, TEACHERS, TIMES, TYPES } from './data';
 import type { Lesson, Mode, Type, Participant } from './data';
 import { validate } from './demoLogic';
-import { deriveOffers, chooseRooms, firstSuitableRoom, suitableSubgroupPair, needsComputers } from './plannerDomain';
+import { deriveOffers, chooseRooms, firstSuitableRoom, suitableSubgroupPair, needsComputers, calendarIssues, currentDemoCalendar } from './plannerDomain';
 import { readBlockedRooms } from './scheduleAssist';
 
 type Props={item:Lesson;existing:boolean;all:Lesson[];catalog:Lesson[];view:'group'|'teacher'|'room';save:(l:Lesson)=>boolean|void;remove:(id:string)=>void;cancel:()=>void};
@@ -104,6 +104,7 @@ export default function SmartLessonEditor({item,existing,all,catalog,view,save,r
   patch({room});
  };
  const issues=validate(roomCandidate,all).filter(i=>i.hard);
+ const dateIssues=calendarIssues(roomCandidate,currentDemoCalendar());
  const multiple= form.type==='stream'||form.type==='parallel';
  const isValid=Boolean(form.groups.length&&(!multiple||form.groups.length>=2)&&form.subject&&form.teacher&&(form.mode==='online'||form.mode==='async'||roomId(form.room).length>0)&&!issues.length);
  const saveForm=(e:FormEvent)=>{e.preventDefault();if(!isValid){setMsg(issues[0]?.message||'Заполни доступные варианты занятия');return}save(roomCandidate)};
@@ -153,6 +154,7 @@ export default function SmartLessonEditor({item,existing,all,catalog,view,save,r
      {manual&&<><label className="smart-field"><span>Дисциплина (деморежим)</span><select value={form.subject} onChange={e=>patch({subject:e.target.value})}>{options(SUBJECTS)}</select></label><label className="smart-field"><span>Преподаватель (деморежим)</span><select value={form.teacher} onChange={e=>patch({teacher:e.target.value})}>{options(TEACHERS)}</select></label><div className="smart-warning">Ручное изменение учебного назначения требует проверки полномочий и связи TeachingAssignment в общей системе.</div></>}
    </div>}
    {issues.length>0&&<div className="smart-warning"><CircleAlert size={14}/> {issues[0].message}</div>}
+   {dateIssues.length>0&&<div className="smart-warning"><CalendarDays size={14}/> {dateIssues[0]} — выбери другую дату или согласуй календарь.</div>}
    {msg&&<div className="smart-warning">{msg}</div>}
    <div className="smart-disclaimer">Предложения основаны на тестовых данных: связь группа—предмет—преподаватель выведена из расписания, а не подтверждена Academic Core.</div>
   </div>
