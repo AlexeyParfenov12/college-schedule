@@ -27,6 +27,7 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
  const [practiceGroup,setPracticeGroup]=useState('П-21'),[practiceKind,setPracticeKind]=useState<'college'|'company'>('college');
  const [practiceStart,setPracticeStart]=useState(5),[practiceWeeks,setPracticeWeeks]=useState(2);
  const [practiceRoom,setPracticeRoom]=useState('109'),[practiceTeacher,setPracticeTeacher]=useState(TEACHERS[0]);
+ const [practiceComputers,setPracticeComputers]=useState(false);
  const [practiceFrom,setPracticeFrom]=useState(1),[practiceTo,setPracticeTo]=useState(4),[practiceTitle,setPracticeTitle]=useState('Учебная практика');
  const [practiceDays,setPracticeDays]=useState([0,1,2,3,4]);
  const [variants,setVariants]=useState<AnnualVariant[]>([]),[active,setActive]=useState(0);
@@ -41,7 +42,7 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
  const rule=teacherRule(cfg,teacher);
  const teacherOptions=TEACHERS.filter(x=>x.toLowerCase().includes(teacherSearch.toLowerCase()));
  const activeRooms=ROOMS.filter(r=>r.active&&cfg.activeRooms.includes(r.id));
- const practiceRooms=activeRooms.filter(r=>r.capacity>=(GROUPS.find(g=>g.id===practiceGroup)?.count||0));
+ const practiceRooms=activeRooms.filter(r=>r.capacity>=(GROUPS.find(g=>g.id===practiceGroup)?.count||0)&&(!practiceComputers||r.pc>=(GROUPS.find(g=>g.id===practiceGroup)?.count||0)));
  const subjectGroups=useMemo(()=>{
   const map=new Map<string,{teacher:string;subject:string;groups:string[]}>();
   for(const d of demands){
@@ -72,13 +73,13 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
   const groupData=GROUPS.find(g=>g.id===practiceGroup);
   const room=ROOMS.find(r=>r.id===practiceRoom);
   if(practiceStart+practiceWeeks>cfg.weeks)return notify('Длительность выходит за пределы учебного года');
-  if(practiceKind==='college'&&(!room||!cfg.activeRooms.includes(practiceRoom)||room.capacity<(groupData?.count||0)))return notify('Выбери действующий кабинет достаточной вместимости');
+  if(practiceKind==='college'&&(!room||!cfg.activeRooms.includes(practiceRoom)||room.capacity<(groupData?.count||0)||(practiceComputers&&room.pc<(groupData?.count||0))))return notify('Выбери действующий кабинет достаточной вместимости');
   if(cfg.practiceBlocks.some(p=>p.group===practiceGroup&&
    practiceStart<p.startWeek+p.durationWeeks&&p.startWeek<practiceStart+practiceWeeks))return notify('У группы уже есть практика в эти недели');
   const block:PracticeBlock={id:'p-'+Date.now().toString(36),group:practiceGroup,
    kind:practiceKind,title:practiceTitle.trim()||'Учебная практика',teacher:practiceTeacher,
    startWeek:practiceStart,durationWeeks:practiceWeeks,days:practiceDays,
-   fromSlot:practiceFrom,toSlot:practiceTo,room:practiceKind==='college'?practiceRoom:''};
+   fromSlot:practiceFrom,toSlot:practiceTo,room:practiceKind==='college'?practiceRoom:'',requiresComputers:practiceComputers};
   change(c=>({...c,practiceBlocks:[...c.practiceBlocks,block]}));notify('Непрерывная практика добавлена в годовой план');
  };
  const exportVariant=()=>{
@@ -137,6 +138,7 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
     <F name="Руководитель"><select value={practiceTeacher} onChange={e=>setPracticeTeacher(e.target.value)}>{TEACHERS.map(t=><option key={t} value={t}>{t}</option>)}</select></F>
     <F name="Первая неделя"><select value={practiceStart} onChange={e=>setPracticeStart(Number(e.target.value))}>{periodOptions(cfg.weeks)}</select></F>
     <F name="Продолжительность"><input type="number" min={1} max={cfg.weeks} value={practiceWeeks} onChange={e=>setPracticeWeeks(Math.max(1,Math.min(cfg.weeks,Number(e.target.value)||1)))}/></F>
+    {practiceKind==='college'&&<label className="year-rule"><input type="checkbox" checked={practiceComputers} onChange={e=>setPracticeComputers(e.target.checked)}/> Каждому студенту нужен компьютер в одном кабинете</label>}
     {practiceKind==='college'&&<F name="Закреплённая аудитория на весь период"><select value={practiceRoom} onChange={e=>setPracticeRoom(e.target.value)}><option value="">Выбери кабинет</option>{practiceRooms.map(r=><option value={r.id} key={r.id}>{r.id} · {r.kind} · {r.capacity} мест · {r.pc} ПК</option>)}</select></F>}
     </div><div className="year-fields"><F name="С пары"><select value={practiceFrom} onChange={e=>setPracticeFrom(Number(e.target.value))}>{[1,2,3,4,5,6].map(x=><option key={x} value={x}>{x}</option>)}</select></F><F name="По пару"><select value={practiceTo} onChange={e=>setPracticeTo(Number(e.target.value))}>{[1,2,3,4,5,6].map(x=><option key={x} value={x}>{x}</option>)}</select></F></div>
     <div className="year-day-choices">{DAYS.slice(0,cfg.days).map((d,i)=><label key={d} className={practiceDays.includes(i)?'chosen':''}><input type="checkbox" checked={practiceDays.includes(i)} onChange={e=>setPracticeDays(old=>e.target.checked?[...old,i]:old.filter(x=>x!==i))}/>{d}</label>)}</div>
