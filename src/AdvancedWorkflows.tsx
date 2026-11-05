@@ -4,6 +4,8 @@ import { AlertTriangle, ArrowLeftRight, BarChart3, Bell, BookOpen, CalendarDays,
 import { GROUPS, TEACHERS, SUBJECTS, ROOMS, ROSTERS, CALENDAR, RULES, ABSENCES, DAYS, TIMES, TYPES, MODES, NAV } from './data';
 import type { Lesson, Absence, CalendarEvent, Rule, Mode, Participant } from './data';
 import { exportCSV, exportJSON, findFree, validate, groupCount, workload, reportRows, QUALIFICATIONS, occupiedRooms } from './demoLogic';
+import { CalendarStudio, TemplateStudio, GeneratorStudio } from './PlanningTools';
+import { MiniSchedule, LoadBars, PeriodTimeline } from './ScheduleVisuals';
 
 type Screen=typeof NAV[number][0];
 type Snapshot={id:string;label:string;at:string;week:number;lessons:Lesson[];notice:string};
@@ -165,67 +167,16 @@ export default function AdvancedWorkflows(p:Props){
     </Panel><div className="studio-columns"><Panel title="Кадровый справочник">{TEACHERS.slice(0,15).map(t=><div className="studio-list-row" key={t}><b>{t}</b><small>{QUALIFICATIONS[t]?.join(', ')}</small></div>)}</Panel><Panel title="Учебные дисциплины">{SUBJECTS.map(s=><div className="studio-chip" key={s}>{s}</div>)}</Panel></div>
    <Notice>Данные предназначены для демонстрации. Реальные преподаватели, студенты, TeachingAssignment и учебные планы должны поступать из общего Academic Core.</Notice></div>;
  };
- const makeCalendar=()=>{
- const selected=db.calendar.slice().sort((a,b)=>a.from.localeCompare(b.from));
- return <div className="studio-columns"><Panel title="Учебный календарь">
-  <Rows heads={['Период','Вид','Начало','Окончание','Группы','']} rows={selected.map(x=>[x.title,<Pill color={x.kind==='exam'?'amber':x.kind==='holiday'?'red':'blue'}>{({study:'Учёба',exam:'Сессия',vacation:'Каникулы',practice:'Практика',holiday:'Выходной'} as const)[x.kind]}</Pill>,x.from,x.to,x.groups.length?x.groups.join(', '):'Все',<button className="studio-ghost" title="Удалить" onClick={()=>put(d=>({...d,calendar:d.calendar.filter(e=>e.id!==x.id)}))}><Trash2 size={14}/></button>])}/>
- </Panel><Panel title="Добавить период"><div className="studio-form">
-  <Field title="Название"><input value={calendarName} onChange={e=>setCalendarName(e.target.value)}/></Field>
-  <Field title="Тип"><Select value={calendarKind} onChange={v=>setCalendarKind(v as CalendarEvent['kind'])} items={[['study','Учебный период'],['practice','Практика'],['exam','Сессия'],['vacation','Каникулы'],['holiday','Нерабочий день']].map(([id,label])=>({id,label}))}/></Field>
-  <div className="studio-duo"><Field title="С"><input type="date" value={calendarFrom} onChange={e=>setCalendarFrom(e.target.value)}/></Field><Field title="По"><input type="date" value={calendarTo} onChange={e=>setCalendarTo(e.target.value)}/></Field></div>
-  <Button primary disabled={!calendarName.trim()||calendarFrom>calendarTo} onClick={()=>{put(d=>({...d,calendar:[...d.calendar,{id:newId(),title:calendarName,kind:calendarKind,from:calendarFrom,to:calendarTo,groups:[] }]}));p.notify('Учебный период добавлен в демонстрационный календарь')}}><Plus size={15}/> Добавить период</Button>
-  <Notice>Изменения календаря пока не отменяют уже опубликованные занятия: для этого нужна отдельная операция пересчёта расписания.</Notice>
- </div></Panel></div>;
- };
- const makeTemplates=()=>{
- return <div className="studio-stack"><div className="studio-inline-filters">{commonHeader}<Field title="Целевой период"><Select value={targetWeek} onChange={v=>setTargetWeek(Number(v))} items={weekOpts}/></Field></div>
- <div className="studio-columns"><Panel title="Циклы и шаблоны">
-  <Rows heads={['Название','Группа','Повтор','Статус','']} rows={db.templates.map(x=>[x.name,x.group,x.weeks+' нед.',x.locked?<Pill color="green">Закреплён</Pill>:<Pill>Черновик</Pill>,<Button onClick={()=>put(d=>({...d,templates:d.templates.map(y=>y.id===x.id?{...y,locked:!y.locked}:y)}))}>{x.locked?'Снять фиксацию':'Закрепить'}</Button>])}/>
- </Panel><Panel title="Создать / скопировать шаблон"><div className="studio-form">
-   <Field title="Название шаблона"><input value={templateName} onChange={e=>setTemplateName(e.target.value)}/></Field>
-   <Button onClick={()=>{put(d=>({...d,templates:[...d.templates,{id:newId(),name:templateName,week:p.week,group:p.group,weeks:2,locked:false}]}));p.notify('Шаблон сохранён')}}><Plus size={15}/> Сохранить шаблон</Button>
-   <label className="studio-checkbox"><input type="checkbox" checked={copyAll} onChange={e=>setCopyAll(e.target.checked)}/> Копировать все группы, а не только {p.group}</label>
-   <Notice>Копирование создаёт занятия в другой неделе, не заменяя существующие. Совпадения будут проверены.</Notice>
-   <Button primary disabled={targetWeek===p.week} onClick={()=>{
-    const source=curr.filter(x=>copyAll||x.groups.includes(p.group));
-    let next:Lesson[]=[];
-    for(const x of p.items){
-      if((x.week||0)!==targetWeek){next.push(x);continue}
-      if(copyAll)continue;
-      if(!x.groups.includes(p.group)){next.push(x);continue}
-      const keep=x.groups.filter(g=>g!==p.group);
-      if(keep.length)next.push({...x,groups:keep,type:keep.length===1?'regular':x.type,participants:x.participants?.filter(v=>v.group!==p.group)});
-    }
-    let added=0;
-    for(const x of source){
-      const c={...x,id:'copy-'+newId(),week:targetWeek};
-      if(validate(c,next).some(i=>i.hard))continue;
-      next.push(c);added++;
-    }
-    editData(()=>next,'Шаблон применён к неделе '+(targetWeek+1));
-    p.notify('Скопировано '+added+' занятий из '+source.length);
-   }}><Copy size={15}/> Копировать в неделю {targetWeek+1}</Button>
- </div></Panel></div></div>;
- };
- const makeGenerator=()=>{
- const seed:Lesson={id:'proposal',week:p.week,day,slot,subject,teacher,room:selectedRoom,groups:[p.group],mode:'offline',type:'regular'};
- const possible=findFree(seed,curr,6).filter(x=>!db.rooms[x.room]?.blocked);
- const chosen=proposal||possible[0];
- return <div className="studio-columns"><Panel title="Автоматическое составление — тестовый алгоритм"><div className="studio-form">
-   <Field title="Группа"><Select value={p.group} onChange={p.setGroup} items={opts(GROUPS.map(g=>g.id))}/></Field>
-   <Field title="Дисциплина"><Select value={subject} onChange={setSubject} items={opts(SUBJECTS)}/></Field>
-   <Field title="Преподаватель"><Select value={teacher} onChange={setTeacher} items={opts(TEACHERS)}/></Field>
-   <Field title="Количество занятий для досоставления"><input type="number" min="1" max="12" value={genNumber} onChange={e=>setGenNumber(Math.max(1,Math.min(12,Number(e.target.value)||1)))}/></Field>
-   <div className="studio-note info"><SlidersHorizontal size={15}/> Учитываются жёсткие пересечения преподавателей, групп и аудиторий. Мягкие предпочтения используются при оценке вариантов.</div>
-   <Button primary onClick={()=>{
-    let count=0;const next=[...p.items];for(let k=0;k<genNumber;k++){const basis={...seed,id:'auto-'+newId()};const variants=findFree(basis,next.filter(x=>(x.week||0)===p.week),6).filter(x=>!db.rooms[x.room]?.blocked);if(!variants.length)break;const best=variants[0];next.push({...basis,day:best.day,slot:best.slot,room:best.room});count++}editData(()=>next,'Алгоритм дополнил расписание');p.notify('Назначено '+count+' из '+genNumber+' занятий');
-   }}><WandSparkles size={15}/> Досоставить расписание</Button>
- </div></Panel><Panel title="Найденные свободные варианты" aside={<Pill color="lime">{possible.length}</Pill>}>
- {possible.slice(0,12).map((s,i)=><button key={i} className={'studio-candidate '+(chosen===s?'selected':'')} onClick={()=>setProposal(s)}><b>{DAYS[s.day]} · {s.slot} пара · аудитория {s.room}</b><span>Оценка {s.score} · конфликты: 0</span></button>)}
- {!possible.length&&<Notice kind="warning">В выбранном периоде свободных вариантов нет.</Notice>}
- {chosen&&<Button onClick={()=>create({...seed,id:'auto-'+newId(),day:chosen.day,slot:chosen.slot,room:chosen.room})}><Check size={15}/> Принять выбранный вариант</Button>}
- </Panel></div>;
- };
+ const makeCalendar=()=> <CalendarStudio events={db.calendar} lessons={p.items} group={p.group} week={p.week} setWeek={p.setWeek}
+   add={event=>{put(d=>({...d,calendar:[...d.calendar,event]}));p.notify('Период добавлен в учебный календарь (демо)')}}
+   remove={id=>put(d=>({...d,calendar:d.calendar.filter(e=>e.id!==id)}))}/>;
+ const makeTemplates=()=> <TemplateStudio lessons={p.items} calendar={db.calendar} group={p.group} week={p.week}
+   blocked={Object.entries(db.rooms).filter(([,x])=>x.blocked).map(([id])=>id)}
+   onApply={(next,count)=>editData(()=>next,'Шаблон применён: '+count+' занятий добавлено')}
+   onSave={(name,sourceWeek,group,cycle)=>{put(d=>({...d,templates:[...d.templates,{id:newId(),name,week:sourceWeek,group,weeks:cycle,locked:false}]}));p.notify('Настройки цикла сохранены')}}/>;
+ const makeGenerator=()=> <GeneratorStudio lessons={p.items} calendar={db.calendar} week={p.week} group={p.group}
+   onGroup={p.setGroup} blocked={Object.entries(db.rooms).filter(([,x])=>x.blocked).map(([id])=>id)}
+   onApply={(next,count)=>editData(()=>next,'Автосоставление: добавлено '+count+' занятий')}/>;
  const makeGroups=()=>{
  const group=GROUPS.find(x=>x.id===groupDetails)||GROUPS[0];
  const members=selectedRoster;
