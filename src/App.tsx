@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent, ReactNode, DragEvent, MouseEvent } from 'react';
 import { CalendarDays, LayoutDashboard, ArrowLeftRight, Users, Building2, Settings2, FileText, Clock3, Plus, Search, Download, Check, AlertTriangle, ChevronLeft, ChevronRight, Menu, BookOpen, Monitor, Network, GitFork, WandSparkles, Save, X, Pencil, Trash2, Copy, Bell, Layers3, BarChart3, RotateCcw, Eye, SlidersHorizontal, Send, School, Filter } from 'lucide-react';
-import { DAYS, TIMES, GROUPS, TEACHERS, SUBJECTS, ROOMS, TYPES, MODES, INITIAL, NAV, buildSeed } from './data';
+import { DAYS, TIMES, GROUPS, TEACHERS, SUBJECTS, ROOMS, TYPES, MODES, INITIAL, NAV, CALENDAR, buildSeed } from './data';
 import type { Lesson, Type, Mode } from './data';
 import AdvancedWorkflows from './AdvancedWorkflows';
 import LessonQuickActions from './LessonQuickActions';
@@ -266,6 +266,19 @@ export default function App(){
  const month=<div className="calendar-grid">{['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(v=><b key={v}>{v}</b>)}{Array.from({length:6},(_,i)=><span key={'o'+i}/>)}{Array.from({length:30},(_,i)=><button className={i+1>=9&&i+1<=14?'week-day':''} key={i}>{i+1}</button>)}</div>;
  const render=()=>screen==='schedule'
   ? <>{weekHeader}{schedule}</>
+  : screen==='year'?<AnnualPlanner lessons={items} calendar={(()=>{
+      try{const v=JSON.parse(localStorage.getItem('college-schedule-extras-v1')||'{}');return Array.isArray(v.calendar)?v.calendar:CALENDAR}
+      catch{return CALENDAR}
+    })()} notify={setNotice} onApply={(variant,weeks)=>{
+      const preserved=items.filter(x=>(x.week||0)>=weeks||x.status==='held');
+      const fixedIds=new Set(preserved.map(x=>x.id));
+      const generated=variant.lessons.filter(x=>!fixedIds.has(x.id));
+      const next=[...preserved,...generated];
+      const approx=JSON.stringify(next).length;
+      if(approx>4_600_000){setNotice('Годовой черновик превышает безопасный размер браузерного хранилища. Скачай JSON варианта.');return}
+      setItems(next);setStatus('draft');setLastChange(null);setSelected(null);setWeek(0);setScreen('schedule');
+      setNotice('Вариант на '+weeks+' недель применён к демочерновику: '+generated.length+' занятий');
+    }}/>
   : <AdvancedWorkflows screen={screen} items={items} setItems={setItems} week={week} setWeek={setWeek} group={group} setGroup={setGroup} teacher={teacher} setTeacher={setTeacher} room={room} setRoom={setRoom} onNavigate={show} onEdit={setSelected} notify={setNotice} markDraft={()=>setStatus('draft')} status={status} setStatus={setStatus} density={density} setDensity={setDensity} days={days} setDays={setDays}/>;
  return <div className="app">
   <aside className={'nav '+(collapsed?'closed':'')}>
