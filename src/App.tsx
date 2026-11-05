@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { FormEvent, ReactNode, DragEvent } from 'react';
+import type { FormEvent, ReactNode, DragEvent, MouseEvent } from 'react';
 import { CalendarDays, LayoutDashboard, ArrowLeftRight, Users, Building2, Settings2, FileText, Clock3, Plus, Search, Download, Check, AlertTriangle, ChevronLeft, ChevronRight, Menu, BookOpen, Monitor, Network, GitFork, WandSparkles, Save, X, Pencil, Trash2, Copy, Bell, Layers3, BarChart3, RotateCcw, Eye, SlidersHorizontal, Send, School, Filter } from 'lucide-react';
 import { DAYS, TIMES, GROUPS, TEACHERS, SUBJECTS, ROOMS, TYPES, MODES, INITIAL, NAV, buildSeed } from './data';
 import type { Lesson, Type, Mode } from './data';
 import AdvancedWorkflows from './AdvancedWorkflows';
 import LessonQuickActions from './LessonQuickActions';
 import SmartLessonEditor from './SmartLessonEditor';
+import LessonWeekMove from './LessonWeekMove';
 import { moveOptions, explainCandidate, readBlockedRooms, swapOptions } from './scheduleAssist';
 import type { MoveOption } from './scheduleAssist';
 import { validate } from './demoLogic';
@@ -42,6 +43,8 @@ export default function App(){
  const [sideMode,setSideMode]=useState<'assistant'|'edit'>('assistant');
  const [moveMode,setMoveMode]=useState(false);
  const [preview,setPreview]=useState<MoveOption|null>(null);
+ const [weekMoving,setWeekMoving]=useState<Item|null>(null);
+ const [contextMenu,setContextMenu]=useState<{x:number;y:number;lesson:Item}|null>(null);
  const [lastChange,setLastChange]=useState<{before:Item[];changedIds:string[]}|null>(null);
  const [hoverMove,setHoverMove]=useState<MoveOption|null>(null);
  const [view,setView]=useState<View>('group');
@@ -76,7 +79,7 @@ export default function App(){
  const collisions=selected?cellConflict(selected,current):[];
  const issueCount=current.filter(x=>cellConflict(x,current).length>0).length;
  const displayName=NAV.find(x=>x[0]===screen)?.[1]||'Расписание';
- const choose=(x:Item)=>{setSelected(x);setSideMode('assistant');setMoveMode(x.status!=='held');setPreview(null);setHoverMove(null)};
+ const choose=(x:Item)=>{setContextMenu(null);setSelected(x);setSideMode('assistant');setMoveMode(false);setPreview(null);setHoverMove(null)};
  const make=(day=0,slot=1)=>{const created:Item={id:id(),day,slot,week,subject:'',teacher:view==='teacher'?teacher:'',groups:view==='group'?[group]:[],room:view==='room'?room:'',type:'regular',mode:'offline'};setSelected(created);setSideMode('edit');setMoveMode(false);setPreview(null)};
 
  const save=(x:Item)=>{
@@ -88,6 +91,12 @@ export default function App(){
   setSelected(null);setMoveMode(false);setPreview(null);setStatus('draft');
   setNotice('Изменение сохранено · можно отменить последнее действие');
   return true;
+ };
+ const askRemove=(key:string)=>{
+  const x=items.find(y=>y.id===key);
+  if(!x)return;
+  if(x.status==='held'){setNotice('Проведённое занятие нельзя удалить через редактор');return}
+  if(window.confirm('Удалить занятие «'+x.subject+'» ('+x.groups.join(' + ')+', '+DAYS[x.day]+', '+x.slot+'-я пара)?\nЭто действие можно отменить.'))remove(key);
  };
  const remove=(key:string)=>{
   const existing=items.find(x=>x.id===key);
@@ -124,7 +133,29 @@ export default function App(){
   setLastChange({before:[selected,other],changedIds:[selected.id,other.id]});
   setItems([...remaining,first,second]);setStatus('draft');setSelected(null);setMoveMode(false);setPreview(null);setNotice('Занятия обменены местами · доступна отмена');
  };
- const closeSelected=()=>{setSelected(null);setMoveMode(false);setPreview(null);setHoverMove(null)};
+ const closeSelected=()=>{setSelected(null);setMoveMode(false);setPreview(null);setHoverMove(null);setContextMenu(null)};
+ const rightClick=(event:MouseEvent<HTMLButtonElement>,lesson:Item)=>{
+  event.preventDefault();event.stopPropagation();
+  setContextMenu({x:Math.min(event.clientX,Math.max(15,window.innerWidth-240)),y:Math.min(event.clientY,Math.max(15,window.innerHeight-235)),lesson});
+  setSelected(lesson);setSideMode('assistant');setMoveMode(false);setPreview(null);
+ };
+ const moveAcrossWeeks=(next:Item)=>{
+  const source=items.find(x=>x.id===next.id);
+  if(!source){setNotice('Исходное занятие больше не существует');return}
+  if(source.status==='held'){setNotice('Проведённое занятие нельзя перенести');return}
+  const errors=explainCandidate(next,items,readBlockedRooms());
+  if(errors.length){setNotice('Перенос отменён: '+errors[0]);return}
+  setLastChange({before:[source],changedIds:[source.id]});
+  setItems(v=>v.map(x=>x.id===next.id?next:x));
+  setWeek(next.week||0);setWeekMoving(null);setSelected(null);setContextMenu(null);setMoveMode(false);setPreview(null);
+  setStatus('draft');setNotice('Занятие перенесено на неделю '+((next.week||0)+1)+' · доступна отмена');
+ };
+ useEffect(()=>{
+  if(!contextMenu)return;
+  const dismiss=()=>setContextMenu(null);
+  document.addEventListener('click',dismiss);
+  return ()=>document.removeEventListener('click',dismiss);
+ },[contextMenu]);;
  const move=(key:string,day:number,slot:number)=>{
   const source=items.find(x=>x.id===key);
   if(!source)return;
@@ -136,7 +167,7 @@ export default function App(){
  };
  useEffect(()=>{
    const handler=(e:KeyboardEvent)=>{
-    if(e.key==='Escape'){setPreview(null);setMoveMode(false);setHoverMove(null);return}
+    if(e.key==='Escape'){setPreview(null);setMoveMode(false);setHoverMove(null);setContextMenu(null);setWeekMoving(null);return}
     const target=e.target as HTMLElement|null;
     if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'&&lastChange&&!['INPUT','TEXTAREA','SELECT'].includes(target?.tagName||'')){e.preventDefault();undo()}
    };
