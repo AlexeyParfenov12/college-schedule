@@ -1,30 +1,38 @@
 import { GROUPS, ROOMS, TEACHERS } from './data';
 import type { Lesson, CalendarEvent } from './data';
-import { deriveOffers, needsComputers, calendarIssues } from './plannerDomain';
+import { deriveOffers, needsComputers, calendarIssues, lessonDate } from './plannerDomain';
 
 export type TeacherPreference={
  daysOff:number[]; fromSlot:number; toSlot:number;
  forbidden:{day:number;from:number;to:number}[];
  preferDays:number[]; maxOnlinePct:number;
 };
+export type PracticeBlock={
+ id:string;group:string;kind:'college'|'company';title:string;teacher:string;
+ startWeek:number;durationWeeks:number;days:number[];fromSlot:number;toSlot:number;
+ room:string;
+};
+export type PracticeAudit={blockId:string;group:string;week:number;reason:string};
 export type AnnualConfig={
  weeks:number; days:5|6; slotsPerDay:number; commuteGap:1|2;
  defaultOnlinePct:number; groupGapWeight:number; teacherGapWeight:number;
  activeRooms:string[]; allowStreams:string[]; allowSubgroups:string[]; assistedSubgroups:string[];
  teacherPreferences:Record<string,TeacherPreference>;
+ practiceBlocks:PracticeBlock[];
 };
 export type YearDemand={id:string;group:string;teacher:string;subject:string;pairsPerWeek:number;requiredPairs:number};
 export type Unplaced={id:string;week:number;group:string;subject:string;teacher:string;reason:string};
 export type AnnualVariant={id:string;name:string;lessons:Lesson[];unplaced:Unplaced[];
  totalPairs:number;placedPairs:number;coveredHours:number;requiredHours:number;
- groupWindows:number;teacherWindows:number;onlinePercent:number;score:number;streamCount:number;subgroupCount:number};
+ groupWindows:number;teacherWindows:number;onlinePercent:number;score:number;streamCount:number;subgroupCount:number;
+ practicePairs:number;practiceIssues:PracticeAudit[];practiceBlocks:PracticeBlock[]};
 export const ANNUAL_WEEK_LIMIT=40;
 export function defaultAnnualConfig():AnnualConfig{
  return {
   weeks:40,days:5,slotsPerDay:6,commuteGap:1,
   defaultOnlinePct:20,groupGapWeight:90,teacherGapWeight:65,
   activeRooms:ROOMS.filter(r=>r.active).map(r=>r.id),allowStreams:[],
-  allowSubgroups:[],assistedSubgroups:[],teacherPreferences:{}
+  allowSubgroups:[],assistedSubgroups:[],teacherPreferences:{},practiceBlocks:[]
  };
 }
 export const teacherRule=(cfg:AnnualConfig,name:string):TeacherPreference=>cfg.teacherPreferences[name]||{
@@ -72,6 +80,7 @@ type WeekState={
  groupBusy:Set<string>;teacherBusy:Set<string>;roomBusy:Set<string>;
 };
 const createWeek=():WeekState=>({lessons:[],groupByDay:new Map(),teacherByDay:new Map(),groupBusy:new Set(),teacherBusy:new Set(),roomBusy:new Set()});
+export const practiceWeekActive=(p:PracticeBlock,w:number)=>w>=p.startWeek&&w<p.startWeek+p.durationWeeks;
 const k=(value:string,day:number)=>value+'|'+day;
 const busyKey=(value:string,day:number,slot:number)=>value+'|'+day+'|'+slot;
 const get=(m:Map<string,Lesson[]>,key:string)=>m.get(key)||[];
@@ -90,6 +99,44 @@ export const hasSlotConflict=(state:WeekState,l:Lesson):boolean=>
  l.groups.some(g=>state.groupBusy.has(busyKey(g,l.day,l.slot)))||
  state.teacherBusy.has(busyKey(l.teacher,l.day,l.slot))||
  (l.mode!=='online'&&(l.room.match(/\b\d{3}\b/g)||[]).some(room=>state.roomBusy.has(busyKey(room,l.day,l.slot))));
+export function practiceReservations(cfg:AnnualConfig,events:CalendarEvent[],week:number,state:WeekState){
+ const created:Lesson[]=[],issues:PracticeAudit[]=[];
+ const active=(cfg.practiceBlocks||[]).filter(p=>practiceWeekActive(p,week));
+ const activeGroups=new Set(active.map(p=>p.group));
+ for(const block of active){
+  const group=GROUPS.find(g=>g.id===block.group);
+  if(!group){issues.push({blockId:block.id,group:block.group,week,reason:'Группа не найдена'});continue}
+  const room=ROOMS.find(r=>r.id===block.room);
+  if(block.kind==='college'){
+   if(!room||!cfg.activeRooms.includes(block.room)||!room.active){
+    issues.push({blockId:block.id,group:block.group,week,reason:'Закреплённый кабинет практики закрыт или не существует'});continue;
+   }
+   if(room.capacity<group.count){
+    issues.push({blockId:block.id,group:block.group,week,reason:'В закреплённом кабинете не хватает мест для '+group.count+' студентов'});continue;
+   }
+  }
+  for(const day of block.days){
+   if(day>=cfg.days)continue;
+   for(let slot=block.fromSlot;slot<=Math.min(block.toSlot,cfg.slotsPerDay);slot++){
+    const lesson:Lesson={id:'practice-'+block.id+'-'+week+'-'+day+'-'+slot,
+     week,day,slot,groups:[block.group],subject:block.title||'Учебная практика',
+     teacher:block.teacher||'Руководитель практики',room:block.kind==='college'?block.room:'Предприятие',
+     mode:'offline',type:'regular',hours:2,notes:'Непрерывный блок практики · '+(block.kind==='college'?'Закреплённый кабинет':'Внешняя организация')};
+    const conflicts=hasSlotConflict(state,lesson);
+    // A matching practice period is not a prohibition; vacations and holidays are.
+    const vacation=events.some(e=>['holiday','vacation'].includes(e.kind)&&
+      e.from<=lessonDate(week,day)&&lessonDate(week,day)<=e.to&&(!e.groups.length||e.groups.includes(block.group)));
+    if(vacation||conflicts){
+     issues.push({blockId:block.id,group:block.group,week,reason:vacation?'Практика пересекается с каникулами или выходным':'Группа, руководитель или кабинет заняты другой практикой/фиксированным занятием'});
+     continue;
+    }
+    append(state,lesson);created.push(lesson);
+   }
+  }
+ }
+ return {created,issues,activeGroups};
+}
+
 type Task={demand:YearDemand;group:string;teacher:string;subject:string;week:number};
 function hardReason(task:Task,state:WeekState,cfg:AnnualConfig,calendar:CalendarEvent[],roomCandidates:typeof ROOMS,teacherOnline:number,onlineQuota:number,variant:number){
  const rule=teacherRule(cfg,task.teacher);
@@ -145,12 +192,19 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
  for(const d of demands){const limit=quota.get(d.teacher)||0;quota.set(d.teacher,limit+d.requiredPairs)}
  for(const [teacher,total] of quota)quota.set(teacher,Math.floor(total*Math.max(0,Math.min(100,teacherRule(cfg,teacher).maxOnlinePct))/100));
  const covered=new Map<string,number>();
+ const practiceIssues:PracticeAudit[]=[];
+ let practicePairs=0;
  let streamCount=0,subgroupCount=0;
  for(let week=0;week<cfg.weeks;week++){
   const state=createWeek();
   for(const l of locked.filter(l=>(l.week||0)===week&&l.status==='held'))append(state,l);
+  const reservations=practiceReservations(cfg,events,week,state);
+  practicePairs+=reservations.created.length;
+  practiceIssues.push(...reservations.issues);
+  placed.push(...reservations.created);
   const tasks:Task[]=[];
   for(const d of demands){
+   if(reservations.activeGroups.has(d.group))continue;
    const done=covered.get(d.id)||0;
    const quotaNow=Math.ceil((week+1)*d.requiredPairs/cfg.weeks);
    const due=Math.max(0,Math.min(3,quotaNow-done));
@@ -220,11 +274,15 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
  }
  for(const entries of groupMap.values())groupWindows+=avoidableWindows(entries,cfg.commuteGap);
  for(const entries of teacherMap.values())teacherWindows+=avoidableWindows(entries,cfg.commuteGap);
- const totalPairs=demands.reduce((sum,d)=>sum+d.requiredPairs,0);
+ const totalPracticePairs=(cfg.practiceBlocks||[]).reduce((n,p)=>
+  n+Math.max(0,Math.min(cfg.weeks,p.startWeek+p.durationWeeks)-p.startWeek)*
+  p.days.filter(day=>day<cfg.days).length*
+  Math.max(0,Math.min(p.toSlot,cfg.slotsPerDay)-p.fromSlot+1),0);
+ const totalPairs=demands.reduce((sum,d)=>sum+d.requiredPairs,0)+totalPracticePairs;
  const placedPairs=placed.reduce((sum,l)=>sum+l.groups.length,0);
  const online=placed.filter(l=>l.mode==='online').length;
  const score=Math.round((placedPairs/Math.max(1,totalPairs))*10000-groupWindows*cfg.groupGapWeight*.22-teacherWindows*cfg.teacherGapWeight*.12);
  return {id:'variant-'+variant,name:label,lessons:placed,unplaced,
   totalPairs,placedPairs,requiredHours:totalPairs*2,coveredHours:placedPairs*2,
-  groupWindows,teacherWindows,onlinePercent:Math.round(online/Math.max(1,placed.length)*100),score,streamCount,subgroupCount};
+  groupWindows,teacherWindows,onlinePercent:Math.round(online/Math.max(1,placed.length)*100),score,streamCount,subgroupCount,practicePairs,practiceIssues,practiceBlocks:cfg.practiceBlocks||[]};
 }
