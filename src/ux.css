@@ -132,3 +132,51 @@ input[type="checkbox"]{appearance:auto;width:15px!important;height:15px!importan
 @media(max-width:810px){.right-editor{position:static;width:100%;max-height:none}.assist-panel{max-height:520px}.editor{max-height:540px}.group-sidebar{width:100%;max-height:120px}.group-sidebar .side-scroll{display:flex;overflow-x:auto;overflow-y:hidden}.group-sidebar .side-scroll button{width:auto;white-space:nowrap}.move-toolbar{align-items:start}.timetable-scroll{max-height:440px}}
 @media(max-width:600px){.studio-table-tools{gap:6px}.studio-table-count{margin-left:0}.studio-table-tools .assist-search{min-width:120px}.right-editor{max-height:none}.move-preview{right:8px;bottom:8px;width:calc(100vw - 64px)}.studio-panel .studio-group-select{grid-template-columns:repeat(3,1fr)}.move-toolbar>div:first-child span{font-size:10px}}
 @media(prefers-reduced-motion:reduce){*{transition-duration:.01ms!important;animation-duration:.01ms!important}}
+
+/* Lesson context menu and safe cross-week planning dialog */
+.assist-quick-actions{display:flex;align-items:center;gap:6px;padding:7px 9px;border-bottom:1px solid #E5EDEA}
+.assist-quick-actions button{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid #D8E7E1;background:#F7FAF8;color:#436D65;border-radius:6px;min-height:31px;font-size:10.5px;cursor:pointer;padding:7px}
+.assist-quick-actions button.danger{color:#AD4F4F;background:#FFF8F7;border-color:#EAD4D1}
+.assist-quick-actions button:disabled{opacity:.4}
+.lesson-context-menu{position:fixed;z-index:1000;width:226px;max-width:calc(100vw - 16px);background:white;border:1px solid #D4E4DD;box-shadow:0 14px 44px #1A48472B;border-radius:9px;padding:5px}
+.lesson-context-title{padding:8px 9px 10px;font-size:11px;font-weight:750;display:flex;flex-direction:column;gap:4px;color:#315B51;border-bottom:1px solid #E7EFEB;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lesson-context-title small{font-size:10px;font-weight:400;color:#819991;overflow:hidden;text-overflow:ellipsis}
+.lesson-context-menu>button{background:white;border:0;display:flex;align-items:center;gap:9px;width:100%;padding:9px;border-radius:6px;text-align:left;font-size:11px;color:#315D56;cursor:pointer}
+.lesson-context-menu>button:hover{background:#EDF7ED}
+.lesson-context-menu>button.danger{color:#BB5656}
+.lesson-context-menu>button.danger:hover{background:#FFF0EF}
+.lesson-context-menu>button:disabled{opacity:.4;cursor:not-allowed}
+.lesson-context-separator{height:1px;background:#E7EEEA;margin:4px}
+.lesson{z-index:1;position:relative}
+.timetable-scroll.move-active .slot-cell:not(:has(.lesson)) .target-overlay{z-index:2}
+.week-move-backdrop{position:fixed;inset:0;z-index:1100;display:grid;place-items:center;background:#092B2E75;padding:16px}
+.week-move-modal{width:min(720px,100%);max-height:min(92vh,920px);overflow:hidden;background:white;border:1px solid #CFE3D5;border-radius:12px;display:flex;flex-direction:column;box-shadow:0 16px 70px #072B3352}
+.week-move-modal>header{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:15px 16px 12px;border-bottom:1px solid #E4EFE7}
+.week-move-modal>header>div{display:flex;flex-direction:column;gap:5px}
+.week-move-modal>header strong{font-size:15px;color:#164D49}
+.week-move-modal>header small{font-size:11px;color:#708D83}
+.week-move-modal>header button{border:0;background:transparent;cursor:pointer;color:#78958B;padding:3px}
+.week-move-details{padding:12px 16px;display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:#536F68}
+.week-move-details>span{padding:7px 9px;background:#F2F8F4;border-radius:6px}
+.week-move-nav{padding:0 16px 10px;display:flex;align-items:center;gap:8px}
+.week-move-nav>button{height:34px;width:34px;border:1px solid #D8E6DE;border-radius:6px;background:#FFF;color:#376B5E;display:grid;place-items:center;cursor:pointer}
+.week-move-nav>button:disabled{opacity:.3;cursor:default}
+.week-move-nav label{display:flex;flex-direction:column;gap:3px;font-size:10px;color:#799489}
+.week-move-nav select{min-width:190px;border:1px solid #D7E6DF;border-radius:6px;background:white;padding:7px;color:#275C53;font-size:11px}
+.week-move-free{margin-left:auto;color:#39835F;background:#E6F4E9;border-radius:6px;padding:6px 9px;font-size:11px;white-space:nowrap}
+.week-move-guide{font-size:11px;color:#78928A;padding:0 16px 8px;margin:0;line-height:1.5}
+.week-move-grid{display:grid;grid-template-columns:75px repeat(6,minmax(0,1fr));margin:0 16px;border-top:1px solid #DCE7E0;border-left:1px solid #DCE7E0;overflow-y:auto;min-height:0}
+.week-move-fragment{display:contents}
+.week-move-row-head{background:#F1F7F3;text-align:center;font-size:11px;color:#54796B;font-weight:700;padding:8px;border-right:1px solid #DCE7E0;border-bottom:1px solid #DCE7E0}
+.week-move-row-head small{display:block;font-size:9px;color:#A0B0A7;margin-top:4px}
+.week-move-time{border-right:1px solid #DCE7E0;border-bottom:1px solid #DCE7E0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;font-size:12px;color:#42685D}
+.week-move-time small{font-size:9px;color:#879B8F}
+.week-move-cell{min-height:52px;display:flex;align-items:center;justify-content:center;gap:4px;border:0;border-right:1px solid #DCE7E0;border-bottom:1px solid #DCE7E0;background:#EAF7E9;color:#3F8A52;font-size:10px;cursor:pointer}
+.week-move-cell.occupied{background:#FFF2F0;color:#AA6660}
+.week-move-cell.original{background:#E5F0EE;color:#53867D}
+.week-move-cell.chosen{box-shadow:inset 0 0 0 2px #228C74;font-weight:750}
+.week-move-cell:hover{filter:brightness(.96)}
+.week-move-feedback{min-height:42px;margin:10px 16px;padding:9px 11px;border-radius:6px;background:#F1F8F1;color:#477B58;font-size:11px;line-height:1.4}
+.week-move-feedback.error{background:#FFF3EE;color:#A36551}
+.week-move-modal>footer{display:flex;justify-content:flex-end;gap:8px;padding:11px 16px;border-top:1px solid #E6EEE9}
+@media(max-width:640px){.week-move-grid{grid-template-columns:40px repeat(6,minmax(0,1fr));margin:0 8px}.week-move-cell{font-size:0;min-height:44px}.week-move-cell svg{width:13px;height:13px}.week-move-time small{display:none}.week-move-nav{flex-wrap:wrap}.week-move-free{margin-left:0}}
