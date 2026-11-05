@@ -120,7 +120,7 @@ export function previewTemplate(lessons:Lesson[],opts:TemplateArgs):PreviewPlan{
 export function previewAutofill(base:Lesson,lessons:Lesson[],calendar:CalendarEvent[],blocked:string[],count:number,
  options:{days:number[];slots:number[];requirePc:boolean}):{placed:Lesson[];rejected:string[]}{
  const placed:Lesson[]=[],rejected:string[]=[];
- const current=[...lessons];
+ const current=[...lessons.filter(l=>(l.week||0)===(base.week||0))];
  for(let i=0;i<count;i++){
   const choices:{lesson:Lesson;score:number}[]=[];
   for(const day of options.days)for(const slot of options.slots){
