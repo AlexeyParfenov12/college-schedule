@@ -92,7 +92,9 @@ export default function SmartLessonEditor({item,existing,all,catalog,view,save,r
  const groupSize=groupCount(form.groups);
  const minNeeded=needsComputers(form.subject)&&form.type==='regular'&&groupSize>0&&preferred.length===0;
  const switchType=(type:Type)=>{
-  const base:Lesson={...form,type,groups:type==='regular'||type==='subgroup'?[form.groups[0]]:form.groups.length>1?form.groups:[form.groups[0],GROUPS.find(g=>g.id!==form.groups[0])?.id||form.groups[0]]};
+  const comparable=offers.find(o=>o.teacher===form.teacher&&o.subject===form.subject&&o.group!==form.groups[0]);
+  const nextGroups=type==='regular'||type==='subgroup'?[form.groups[0]]:form.groups.length>1?form.groups:comparable?[form.groups[0],comparable.group]:[form.groups[0]];
+  const base:Lesson={...form,type,groups:nextGroups};
   base.mode=type==='parallel'?'hybrid':type==='subgroup'?'offline':form.mode;
   base.room=deriveRoom(base,all);setForm(base);setSecondRoom(roomId(base.room)[1]||'');
  };
@@ -102,7 +104,8 @@ export default function SmartLessonEditor({item,existing,all,catalog,view,save,r
   patch({room});
  };
  const issues=validate(roomCandidate,all).filter(i=>i.hard);
- const isValid=Boolean(form.groups.length&&form.subject&&form.teacher&&(form.mode==='online'||form.mode==='async'||roomId(form.room).length>0)&&!issues.length);
+ const multiple= form.type==='stream'||form.type==='parallel';
+ const isValid=Boolean(form.groups.length&&(!multiple||form.groups.length>=2)&&form.subject&&form.teacher&&(form.mode==='online'||form.mode==='async'||roomId(form.room).length>0)&&!issues.length);
  const saveForm=(e:FormEvent)=>{e.preventDefault();if(!isValid){setMsg(issues[0]?.message||'Заполни доступные варианты занятия');return}save(roomCandidate)};
  const typeLabel=Object.entries(TYPES);
  const isOnline=form.mode==='online'||form.mode==='async';
@@ -125,7 +128,7 @@ export default function SmartLessonEditor({item,existing,all,catalog,view,save,r
     {!usedOffers.length&&<div className="smart-warning">Для выбранного {startBy==='group'?'коллектива':'преподавателя'} нет подтверждённых назначений в демонстрационных данных. Данные TeachingAssignment будут поступать из Academic Core.</div>}
     <div className="smart-step-title"><span>3</span> Где и в каком формате?</div>
     <div className="smart-inline"><label className="smart-field"><span>Тип занятия</span><select value={form.type} onChange={e=>switchType(e.target.value as Type)}>{typeLabel.map(([type,title])=><option key={type} value={type}>{title}</option>)}</select></label><label className="smart-field"><span>Формат</span><select value={form.mode} onChange={e=>{const mode=e.target.value as Mode;const updated={...form,mode};updated.room=deriveRoom(updated,all);setForm(updated)}}>{Object.entries(MODES).map(([m,title])=><option value={m} key={m}>{title}</option>)}</select></label></div>
-    {(form.type==='stream'||form.type==='parallel')&&<div className="smart-group-picker"><span>Участники ({form.groups.length})</span><div>{form.groups.map(g=><button type="button" key={g} onClick={()=>patch({groups:form.groups.filter(x=>x!==g)})}>{g}<X size={11}/></button>)}</div><button type="button" className="smart-text" onClick={()=>setSearchOpen(v=>!v)}>+ Добавить группу</button>
+    {(form.type==='stream'||form.type==='parallel')&&<div className="smart-group-picker"><span>Участники ({form.groups.length}) · нужно минимум две группы</span><div>{form.groups.map(g=><button type="button" key={g} onClick={()=>patch({groups:form.groups.filter(x=>x!==g)})}>{g}<X size={11}/></button>)}</div><button type="button" className="smart-text" onClick={()=>setSearchOpen(v=>!v)}>+ Добавить группу</button>
      {searchOpen&&<div className="smart-drop"><input aria-label="Поиск дополнительных групп" placeholder="Поиск…" value={groupSearch} onChange={e=>setGroupSearch(e.target.value)}/><div>{GROUPS.filter(g=>!form.groups.includes(g.id)&&g.id.toLowerCase().includes(groupSearch.toLowerCase())).map(g=><button type="button" key={g.id} onClick={()=>patch({groups:[...form.groups,g.id]})}>{g.id} <Plus size={11}/></button>)}</div></div>}
     </div>}
     {showRoom&&<div className="smart-room">
