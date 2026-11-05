@@ -39,7 +39,28 @@ function Field({title,children}:{title:string;children:ReactNode}){return <label
 const opts=(xs:string[])=>xs.map(x=>({id:x,label:x}));
 const weekOpts=Array.from({length:16},(_,i)=>({id:i,label:'Учебная неделя '+(i+1)}));
 function Pill({children,color='gray'}:{children:ReactNode;color?:'gray'|'green'|'red'|'amber'|'blue'|'lime'}){return <span className={'studio-pill '+color}>{children}</span>}
-function Rows({heads,rows}:{heads:string[];rows:ReactNode[][]}){return <div className="studio-table-scroll"><table className="studio-table"><thead><tr>{heads.map((x,i)=><th key={i}>{x}</th>)}</tr></thead><tbody>{rows.map((row,i)=><tr key={i}>{row.map((cell,j)=><td key={j}>{cell}</td>)}</tr>)}</tbody></table></div>}
+function Rows({heads,rows}:{heads:string[];rows:ReactNode[][]}){
+ const [query,setQuery]=useState('');
+ const [groupFilter,setGroupFilter]=useState('');
+ const [page,setPage]=useState(0);
+ const [pageSize,setPageSize]=useState(12);
+ const filtered=rows.filter(row=>row.some(v=>(typeof v==='string'||typeof v==='number')&&String(v).toLowerCase().includes(query.trim().toLowerCase())));
+ const searchable=rows.length>12;
+ const totalPages=Math.max(1,Math.ceil(filtered.length/pageSize));
+ const actualPage=Math.min(page,totalPages-1);
+ const shown=filtered.slice(actualPage*pageSize,(actualPage+1)*pageSize);
+ return <div className="studio-table-shell">
+   {searchable&&<div className="studio-table-tools">
+    <div className="assist-search"><Search size={13}/><input aria-label="Фильтр строк таблицы" placeholder="Найти в таблице…" value={query} onChange={e=>{setQuery(e.target.value);setPage(0)}}/></div>
+    <span className="studio-table-count">{filtered.length} записей</span>
+    <select aria-label="Строк на странице" value={pageSize} onChange={e=>{setPageSize(Number(e.target.value));setPage(0)}}><option value={12}>12 строк</option><option value={24}>24 строки</option><option value={48}>48 строк</option></select>
+   </div>}
+   <div className="studio-table-scroll"><table className="studio-table"><thead><tr>{heads.map((x,i)=><th key={i}>{x}</th>)}</tr></thead>
+    <tbody>{shown.map((row,i)=><tr key={actualPage*pageSize+i}>{row.map((cell,j)=><td key={j}>{cell}</td>)}</tr>)}</tbody>
+   </table>{!shown.length&&<div className="studio-table-empty">Нет строк по выбранному фильтру</div>}</div>
+   {filtered.length>pageSize&&<div className="studio-table-pagination"><span>{actualPage*pageSize+1}–{Math.min((actualPage+1)*pageSize,filtered.length)} из {filtered.length}</span><button aria-label="Предыдущая страница таблицы" disabled={actualPage===0} onClick={()=>setPage(p=>Math.max(0,p-1))}>‹</button><span>{actualPage+1}/{totalPages}</span><button aria-label="Следующая страница таблицы" disabled={actualPage>=totalPages-1} onClick={()=>setPage(p=>p+1)}>›</button></div>}
+ </div>;
+}
 function Notice({children,kind='info'}:{children:ReactNode;kind?:'info'|'warning'}){return <div className={'studio-note '+kind}><AlertTriangle size={15}/><span>{children}</span></div>}
 function BaseStat({value,label,emphasis=''}:{value:string|number;label:string;emphasis?:string}){return <div className="studio-stat"><strong className={emphasis}>{value}</strong><small>{label}</small></div>}
 function MiniButton({children,onClick}:{children:ReactNode;onClick:()=>void}){return <button type="button" className="studio-link" onClick={onClick}>{children}<ChevronRight size={13}/></button>}
@@ -88,7 +109,11 @@ export default function AdvancedWorkflows(p:Props){
  const [distanceEnd,setDistanceEnd]=useState(4);
  const selectedAbsence=db.absences.find(x=>x.id===absenceId)||db.absences[0];
  const onGroup=(g:string)=>setGroups(v=>v.includes(g)?v.filter(x=>x!==g):[...v,g]);
- const groupButtons=<div className="studio-group-select">{GROUPS.map(g=><label key={g.id} className={groups.includes(g.id)?'chosen':''}><input type="checkbox" checked={groups.includes(g.id)} onChange={()=>onGroup(g.id)}/>{g.id}</label>)}</div>;
+ const groupButtons=<div className="group-picker">
+  <div className="selected-groups">{groups.map(g=><button key={g} onClick={()=>onGroup(g)} title="Убрать группу">{g} <X size={11}/></button>)}</div>
+  <div className="assist-search"><Search size={13}/><input aria-label="Поиск групп для объединения" value={groupFilter} onChange={e=>setGroupFilter(e.target.value)} placeholder="Найти группу…"/></div>
+  <div className="studio-group-select">{GROUPS.filter(g=>g.id.toLowerCase().includes(groupFilter.toLowerCase())).map(g=><button key={g.id} className={groups.includes(g.id)?'chosen':''} onClick={()=>onGroup(g.id)}>{groups.includes(g.id)?<Check size={12}/>:<Plus size={12}/>} {g.id}</button>)}</div>
+ </div>;
  const ifOpen=(x:Lesson)=>{p.setGroup(x.groups[0]||'П-21');p.onNavigate('schedule');p.onEdit(x)};
  const findProblems=useMemo(()=>curr.flatMap(x=>validate(x,curr).map(issue=>({lesson:x,issue}))).filter((v,i,a)=>a.findIndex(z=>z.lesson.id===v.lesson.id&&z.issue.message===v.issue.message)===i),[curr]);
  const involved=useMemo(()=>selectedAbsence?curr.filter(x=>x.teacher===selectedAbsence.teacher&&x.day>=selectedAbsence.from&&x.day<=selectedAbsence.to&&x.status!=='cancelled'):[],[curr,selectedAbsence]);
