@@ -175,3 +175,12 @@
 .plan-saved button:hover{background:#E3F4E0}
 .plan-saved button small{font-size:9px;color:#7F9B86}
 .plan-inline-link{background:transparent;border:0;color:#187C69;text-decoration:underline;font-weight:700;font-size:10.5px;cursor:pointer;padding:3px}
+
+/* The timetable already defines its group/teacher/room context. Show it as a fact, not another input. */
+.smart-context{display:flex;align-items:center;gap:7px;background:#F2F8F4;border:1px solid #D8E8DB;border-radius:7px;padding:8px 10px;color:#52796B;font-size:11px;line-height:1.35}
+.smart-context svg{color:#369179;flex:none}
+.smart-context strong{color:#245D50}
+.smart-summary.compact{display:flex;flex-wrap:wrap;flex-direction:row;gap:6px;padding:7px 9px;font-size:10px}
+.smart-summary.compact span{white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.smart-step-title{margin-top:2px}
+.smart-field select:disabled{background:#F5F7F5;color:#9AAFA7;cursor:not-allowed}
