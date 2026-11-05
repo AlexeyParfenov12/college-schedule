@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Lesson } from './data';
 import { ROOMS, TEACHERS } from './data';
-import { countAvailable, explainCandidate, moveOptions, teacherSuggestions, roomSuggestions } from './scheduleAssist';
+import { countAvailable, explainCandidate, moveOptions, teacherSuggestions, roomSuggestions, swapOptions } from './scheduleAssist';
 const src=(changes:Partial<Lesson>={}):Lesson=>({
  id:'original',week:0,day:0,slot:1,subject:'Программирование',teacher:TEACHERS[0],
  groups:['П-21'],room:'109',type:'regular',mode:'offline',...changes
@@ -47,5 +47,16 @@ describe('contextual scheduling assistant',()=>{
  it('disallows modification hints for already confirmed lessons',()=>{
    const a=src({status:'held'});
    expect(explainCandidate({...a,day:2},[a])).toContain('Занятие уже подтверждено как проведённое');
+ });
+ it('allows an atomic two-way swap and rejects a third-party collision',()=>{
+  const a=src({id:'a',day:0,slot:1,room:'109'});
+  const b=src({id:'b',day:1,slot:2,room:'110',teacher:TEACHERS[1]});
+  expect(swapOptions(a,[a,b]).find(x=>x.lesson.id==='b')?.available).toBe(true);
+  const third=src({id:'third',day:1,slot:2,groups:['П-23'],room:'109',teacher:TEACHERS[2]});
+  expect(swapOptions(a,[a,b,third]).find(x=>x.lesson.id==='b')?.available).toBe(false);
+ });
+ it('never offers exchanges of confirmed lessons',()=>{
+  const a=src({id:'a',day:0,slot:1}),b=src({id:'b',day:1,slot:1,status:'held'});
+  expect(swapOptions(a,[a,b]).find(x=>x.lesson.id==='b')?.available).toBe(false);
  });
 });
