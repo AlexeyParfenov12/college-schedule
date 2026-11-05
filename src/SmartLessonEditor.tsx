@@ -10,7 +10,7 @@ import { readBlockedRooms } from './scheduleAssist';
 type Props={item:Lesson;existing:boolean;all:Lesson[];catalog:Lesson[];view:'group'|'teacher'|'room';save:(l:Lesson)=>boolean|void;remove:(id:string)=>void;cancel:()=>void};
 const options=(values:string[])=>values.map(v=><option key={v} value={v}>{v}</option>);
 const groupCount=(names:string[])=>names.reduce((n,id)=>n+(GROUPS.find(g=>g.id===id)?.count||0),0);
-const roomId=(v:string)=>v.match(/\b\d{3}\b/g)||[];
+const roomId=(v:string):string[]=>[...(v.match(/\b\d{3}\b/g)||[])];
 const groupOptions=GROUPS.map(g=>g.id);
 const parseMode=(x:Lesson):'group'|'teacher'=>x.groups.length?'group':'teacher';
 function deriveRoom(choice:Lesson,all:Lesson[]):string{
@@ -53,7 +53,7 @@ export default function SmartLessonEditor({item,existing,all,catalog,view,save,r
   setStartBy(view==='teacher'?'teacher':'group');setExpanded(false);setSearchOpen(false);setMsg('');
   const choices=deriveOffers(catalog);
   const exact=choices.find(o=>o.group===item.groups[0]&&o.subject===item.subject&&o.teacher===item.teacher);
-  const choice=exact||(!existing&&choices.find(o=>view==='teacher'?o.teacher===item.teacher:o.group===item.groups[0]));
+  const choice=exact||(!existing?choices.find(o=>view==='teacher'?o.teacher===item.teacher:o.group===item.groups[0]):undefined);
   const initial:Lesson=!existing&&choice?{...item,groups:[choice.group],subject:choice.subject,teacher:choice.teacher}:item;
   if(!existing)initial.room=deriveRoom(initial,catalog.filter(x=>(x.week||0)===(initial.week||0)));
   setForm(initial);
