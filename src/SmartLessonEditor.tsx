@@ -46,11 +46,13 @@ export default function SmartLessonEditor({item,existing,all,catalog,view,contex
  const primaryGroup=view==='group'?(contextGroup||item.groups[0]):form.groups[0]||'';
  const related=useMemo(()=>offers.filter(o=>o.group===primaryGroup),[offers,primaryGroup]);
  const teacherNames=useMemo(()=>Array.from(new Set(related.map(o=>o.teacher))),[related]);
- const availableTeachers=useMemo(()=>form.teacher&&!teacherNames.includes(form.teacher)?[form.teacher,...teacherNames]:teacherNames,[teacherNames,form.teacher]);
+ const teacherIsBusy=(name:string)=>all.some(l=>l.id!==form.id&&l.status!=='cancelled'&&(l.week||0)===(form.week||0)&&l.day===form.day&&l.slot===form.slot&&l.teacher===name);
+ const groupIsBusy=(name:string)=>all.some(l=>l.id!==form.id&&l.status!=='cancelled'&&(l.week||0)===(form.week||0)&&l.day===form.day&&l.slot===form.slot&&l.groups.includes(name));
+ const availableTeachers=useMemo(()=>teacherNames.filter(name=>!teacherIsBusy(name)),[teacherNames,all,form.week,form.day,form.slot,form.id]);
  const subjectNames=useMemo(()=>Array.from(new Set(related.filter(o=>o.teacher===form.teacher).map(o=>o.subject))),[related,form.teacher]);
  const subjects=useMemo(()=>existing&&form.subject&&!subjectNames.includes(form.subject)?[form.subject,...subjectNames]:subjectNames,[existing,form.subject,subjectNames]);
  const assignedGroups=useMemo(()=>Array.from(new Set(offers.filter(o=>o.teacher===form.teacher).map(o=>o.group))),[offers,form.teacher]);
- const availableGroups=view==='teacher'?assignedGroups:GROUPS.map(g=>g.id);
+ const availableGroups=(view==='teacher'?assignedGroups:GROUPS.map(g=>g.id)).filter(name=>!groupIsBusy(name));
  const roomSuggestion=(value:Lesson)=>view==='room'&&contextRoom&&value.mode!=='online'&&value.mode!=='async'?contextRoom:deriveRoom(value,all);
  useEffect(()=>{
   setExpanded(false);setSearchOpen(false);setMsg('');
@@ -95,8 +97,8 @@ export default function SmartLessonEditor({item,existing,all,catalog,view,contex
  const allRooms=useMemo(()=>chooseRooms(roomCandidate,all,blocked),[roomCandidate,all,key]);
  const preferred=allRooms.filter(r=>r.available);
  const chosen=roomId(form.room);
- const selectable=allRooms.filter(r=>r.available||chosen.includes(r.id));
- const currentVenue=chosen[0]||'';
+ const selectable=allRooms.filter(r=>r.available);
+ const currentVenue=selectable.some(r=>r.id===chosen[0])?chosen[0]:'';
  const groupSize=groupCount(form.groups);
  const minNeeded=needsComputers(form.subject)&&form.type==='regular'&&groupSize>0&&preferred.length===0;
  const switchType=(type:Type)=>{
@@ -141,7 +143,7 @@ export default function SmartLessonEditor({item,existing,all,catalog,view,contex
       <div className="smart-step-title"><span>{view==='group'?1:2}</span> Преподаватель</div>
       <label className="smart-field"><span>{primaryGroup?'Преподаватели группы '+primaryGroup:'Сначала выбери группу'}</span>
        <select aria-label="Преподаватель занятия" value={form.teacher} onChange={e=>selectTeacher(e.target.value)} disabled={!primaryGroup}>
-        <option value="">Выбери преподавателя</option>{availableTeachers.map(t=><option value={t} key={t}>{t}</option>)}
+        <option value="">Выбери свободного преподавателя</option>{availableTeachers.map(t=><option value={t} key={t}>{t}</option>)}
        </select>
       </label>
     </>}
