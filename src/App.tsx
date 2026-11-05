@@ -7,6 +7,7 @@ import AdvancedWorkflows from './AdvancedWorkflows';
 import LessonQuickActions from './LessonQuickActions';
 import SmartLessonEditor from './SmartLessonEditor';
 import LessonWeekMove from './LessonWeekMove';
+import AnnualPlanner from './AnnualPlanner';
 import { moveOptions, explainCandidate, readBlockedRooms, swapOptions } from './scheduleAssist';
 import type { MoveOption } from './scheduleAssist';
 import { validate } from './demoLogic';
@@ -15,7 +16,7 @@ import { lessonDate } from './plannerDomain';
 type Item = Lesson & {week?:number};
 type View = 'group'|'teacher'|'room';
 type Screen = typeof NAV[number][0];
-const iconSet=[LayoutDashboard,CalendarDays,CalendarDays,Layers3,WandSparkles,ArrowLeftRight,Users,Network,GitFork,Building2,Monitor,BarChart3,Send,FileText,School,Settings2,BookOpen,BookOpen];
+const iconSet=[LayoutDashboard,CalendarDays,CalendarDays,Layers3,WandSparkles,School,ArrowLeftRight,Users,Network,GitFork,Building2,Monitor,BarChart3,Send,FileText,School,Settings2,BookOpen,BookOpen];
 const BASE=buildSeed(16) as Item[];
 const BASE_MAP=new Map(BASE.map(x=>[x.id,JSON.stringify(x)]));
 const start=():Item[]=>{try{
@@ -185,7 +186,7 @@ export default function App(){
  const weekDate=useMemo(()=>{const d=new Date(2026,10,9+week*7);const e=new Date(d);e.setDate(e.getDate()+5);return d.toLocaleDateString('ru-RU',{day:'numeric',month:'short'})+' – '+e.toLocaleDateString('ru-RU',{day:'numeric',month:'short',year:'numeric'})},[week]);
  const weekHeader=<div className="toolbar">
    <div className="control-group"><button className={view==='group'?'active':''} onClick={()=>{setView('group');closeSelected()}}><Users size={15}/> Группы</button><button className={view==='teacher'?'active':''} onClick={()=>{setView('teacher');closeSelected()}}>Преподаватели</button><button className={view==='room'?'active':''} onClick={()=>{setView('room');closeSelected()}}>Аудитории</button></div>
-   <div className="control-group"><button aria-label="Предыдущая неделя" onClick={()=>{setWeek(w=>Math.max(0,w-1));closeSelected()}}><ChevronLeft size={15}/></button><b>{weekDate}</b><button aria-label="Следующая неделя" onClick={()=>{setWeek(w=>Math.min(15,w+1));closeSelected()}}><ChevronRight size={15}/></button></div>
+   <div className="control-group"><button aria-label="Предыдущая неделя" onClick={()=>{setWeek(w=>Math.max(0,w-1));closeSelected()}}><ChevronLeft size={15}/></button><b>{weekDate}</b><button aria-label="Следующая неделя" onClick={()=>{setWeek(w=>Math.min(39,w+1));closeSelected()}}><ChevronRight size={15}/></button></div>
    <div className="control-group right"><button className={density==='compact'?'active':''} onClick={()=>setDensity('compact')}>Компактно</button><button className={density==='standard'?'active':''} onClick={()=>setDensity('standard')}>Подробнее</button></div>
    <Action onClick={()=>exportCSV()}><Download size={14}/> CSV</Action>
    {lastChange&&<Action onClick={undo} title="Ctrl+Z — отменить последнее изменение"><RotateCcw size={14}/> Отменить</Action>}
