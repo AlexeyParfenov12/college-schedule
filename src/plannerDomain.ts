@@ -1,4 +1,4 @@
-import { DAYS, GROUPS, ROOMS, TEACHERS, SUBJECTS } from './data';
+import { DAYS, GROUPS, ROOMS, TEACHERS, SUBJECTS, CALENDAR } from './data';
 import type { Lesson, CalendarEvent } from './data';
 import { occupiedRooms, validate } from './demoLogic';
 
@@ -147,4 +147,10 @@ export function previewAutofill(base:Lesson,lessons:Lesson[],calendar:CalendarEv
 }
 export function planningProgress(lessons:Lesson[],group:string,week:number):number[]{
  return DAYS.map((_,day)=>lessons.filter(l=>l.groups.includes(group)&&(l.week||0)===week&&l.day===day&&l.status!=='cancelled').length);
+}
+
+/** Read the synthetic calendar shared by the editor and planning tools, never production data. */
+export function currentDemoCalendar():CalendarEvent[]{
+ try{const raw=localStorage.getItem('college-schedule-extras-v1');if(raw){const value=JSON.parse(raw);if(Array.isArray(value.calendar))return value.calendar as CalendarEvent[]}}catch{}
+ return CALENDAR;
 }
