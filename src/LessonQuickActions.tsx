@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowLeftRight, CalendarClock, Check, ChevronDown, ChevronUp, DoorOpen, Pencil, Search, ShieldCheck, Users, X } from 'lucide-react';
+import { ArrowLeftRight, CalendarClock, Check, ChevronDown, ChevronUp, DoorOpen, Pencil, Search, ShieldCheck, Trash2, Users, X } from 'lucide-react';
 import { DAYS, TYPES } from './data';
 import type { Lesson } from './data';
 import { moveOptions, roomSuggestions, teacherSuggestions, affectedParticipants, swapOptions } from './scheduleAssist';
@@ -8,9 +8,9 @@ type Props={
  lesson:Lesson; current:Lesson[]; blocked:string[]; isMoveMode:boolean;
  onMoveMode:()=>void; onPreviewMove:(day:number,slot:number)=>void; onSwap:(lesson:Lesson)=>void;
  onTeacher:(teacher:string)=>void; onRoom:(room:string)=>void;
- onEdit:()=>void; onClose:()=>void;
+ onEdit:()=>void; onClose:()=>void; onDelete:()=>void; onWeekMove:()=>void;
 };
-export default function LessonQuickActions({lesson,current,blocked,isMoveMode,onMoveMode,onPreviewMove,onSwap,onTeacher,onRoom,onEdit,onClose}:Props){
+export default function LessonQuickActions({lesson,current,blocked,isMoveMode,onMoveMode,onPreviewMove,onSwap,onTeacher,onRoom,onEdit,onClose,onDelete,onWeekMove}:Props){
  const [expanded,setExpanded]=useState<'teacher'|'room'|null>(null);
  const [filter,setFilter]=useState('');
  const teachers=useMemo(()=>teacherSuggestions(lesson,current,blocked),[lesson,current,blocked]);
@@ -24,7 +24,8 @@ export default function LessonQuickActions({lesson,current,blocked,isMoveMode,on
      .filter(x=>x.id.toLowerCase().includes(filter.toLowerCase()));
  return <div className="assist-panel" data-testid="lesson-assistant">
   <div className="assist-header"><div><b>{lesson.subject}</b><small>{TYPES[lesson.type]} · {affectedParticipants(lesson)} · {lesson.room}</small></div><button className="icon-btn" title="Закрыть помощник" onClick={onClose}><X size={15}/></button></div>
-  <div className="assist-tabs"><button className={isMoveMode?'on':''} onClick={onMoveMode} disabled={isLocked}><ArrowLeftRight size={14}/> {isMoveMode?'Выбор ячейки…':'Перенести'}</button><button onClick={onEdit}><Pencil size={14}/> Все поля</button></div>
+  <div className="assist-tabs"><button className={isMoveMode?'on':''} onClick={onMoveMode} disabled={isLocked}><ArrowLeftRight size={14}/> {isMoveMode?'Выбор ячейки…':'Перенести'}</button><button onClick={onEdit}><Pencil size={14}/> Изменить</button></div>
+  <div className="assist-quick-actions"><button onClick={onWeekMove} disabled={isLocked}><CalendarClock size={14}/> Другая неделя</button><button className="danger" onClick={onDelete} disabled={isLocked}><Trash2 size={14}/> Удалить пару</button></div>
   <div className="assist-scroll">
    {isLocked&&<div className="assist-note">Проведённое занятие заблокировано для изменения. Исправления должны проходить отдельную проверяемую процедуру.</div>}
    {isMoveMode&&<div className="assist-highlight"><ShieldCheck size={15}/> На сетке зелёные ячейки доступны, красные — заняты или запрещены. Нажми на ячейку для предварительного просмотра, затем подтверди перенос.</div>}
