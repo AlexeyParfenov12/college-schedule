@@ -14,10 +14,30 @@ export function validate(l:Lesson, others:Lesson[], options:{capacity?:boolean;p
   const rooms=places.filter(r=>occupiedRooms(x).includes(r));
   if(rooms.length)issues.push({kind:'room',hard:true,message:'Аудитория '+rooms.join(', ')+' занята'});
  }
- if(options.capacity&&l.type==='stream'&&l.mode==='offline'){
-   const count=groups.reduce((sum,g)=>sum+(GROUPS.find(x=>x.id===g)?.count||0),0);
-   const room=ROOMS.find(r=>r.id===l.room);
-   if(room && room.capacity<count)issues.push({kind:'capacity',hard:true,message:'Вместимость '+room.capacity+' мест, участников '+count});
+ if(options.capacity&&l.mode!=='online'&&l.mode!=='async'){
+  const count=groups.reduce((sum,g)=>sum+(GROUPS.find(x=>x.id===g)?.count||0),0);
+  if(l.type==='stream'||l.type==='regular'){
+   for(const place of places){
+    const room=ROOMS.find(r=>r.id===place);
+    if(room&&room.capacity<count)issues.push({kind:'capacity',hard:true,message:'Кабинет '+place+': '+room.capacity+' мест при '+count+' участниках'});
+   }
+  }
+  if(l.type==='subgroup'){
+   const need=Math.ceil(count/Math.max(2,l.participants?.length||2));
+   if(places.length<2&&!l.participants?.length)issues.push({kind:'capacity',hard:true,message:'Для одновременной работы подгрупп нужно назначить отдельные помещения (например, 102 / 107)'});
+   for(const place of places){
+    const room=ROOMS.find(r=>r.id===place);
+    if(room&&room.capacity<need)issues.push({kind:'capacity',hard:true,message:'Для подгруппы нужно '+need+' мест, в кабинете '+place+' доступно '+room.capacity});
+   }
+  }
+  if(l.type==='parallel'){
+   const own=l.participants?.filter(x=>x.mode!=='online'&&x.mode!=='async')||[{group:groups[0],room:places[0],mode:'offline' as const}];
+   for(const participant of own){
+    const room=ROOMS.find(r=>r.id===participant.room);
+    const attend=participant.count||GROUPS.find(x=>x.id===participant.group)?.count||0;
+    if(room&&room.capacity<attend)issues.push({kind:'capacity',hard:true,message:'Параллель: '+participant.group+' ('+attend+' чел.) не помещается в '+room.id+' ('+room.capacity+' мест)'});
+   }
+  }
  }
  if(options.parallel&&l.type==='parallel'){
   const placements=l.participants||[];
