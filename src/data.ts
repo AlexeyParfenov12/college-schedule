@@ -70,7 +70,7 @@ export const RULES:Rule[]=[
 ];
 export const NAV=[
  ['overview','Обзор'],['schedule','Расписание'],['calendar','Учебный календарь'],
- ['templates','Шаблоны'],['generator','Автосоставление'],['substitutions','Замены'],
+ ['templates','Шаблоны'],['generator','Автосоставление'],['year','Годовой планировщик'],['substitutions','Замены'],
  ['groups','Группы и подгруппы'],['streams','Потоки'],['parallels','Параллели'],
  ['resources','Аудитории'],['distance','Дистант и гибрид'],['workload','Нагрузка и часы'],
  ['publication','Публикация'],['reports','Отчёты'],['academic','Академические данные'],
