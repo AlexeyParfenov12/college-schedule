@@ -49,8 +49,8 @@ export function PeriodTimeline({calendar,lessons,group,onWeek,activeWeek=0}:{cal
  </div>;
 }
 
-export function LoadBars({lessons,week,group}:{lessons:Lesson[];week:number;group?:string}){
- const data=DAYS.map((d,day)=>({day:d,count:lessons.filter(l=>(l.week||0)===week&&l.day===day&&l.status!=='cancelled'&&(!group||l.groups.includes(group))).length}));
+export function LoadBars({lessons,week,group,teacher,room}:{lessons:Lesson[];week:number;group?:string;teacher?:string;room?:string}){
+ const data=DAYS.map((d,day)=>({day:d,count:lessons.filter(l=>(l.week||0)===week&&l.day===day&&l.status!=='cancelled'&&(!group||l.groups.includes(group))&&(!teacher||l.teacher===teacher)&&(!room||occupiedRooms(l).includes(room))).length}));
  const max=Math.max(1,...data.map(x=>x.count));
  return <div className="viz-bars" data-testid="load-bars"><div className="viz-title"><Layers3 size={16}/><b>Распределение занятий по дням</b></div><div className="viz-bar-grid">
   {data.map(x=><div className="viz-bar-row" key={x.day}><span>{x.day}</span><div className="viz-bar-track"><div style={{width:(x.count/max)*100+'%'}}/></div><b>{x.count}</b></div>)}
