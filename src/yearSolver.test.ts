@@ -78,6 +78,13 @@ describe('Practice blocks with fixed rooms',()=>{
   expect(result.practiceIssues.length).toBeGreaterThan(0);
   expect(result.practicePairs).toBe(0);
  });
+ it('flags academic-calendar practice without a corresponding fixed reservation',()=>{
+  const cfg=defaultAnnualConfig();cfg.weeks=3;
+  const event:CalendarEvent={id:'practice-calendar',kind:'practice',title:'Учебная практика',
+   from:'2026-11-16',to:'2026-11-20',groups:['П-21']};
+  const variant=solveAnnualVariant([],cfg,[event],0);
+  expect(variant.practiceIssues.some(x=>x.group==='П-21'&&x.reason.includes('не закреплены'))).toBe(true);
+ });
  it('calculates whole weeks inclusively, respecting declared start and duration',()=>{
   const p=block({startWeek:3,durationWeeks:2});
   expect(practiceWeekActive(p,2)).toBe(false);
