@@ -153,3 +153,17 @@
 @media(max-width:900px){.viz-period-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.plan-duo{grid-template-columns:1fr}.right-editor .smart-editor{height:auto;max-height:none}}
 @media(max-width:650px){.plan-intro{padding:11px}.plan-intro svg{display:none}.plan-columns{grid-template-columns:minmax(0,1fr)}.viz-period-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.viz-week-grid{grid-template-columns:24px repeat(6,minmax(0,1fr))}.viz-cell,.viz-week-grid>span{padding:2px;min-height:32px}.viz-event{font-size:8px;padding:2px}.plan-flow{gap:3px}.plan-flow>span{padding:5px;font-size:10px}.plan-pane{padding:9px}.smart-scroll{padding:9px}.smart-inline{grid-template-columns:1fr 1fr}}
 @media print{.plan-command,.smart-editor,.smart-expand,.plan-template-store{display:none}.plan-pane{break-inside:avoid}.viz-week{break-inside:avoid}}
+
+/* A compact visual context belongs above the list, not in a kilometer-long page */
+.studio-context-box{border:1px solid #DCE9E3;background:#FFF;border-radius:9px;overflow:hidden}
+.studio-context-box>header{padding:9px 12px;min-height:43px;display:flex;align-items:center;justify-content:space-between;gap:10px;background:#F7FAF7;border-bottom:1px solid #E6EFE8}
+.studio-context-box>header>div{display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+.studio-context-box>header strong{font-size:12px;color:#366858}
+.studio-context-box>header span{font-size:10px;color:#8BA197}
+.studio-context-box>header button{display:flex;align-items:center;gap:3px;border:1px solid #D8E7DE;background:#FFF;border-radius:6px;padding:5px 8px;font-size:10px;color:#448369;cursor:pointer}
+.studio-context-visuals{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,.65fr);gap:10px;padding:10px}
+.studio-context-visuals .viz-week,.studio-context-visuals .viz-bars{padding:8px}
+.studio-context-visuals .viz-week-grid>span,.studio-context-visuals .viz-cell{min-height:27px}
+.studio-context-visuals .viz-week .viz-legend{margin-top:6px}
+.studio-context-visuals .viz-bar-grid{gap:7px}
+@media(max-width:1160px){.studio-context-visuals{grid-template-columns:minmax(0,1fr)}}
