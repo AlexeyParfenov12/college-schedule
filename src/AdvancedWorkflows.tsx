@@ -74,6 +74,7 @@ export default function AdvancedWorkflows(p:Props){
  const [proposal,setProposal]=useState<ReturnType<typeof findFree>[number]|null>(null);
  const [query,setQuery]=useState('');
  const [groupFilter,setGroupFilter]=useState('');
+ const [showVisual,setShowVisual]=useState(true);
  const [subject,setSubject]=useState('Программирование');
  const [day,setDay]=useState(1);
  const [slot,setSlot]=useState(2);
@@ -377,7 +378,7 @@ export default function AdvancedWorkflows(p:Props){
     <Rows heads={['День','Пара','Дисциплина','Преподаватель','Место','Организация']} rows={mine.map(x=>[DAYS[x.day],x.slot,x.subject,x.teacher,x.type==='subgroup'?x.room.split(/\s*\/\s*/)[(student?.subgroup||1)-1]||x.room:x.room,<Pill color={x.type==='subgroup'?'blue':x.type==='stream'?'green':x.type==='parallel'?'lime':'gray'}>{x.type==='subgroup'?'Подгруппа '+(student?.subgroup||1):TYPES[x.type]}</Pill>])}/>
    </Panel><Notice>Общая группа и принадлежность подгруппе учитываются раздельно. Реальная фильтрация занятий по составу подгруппы будет подключена к Academic Core.</Notice></div>;
  };
- switch(p.screen){
+ const content=(()=>{switch(p.screen){
  case 'overview':return makeOverview();
  case 'academic':return makeAcademic();
  case 'calendar':return makeCalendar();
@@ -396,6 +397,21 @@ export default function AdvancedWorkflows(p:Props){
  case 'teacher':return makeTeacher();
  case 'student':return makeStudent();
  default:return <Notice>Для этого раздела используйте главный редактор расписания.</Notice>;
- }
+ }})();
+ const contextGroup=p.screen==='groups'?groupDetails:p.screen==='streams'||p.screen==='parallels'?groups[0]:p.screen==='distance'?formatGroup:p.screen==='student'?p.group:['overview','academic','publication','reports','settings'].includes(p.screen)?p.group:undefined;
+ const contextTeacher=p.screen==='substitutions'?selectedAbsence?.teacher:p.screen==='teacher'?p.teacher:p.screen==='workload'?teacherHours:undefined;
+ const contextRoom=p.screen==='resources'?selectedRoom:undefined;
+ const viewTitle=p.screen==='substitutions'?'Преподаватель: '+(selectedAbsence?.teacher||''):p.screen==='resources'?'Аудитория '+selectedRoom:p.screen==='workload'||p.screen==='teacher'?'Преподаватель '+(contextTeacher||''):'Группа '+(contextGroup||'');
+ if(['calendar','templates','generator'].includes(p.screen))return content;
+ return <div className="studio-stack">
+  <section className="studio-context-box">
+   <header><div><strong>Как это выглядит в расписании</strong><span>{viewTitle} · неделя {p.week+1}</span></div>
+    <button type="button" onClick={()=>setShowVisual(v=>!v)}>{showVisual?'Свернуть':'Развернуть'} {showVisual?<ChevronRight size={14}/>:<ChevronRight size={14}/>}</button>
+   </header>
+   {showVisual&&<div className="studio-context-visuals"><MiniSchedule lessons={p.items} week={p.week} group={contextGroup} teacher={contextTeacher} room={contextRoom} maxSlot={4} title={viewTitle}/><LoadBars lessons={p.items} week={p.week} group={contextGroup} teacher={contextTeacher} room={contextRoom}/></div>}
+  </section>
+  {content}
+ </div>;
+
 }
 
