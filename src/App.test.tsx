@@ -174,4 +174,28 @@ describe('React interface smoke checks',()=>{
   expect(screen.getByTestId('selected-schedule-cell')).toBeTruthy();
  },20000);
 
+ it('navigates from a workflow to the exact shared lesson and highlights it by stable ID',()=>{
+  render(<App/>);
+  fireEvent.click(within(document.querySelector('aside.nav nav')!).getByRole('button',{name:'Потоки'}));
+  const link=screen.getAllByRole('button',{name:'Изменить'})[0];
+  expect(link).toBeTruthy();
+  fireEvent.click(link);
+  expect(screen.getByTestId('selected-schedule-cell')).toBeTruthy();
+  const focused=document.querySelector<HTMLButtonElement>('.lesson.jump-focused');
+  expect(focused).toBeTruthy();
+  expect(focused!.dataset.lessonId).toBeTruthy();
+  expect(focused!.classList.contains('picked')).toBe(true);
+ },20000);
+ it('permits moving a lesson to the second half of the 40-week demo horizon',()=>{
+  render(<App/>);
+  const first=document.querySelector<HTMLButtonElement>('.lesson');
+  expect(first).toBeTruthy();
+  fireEvent.click(first!);
+  fireEvent.click(screen.getByRole('button',{name:'Другая неделя'}));
+  const select=screen.getByRole('combobox',{name:'Целевая неделя'}) as HTMLSelectElement;
+  expect(select.options).toHaveLength(40);
+  fireEvent.change(select,{target:{value:'25'}});
+  expect(select.value).toBe('25');
+ },20000);
+
 });
