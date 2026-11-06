@@ -180,3 +180,18 @@ input[type="checkbox"]{appearance:auto;width:15px!important;height:15px!importan
 .week-move-feedback.error{background:#FFF3EE;color:#A36551}
 .week-move-modal>footer{display:flex;justify-content:flex-end;gap:8px;padding:11px 16px;border-top:1px solid #E6EEE9}
 @media(max-width:640px){.week-move-grid{grid-template-columns:40px repeat(6,minmax(0,1fr));margin:0 8px}.week-move-cell{font-size:0;min-height:44px}.week-move-cell svg{width:13px;height:13px}.week-move-time small{display:none}.week-move-nav{flex-wrap:wrap}.week-move-free{margin-left:0}}
+
+/* Drag-and-drop heatmap: paint every slot immediately when the user grabs a lesson. */
+.timetable-scroll.dragging .slot-cell.slot-available{background:#DAF3DE!important;border:1px solid #78BA8B!important;box-shadow:inset 0 0 0 2px rgba(76,161,106,.30)}
+.timetable-scroll.dragging .slot-cell.slot-blocked{background:#FFE2DE!important;border:1px solid #DF8C86!important;box-shadow:inset 0 0 0 2px rgba(209,96,91,.22)}
+.timetable-scroll.dragging .slot-cell.slot-current{background:#DDEEEA!important;border:1px dashed #5C9F91!important;box-shadow:inset 0 0 0 1px rgba(58,124,109,.23)}
+.timetable-scroll.dragging .slot-cell.slot-blocked .lesson{filter:saturate(.7);opacity:.86}
+.timetable-scroll.dragging .slot-cell.slot-available .lesson{box-shadow:inset 0 0 0 2px #70B98A}
+.drag-cell-indicator{position:absolute;z-index:4;top:3px;right:3px;display:inline-flex;align-items:center;gap:3px;border:1px solid #83BF90;border-radius:5px;padding:3px 5px;background:#E5F8E5;color:#247041;font-size:9px;font-weight:800;line-height:1.05;white-space:nowrap;pointer-events:none;box-shadow:0 1px 4px #214F3E22}
+.drag-cell-indicator.blocked{border-color:#E1A5A1;background:#FFF0EB;color:#A64F4D}
+.drag-cell-indicator.current{border-color:#84B9AB;background:#E7F4EF;color:#42796D}
+.move-hover-reason{font-size:10.5px;line-height:1.35;color:#416A5D;flex:1;min-width:120px;max-width:290px}
+.timetable-scroll.dragging .target-overlay.available{background:rgba(180,231,186,.80);border:2px solid #73B681;color:#195F38}
+.timetable-scroll.dragging .target-overlay.blocked{background:rgba(255,210,205,.80);border:2px solid #D8918C;color:#9E4843}
+.timetable-scroll.dragging .target-overlay.current{background:rgba(215,236,230,.80)}
+@media(max-width:820px){.drag-cell-indicator{font-size:8px;padding:2px 3px}.drag-cell-indicator svg{width:10px;height:10px}.move-hover-reason{max-width:none}}
