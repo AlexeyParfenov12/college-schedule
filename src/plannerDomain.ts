@@ -1,9 +1,10 @@
 import { DAYS, GROUPS, ROOMS, TEACHERS, SUBJECTS, CALENDAR } from './data';
 import type { Lesson, CalendarEvent } from './data';
 import { occupiedRooms, validate } from './demoLogic';
+import { assessRoomFit, needsComputers } from './roomPolicy';
+export { needsComputers } from './roomPolicy';
 
 export type TeachingOffer = {key:string;group:string;teacher:string;subject:string;count:number;sampleRoom:string};
-export const needsComputers=(subject:string)=>/программ|сет|баз данных|информат|операционн|веб|интерфейс|информационн.*безопас|разработк/i.test(subject);
 export function deriveOffers(lessons:Lesson[]):TeachingOffer[]{
  const map=new Map<string,TeachingOffer>();
  for(const l of lessons){
@@ -18,7 +19,7 @@ export function deriveOffers(lessons:Lesson[]):TeachingOffer[]{
  return [...map.values()].sort((a,b)=>b.count-a.count||a.group.localeCompare(b.group,'ru')||a.subject.localeCompare(b.subject,'ru'));
 }
 
-export type RoomChoice={id:string;label:string;available:boolean;recommended:boolean;reason:string;seats:number;computers:number;score:number};
+export type RoomChoice={id:string;label:string;available:boolean;recommended:boolean;reason:string;seats:number;computers:number;score:number;fit:'ok'|'warning'|'blocked'};
 /** Room suitability is context-dependent; the availability is checked for the exact proposed lesson time. */
 export function chooseRooms(lesson:Lesson,lessons:Lesson[],blocked:string[]=[]):RoomChoice[]{
  const counts=lesson.groups.reduce((sum,id)=>sum+(GROUPS.find(g=>g.id===id)?.count||0),0);
@@ -26,19 +27,18 @@ export function chooseRooms(lesson:Lesson,lessons:Lesson[],blocked:string[]=[]):
  const needed=Math.ceil(counts/split);
  const computer=needsComputers(lesson.subject);
  const candidates=ROOMS.map(room=>{
-  const roomLesson={...lesson,room:room.id,type:lesson.type==='subgroup'?'regular' as const:lesson.type,groups:lesson.type==='subgroup'?[lesson.groups[0]]:lesson.groups};
-  // For split groups, capacity is assessed against the subgroup size below, not whole group.
   const shared=lessons.filter(x=>x.id!==lesson.id&&(x.week||0)===(lesson.week||0)&&x.day===lesson.day&&x.slot===lesson.slot&&x.status!=='cancelled');
   const occupied=shared.some(x=>occupiedRooms(x).includes(room.id));
   const closed=blocked.includes(room.id)||!room.active;
-  const seats=computer?room.pc:room.capacity;
-  const fits=seats>=needed;
-  const alreadyUsed=occupiedRooms(lesson).includes(room.id);
-  const recommended=!closed&&!occupied&&fits;
-  const issue=!fits?'Нужно '+needed+' '+(computer?'компьютеров':'мест')+', есть '+seats:closed?'Кабинет закрыт':occupied?'Кабинет занят':'Свободно · подходит';
-  const lastRoom=lesson.room.match(/\b\d{3}\b/g)?.includes(room.id);
-  const score=(recommended?100:0)+(computer&&room.pc>0?45:0)+(lastRoom?10:0)+(Math.max(0,room.capacity-needed)<12?8:0);
-  return {id:room.id,label:'Ауд. '+room.id+' · '+room.kind+' · '+(computer?room.pc+' ПК':room.capacity+' мест'),available:recommended||alreadyUsed&&!closed&&fits&&!occupied,recommended,reason:issue,seats:room.capacity,computers:room.pc,score};
+  const fit=assessRoomFit(lesson,room,needed);
+  const available=!closed&&!occupied&&!fit.hard;
+  const recommended=available&&fit.level==='ok';
+  const reason=closed?'Аудитория закрыта':occupied?'Аудитория занята':fit.reason;
+  const lastRoom=lesson.room.match(/\\b\\d{3}\\b/g)?.includes(room.id);
+  const score=(recommended?200:available?65:0)+(computer&&room.pc>0?25:0)+(lastRoom?10:0)+(fit.level==='warning'?-30:0);
+  return {id:room.id,label:'Ауд. '+room.id+' · '+room.kind+' · '+room.capacity+' мест'+(room.pc?' · '+room.pc+' ПК':''),
+   available,recommended,reason,seats:room.capacity,computers:room.pc,score,fit:fit.level};
+
  });
  return candidates.sort((a,b)=>b.score-a.score||a.id.localeCompare(b.id));
 }
@@ -127,7 +127,7 @@ export function previewAutofill(base:Lesson,lessons:Lesson[],calendar:CalendarEv
    if(day<0||day>5||slot<1||slot>6)continue;
    const partial={...base,id:'gen-'+i+'-'+day+'-'+slot,day,slot};
    if(calendarIssues(partial,calendar).length)continue;
-   for(const room of chooseRooms(partial,current,blocked).filter(x=>x.available)){
+   for(const room of chooseRooms(partial,current,blocked).filter(x=>x.recommended)){
     if(options.requirePc&&room.computers===0)continue;
     const lesson={...partial,room:room.id};
     if(validate(lesson,current).some(x=>x.hard))continue;
