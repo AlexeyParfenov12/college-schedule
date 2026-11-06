@@ -29,7 +29,7 @@ type Props={
  group:string; setGroup:Dispatch<SetStateAction<string>>;
  teacher:string; setTeacher:Dispatch<SetStateAction<string>>;
  room:string; setRoom:Dispatch<SetStateAction<string>>;
- onNavigate:(key:Screen)=>void; onEdit:(item:Lesson)=>void;
+ onNavigate:(key:Screen)=>void; onEdit:(item:Lesson)=>void; onFocusLesson:(lesson:Lesson)=>void;
  notify:(text:string)=>void; markDraft:()=>void;
  status:'draft'|'published'; setStatus:Dispatch<SetStateAction<'draft'|'published'>>;
  density:'compact'|'standard'; setDensity:Dispatch<SetStateAction<'compact'|'standard'>>;
@@ -119,7 +119,7 @@ export default function AdvancedWorkflows(p:Props){
   <div className="assist-search"><Search size={13}/><input aria-label="Поиск групп для объединения" value={groupFilter} onChange={e=>setGroupFilter(e.target.value)} placeholder="Найти группу…"/></div>
   <div className="studio-group-select">{GROUPS.filter(g=>g.id.toLowerCase().includes(groupFilter.toLowerCase())).map(g=><button key={g.id} className={groups.includes(g.id)?'chosen':''} onClick={()=>onGroup(g.id)}>{groups.includes(g.id)?<Check size={12}/>:<Plus size={12}/>} {g.id}</button>)}</div>
  </div>;
- const ifOpen=(x:Lesson)=>{p.setGroup(x.groups[0]||'П-21');p.onNavigate('schedule');p.onEdit(x)};
+ const ifOpen=(x:Lesson)=>p.onFocusLesson(x);
  const findProblems=useMemo(()=>curr.flatMap(x=>validate(x,curr).map(issue=>({lesson:x,issue}))).filter((v,i,a)=>a.findIndex(z=>z.lesson.id===v.lesson.id&&z.issue.message===v.issue.message)===i),[curr]);
  const involved=useMemo(()=>selectedAbsence?curr.filter(x=>x.teacher===selectedAbsence.teacher&&x.day>=selectedAbsence.from&&x.day<=selectedAbsence.to&&x.status!=='cancelled'):[],[curr,selectedAbsence]);
  const selectedRoster=db.roster[groupDetails]||[];
