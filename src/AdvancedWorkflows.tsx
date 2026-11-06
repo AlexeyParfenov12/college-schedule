@@ -8,6 +8,7 @@ import { CalendarStudio, TemplateStudio, GeneratorStudio } from './PlanningTools
 import { MiniSchedule, LoadBars, PeriodTimeline } from './ScheduleVisuals';
 import { WEEK_COUNT, calendarIssues } from './plannerDomain';
 import RoomManager from './RoomManager';
+import { demoAcademicDemands, demoAcademicHorizon } from './academicPlanning';
 
 type Screen=typeof NAV[number][0];
 type Snapshot={id:string;label:string;at:string;week:number;lessons:Lesson[];notice:string};
@@ -308,15 +309,45 @@ export default function AdvancedWorkflows(p:Props){
   <Panel title="Дистанционные занятия за неделю"><Rows heads={['Группа','День','Пара','Дисциплина','Формат','']} rows={curr.filter(x=>x.mode!=='offline').slice(0,70).map(x=>[x.groups.join(', '),DAYS[x.day],x.slot,x.subject,<Pill color="blue">{MODES[x.mode]}</Pill>,<MiniButton onClick={()=>ifOpen(x)}>Открыть</MiniButton>])}/></Panel></div>;
  };
  const makeWorkload=()=>{
-  const teachers=TEACHERS.map(t=>({workload:workload(p.items,t,p.week),name:t,plan:12}));
-  const assigned=teachers.reduce((s,t)=>s+t.workload.assigned,0),held=teachers.reduce((s,t)=>s+t.workload.held,0);
-  return <div className="studio-stack"><div className="studio-stats"><BaseStat value={assigned+' ч'} label="Назначено за неделю"/><BaseStat value={held+' ч'} label="Подтверждено в демо"/><BaseStat value={(assigned-held)+' ч'} label="Ожидает подтверждения"/><BaseStat value={teachers.filter(t=>t.workload.assigned>0).length} label="Задействовано преподавателей"/></div>
-  <Panel title="Нагрузка по преподавателям">
-   <Rows heads={['Преподаватель','Учебных часов (демо)','Назначено','Подтверждено','Осталось','']} rows={teachers.filter(x=>x.workload.assigned>0).slice(0,45).map(t=>[t.name,t.plan+' ч',t.workload.assigned+' ч',t.workload.held+' ч',Math.max(0,t.workload.assigned-t.workload.held)+' ч',<MiniButton onClick={()=>setTeacherHours(t.name)}>Детали</MiniButton>])}/>
-  </Panel><Panel title={'Занятия преподавателя: '+teacherHours} aside={<Select value={teacherHours} onChange={setTeacherHours} items={opts(TEACHERS)}/>}>
-   <Rows heads={['День','Пара','Группы','Дисциплина','Факт','']} rows={byTeacher.slice(0,55).map(x=>[DAYS[x.day],x.slot,x.groups.join(', '),x.subject,x.status==='held'?<Pill color="green">Проведено</Pill>:<Pill>По плану</Pill>,<Button onClick={()=>editData(old=>old.map(y=>y.id===x.id?{...y,status:y.status==='held'?'scheduled':'held'}:y),'Демо-статус занятия обновлён')}>{x.status==='held'?'Снять':'Подтвердить'}</Button>])}/>
-  <Notice>Это имитация факта проведения для тестов. Официальные часы преподавателя и тарификация в реальной системе не формируются в браузере.</Notice>
-  </Panel></div>;
+  const curriculum=demoAcademicDemands(db.calendar,p.days===5?5:6,demoAcademicHorizon(db.calendar));
+  const groupPlan=curriculum.filter(d=>d.group===p.group).map(d=>{
+   const assigned=p.items.filter(x=>x.status!=='cancelled'&&x.groups.includes(d.group)&&x.teacher===d.teacher&&x.subject===d.subject);
+   const placed=assigned.length*2,held=assigned.filter(x=>x.status==='held').length*2;
+   return {...d,plan:d.requiredPairs*2,placed,held,remaining:Math.max(0,d.requiredPairs*2-placed)};
+  });
+  const totals=groupPlan.reduce((sum,d)=>({plan:sum.plan+d.plan,placed:sum.placed+d.placed,held:sum.held+d.held,remaining:sum.remaining+d.remaining}),{plan:0,placed:0,held:0,remaining:0});
+  const teachers=TEACHERS.map(t=>({workload:workload(p.items,t,p.week),name:t}));
+  return <div className="studio-stack">
+   <div className="studio-inline-filters"><Field title="Контроль часов группы"><Select value={p.group} onChange={p.setGroup} items={opts(GROUPS.map(g=>g.id))}/></Field>
+    <Pill color="amber">Учебные планы и назначения — тестовые данные</Pill></div>
+   <div className="studio-stats">
+    <BaseStat value={totals.plan+' ч'} label="План группы (демо)"/>
+    <BaseStat value={totals.placed+' ч'} label="Распределено по расписанию"/>
+    <BaseStat value={totals.held+' ч'} label="Проведено в деморежиме"/>
+    <BaseStat value={totals.remaining+' ч'} label="Осталось разместить"/>
+   </div>
+   <Panel title={'Покрытие учебного плана · '+p.group}>
+    <Rows heads={['Дисциплина','Преподаватель','План, ч','Распределено, ч','Проведено, ч','Остаток, ч','Действие']} rows={groupPlan.map(d=>[
+     d.subject,d.teacher,d.plan,d.placed,d.held,
+     d.remaining>0?<Pill color="amber">{d.remaining} ч</Pill>:<Pill color="green">Закрыто</Pill>,
+     d.remaining>0?<MiniButton onClick={()=>p.onNavigate('generator')}>Разместить</MiniButton>:<span>—</span>
+    ])}/>
+    <Notice>Демонстрационный план берётся из отдельного адаптера учебных назначений, а не из уже заполненного расписания. Часы не являются утверждённым учебным планом. Для потоков часы каждой группы считаются отдельно; фактическое проведение должно подтверждаться электронным журналом.</Notice>
+   </Panel>
+   <Panel title="Занятость преподавателей на выбранной неделе" aside={<Pill color="lime">Неделя {p.week+1}</Pill>}>
+    <Rows heads={['Преподаватель','Распределено, ч','Проведено, ч','Ожидает подтверждения, ч','']} rows={teachers.filter(x=>x.workload.assigned>0).slice(0,45).map(t=>[
+     t.name,t.workload.assigned,t.workload.held,Math.max(0,t.workload.assigned-t.workload.held),
+     <MiniButton onClick={()=>setTeacherHours(t.name)}>Детали</MiniButton>
+    ])}/>
+   </Panel>
+   <Panel title={'Занятия преподавателя: '+teacherHours} aside={<Select value={teacherHours} onChange={setTeacherHours} items={opts(TEACHERS)}/>}>
+    <Rows heads={['День','Пара','Группы','Дисциплина','Факт','']} rows={byTeacher.slice(0,55).map(x=>[
+      DAYS[x.day],x.slot,x.groups.join(', '),x.subject,x.status==='held'?<Pill color="green">Проведено</Pill>:<Pill>По плану</Pill>,
+      <Button onClick={()=>editData(old=>old.map(y=>y.id===x.id?{...y,status:y.status==='held'?'scheduled':'held'}:y),'Демо-статус занятия обновлён')}>{x.status==='held'?'Снять':'Подтвердить'}</Button>
+     ])}/>
+    <Notice>Подтверждение факта проведения здесь является тестовой операцией. Официальная нагрузка преподавателей, тарификация и часы журнала требуют подключения Academic Core и электронного журнала.</Notice>
+   </Panel>
+  </div>;
  };
  const makePublication=()=>{
   const currentVersion=db.snapshots.find(x=>x.week===p.week);
@@ -340,9 +371,13 @@ export default function AdvancedWorkflows(p:Props){
   </Panel></div>;
  };
  const makeReports=()=>{
-  const reportOptions=['Расписание групп','Расписание преподавателей','Занятость аудиторий','Нагрузка преподавателей','Лист замен','Потоки','Параллели','Подгруппы','Онлайн и гибрид'];
+  const reportOptions=['Расписание групп','Расписание преподавателей','Занятость аудиторий','Нагрузка преподавателей','Контроль учебных часов','Лист замен','Потоки','Параллели','Подгруппы','Онлайн и гибрид'];
   const rows=reportType==='Нагрузка преподавателей'?[['Преподаватель','Назначено (ч)','Проведено (ч)'],...TEACHERS.map(t=>{const w=workload(p.items,t,p.week);return [t,w.assigned,w.held]})]:
   reportType==='Занятость аудиторий'?[['Аудитория','Корпус','День','Пара','Группа','Предмет'],...ROOMS.flatMap(r=>curr.filter(x=>occupiedRooms(x).includes(r.id)).map(x=>[r.id,r.building,DAYS[x.day],x.slot,x.groups.join(', '),x.subject]))]:
+  reportType==='Контроль учебных часов'?[['Группа','Дисциплина','Преподаватель','План, ч (демо)','Распределено, ч','Проведено, ч','Осталось, ч'],...demoAcademicDemands(db.calendar,p.days===5?5:6,demoAcademicHorizon(db.calendar)).map(d=>{
+   const completed=p.items.filter(x=>x.status!=='cancelled'&&x.groups.includes(d.group)&&x.subject===d.subject&&x.teacher===d.teacher);
+   const assigned=completed.length*2;return [d.group,d.subject,d.teacher,d.requiredPairs*2,assigned,completed.filter(x=>x.status==='held').length*2,Math.max(0,d.requiredPairs*2-assigned)]
+  })]:
   reportRows(reportType==='Лист замен'?'Замены':reportType,p.items,p.week);
   return <div className="studio-columns"><Panel title="Конструктор отчётов"><div className="studio-form">
    <Field title="Отчёт"><Select value={reportType} onChange={setReportType} items={opts(reportOptions)}/></Field>
