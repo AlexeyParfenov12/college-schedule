@@ -121,7 +121,8 @@ export default function AdvancedWorkflows(p:Props){
   <div className="studio-group-select">{GROUPS.filter(g=>g.id.toLowerCase().includes(groupFilter.toLowerCase())).map(g=><button key={g.id} className={groups.includes(g.id)?'chosen':''} onClick={()=>onGroup(g.id)}>{groups.includes(g.id)?<Check size={12}/>:<Plus size={12}/>} {g.id}</button>)}</div>
  </div>;
  const ifOpen=(x:Lesson)=>p.onFocusLesson(x);
- const findProblems=useMemo(()=>curr.flatMap(x=>validate(x,curr).map(issue=>({lesson:x,issue}))).filter((v,i,a)=>a.findIndex(z=>z.lesson.id===v.lesson.id&&z.issue.message===v.issue.message)===i),[curr]);
+ const findProblems=useMemo(()=>curr.flatMap(x=>validate(x,curr).filter(issue=>issue.hard).map(issue=>({lesson:x,issue}))).filter((v,i,a)=>a.findIndex(z=>z.lesson.id===v.lesson.id&&z.issue.message===v.issue.message)===i),[curr]);
+ const softWarnings=useMemo(()=>curr.flatMap(x=>validate(x,curr).filter(issue=>!issue.hard).map(issue=>({lesson:x,issue}))),[curr]);
  const involved=useMemo(()=>selectedAbsence?curr.filter(x=>x.teacher===selectedAbsence.teacher&&x.day>=selectedAbsence.from&&x.day<=selectedAbsence.to&&x.status!=='cancelled'):[],[curr,selectedAbsence]);
  const selectedRoster=db.roster[groupDetails]||[];
  const byTeacher=curr.filter(x=>x.teacher===teacherHours&&x.status!=='cancelled');
@@ -160,7 +161,7 @@ export default function AdvancedWorkflows(p:Props){
    ].map(([a,b,c])=><div className="studio-list-row" key={c}><div><b>{a}</b><small>{b}</small></div><MiniButton onClick={()=>p.onNavigate(c as Screen)}>Открыть</MiniButton></div>)}<Notice>Все данные синтетические. Не используйте этот стенд для реального учебного учёта.</Notice></Panel></div>
    <Panel title="Найденные конфликты" aside={<Pill color={findProblems.length?'amber':'green'}>{findProblems.length}</Pill>}>
     {findProblems.length? <Rows heads={['Группа','Пара','Проблема','Операция']} rows={findProblems.slice(0,20).map(({lesson:x,issue})=>[x.groups.join(', '),DAYS[x.day]+', '+x.slot,issue.message,<MiniButton onClick={()=>ifOpen(x)}>Исправить</MiniButton>])}/>:<Notice>На выбранной неделе конфликтов не найдено. Можно продолжать составление расписания.</Notice>}
-   </Panel></div>;
+   </Panel>{softWarnings.length>0&&<Notice>Предупреждений по организации занятий: {softWarnings.length}. Совместная работа за компьютерами допускается при достаточной вместимости и согласованных условиях.</Notice>}</div>;
  };
  const makeAcademic=()=>{
   const grps=GROUPS.filter(g=>(g.id+' '+g.specialty+' '+g.department).toLowerCase().includes(query.toLowerCase()));
