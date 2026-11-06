@@ -38,10 +38,10 @@ describe('contextual scheduling assistant',()=>{
    const occupied=src({id:'busy',teacher:top!.name,groups:['П-22'],room:'110'});
    expect(teacherSuggestions(a,[a,occupied]).find(x=>x.name===top!.name)?.available).toBe(false);
  });
- it('shows capacity failures for a proposed classroom replacement',()=>{
+ it('allows a shared workstation classroom when physical seats are sufficient',()=>{
    const choices=roomSuggestions(src(),[]);
    expect(choices.length).toBe(ROOMS.length-1);
-   expect(choices.find(r=>r.id==='102')?.available).toBe(false);
+   expect(choices.find(r=>r.id==='102')?.available).toBe(true);
    expect(choices.find(r=>r.id==='101')?.available).toBe(true);
  });
  it('disallows modification hints for already confirmed lessons',()=>{
