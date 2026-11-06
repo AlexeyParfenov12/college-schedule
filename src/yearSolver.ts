@@ -1,6 +1,7 @@
 import { GROUPS, ROOMS, TEACHERS } from './data';
 import type { Lesson, CalendarEvent } from './data';
 import { deriveOffers, needsComputers, calendarIssues, lessonDate } from './plannerDomain';
+import { assessRoomFit } from './roomPolicy';
 
 export type TeacherPreference={
  daysOff:number[]; fromSlot:number; toSlot:number;
@@ -48,7 +49,9 @@ export function deriveAnnualDemands(seed:Lesson[],weeks:number,maxSubjects=6):Ye
   .map(o=>({id:o.key,group:g.id,teacher:o.teacher,subject:o.subject,
     pairsPerWeek:o.count>=3?2:1,requiredPairs:(o.count>=3?2:1)*weeks})));
 }
-const seatsFor=(subject:string,room:typeof ROOMS[number])=>needsComputers(subject)?room.pc:room.capacity;
+const suited=(subject:string,room:typeof ROOMS[number],count:number,requiredPc=false)=>assessRoomFit(
+ {id:'check',day:0,slot:1,groups:[],teacher:'',subject,room:room.id,type:'regular',mode:'offline',requiresComputers:requiredPc},room,count
+).level==='ok';
 const location=(l:Lesson)=>l.mode==='online'?'home':l.room==='Предприятие'?'company':'college';
 /** Hard condition for both teacher and every participating group: at most one home/campus switch per day,
  * with a configurable fully vacant travel interval. */
@@ -111,8 +114,9 @@ export function practiceReservations(cfg:AnnualConfig,events:CalendarEvent[],wee
    if(!room||!cfg.activeRooms.includes(block.room)||!room.active){
     issues.push({blockId:block.id,group:block.group,week,reason:'Закреплённый кабинет практики закрыт или не существует'});continue;
    }
-   if(room.capacity<group.count||(block.requiresComputers&&room.pc<group.count)){
-    issues.push({blockId:block.id,group:block.group,week,reason:block.requiresComputers&&room.pc<group.count?'Не хватает компьютеров для непрерывной практики: '+group.count+' студентов, '+room.pc+' ПК':'В закреплённом кабинете не хватает мест для '+group.count+' студентов'});continue;
+   if(!suited(block.title,room,group.count,block.requiresComputers)){
+    const fit=assessRoomFit({id:'practice-test',week,day:0,slot:1,groups:[block.group],teacher:block.teacher,subject:block.title,room:room.id,type:'regular',mode:'offline',requiresComputers:block.requiresComputers},room,group.count);
+    issues.push({blockId:block.id,group:block.group,week,reason:fit.reason});continue;
    }
   }
   for(const day of block.days){
@@ -121,7 +125,7 @@ export function practiceReservations(cfg:AnnualConfig,events:CalendarEvent[],wee
     const lesson:Lesson={id:'practice-'+block.id+'-'+week+'-'+day+'-'+slot,
      week,day,slot,groups:[block.group],subject:block.title||'Учебная практика',
      teacher:block.teacher||'Руководитель практики',room:block.kind==='college'?block.room:'Предприятие',
-     mode:'offline',type:'regular',hours:2,notes:'Непрерывный блок практики · '+(block.kind==='college'?'Закреплённый кабинет':'Внешняя организация')};
+     mode:'offline',type:'regular',hours:2,requiresComputers:block.requiresComputers,notes:'Непрерывный блок практики · '+(block.kind==='college'?'Закреплённый кабинет':'Внешняя организация')};
     const conflicts=hasSlotConflict(state,lesson);
     const availability=teacherRule(cfg,block.teacher);
     const unavailable=availability.daysOff.includes(day)||slot<availability.fromSlot||slot>availability.toSlot||
@@ -147,20 +151,20 @@ function hardReason(task:Task,state:WeekState,cfg:AnnualConfig,calendar:Calendar
  if(rule.fromSlot>rule.toSlot)return 'Недопустимый диапазон пар преподавателя';
  const group=GROUPS.find(g=>g.id===task.group);
  if(!group)return 'Группа отсутствует в Academic Core';
- if(needsComputers(task.subject)&&!roomCandidates.some(r=>r.pc>=group.count)
+ if(needsComputers(task.subject)&&!roomCandidates.some(r=>suited(task.subject,r,group.count))
    &&(!cfg.allowSubgroups.includes(group.id)||!cfg.assistedSubgroups.includes(group.id)))return 'Не хватает компьютеров: нужны разрешение на подгруппы и сопровождающий';
  return 'Нет свободного слота с учётом пожеланий, кабинетов, окон и времени на дорогу';
 }
 function suitableRooms(task:Task,cfg:AnnualConfig,state:WeekState,day:number,slot:number){
  const group=GROUPS.find(g=>g.id===task.group)!;
  const active=ROOMS.filter(r=>cfg.activeRooms.includes(r.id)&&r.active);
- const normal=active.filter(r=>seatsFor(task.subject,r)>=group.count
+ const normal=active.filter(r=>suited(task.subject,r,group.count)
   &&!state.roomBusy.has(busyKey(r.id,day,slot)));
  if(normal.length)return normal.slice().sort((a,b)=>seatsFor(task.subject,a)-seatsFor(task.subject,b)).slice(0,6)
   .map(r=>({room:r.id,type:'regular' as const}));
  if(needsComputers(task.subject)&&cfg.allowSubgroups.includes(task.group)&&cfg.assistedSubgroups.includes(task.group)){
   const half=Math.ceil(group.count/2);
-  const labs=active.filter(r=>r.pc>=half&&!state.roomBusy.has(busyKey(r.id,day,slot)));
+  const labs=active.filter(r=>suited(task.subject,r,half)&&r.pc>0&&!state.roomBusy.has(busyKey(r.id,day,slot)));
   if(labs.length>=2)return [{room:labs[0].id+' / '+labs[1].id,type:'subgroup' as const}];
  }
  return [];
@@ -191,7 +195,7 @@ function candidateScore(state:WeekState,l:Lesson,cfg:AnnualConfig,variant:number
 export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:CalendarEvent[],variant:number,locked:Lesson[]=[]):AnnualVariant{
  const label=['Минимум окон у групп','Удобство преподавателей','Равномерный график','Больше дистанта'][variant]||'Вариант';
  const placed:Lesson[]=[],unplaced:Unplaced[]=[];
- const regularDemands=demands.filter(d=>!((cfg.practiceBlocks||[]).some(p=>p.group===d.group)&&/практик/i.test(d.subject)));
+ const regularDemands=demands; // Practice is linked by academic demand ID, never guessed from a discipline title.
  const quota=new Map<string,number>(),usedOnline=new Map<string,number>();
  for(const d of regularDemands){const limit=quota.get(d.teacher)||0;quota.set(d.teacher,limit+d.requiredPairs)}
  for(const [teacher,total] of quota)quota.set(teacher,Math.floor(total*Math.max(0,Math.min(100,teacherRule(cfg,teacher).maxOnlinePct))/100));
@@ -263,7 +267,7 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
   const missing=d.requiredPairs-(covered.get(d.id)||0);
   if(missing>0){
    const group=GROUPS.find(g=>g.id===d.group);
-   const reason=needsComputers(d.subject)&&group&&!ROOMS.some(r=>cfg.activeRooms.includes(r.id)&&r.pc>=group.count)
+   const reason=needsComputers(d.subject)&&group&&!ROOMS.some(r=>cfg.activeRooms.includes(r.id)&&suited(d.subject,r,group.count))
      &&(!cfg.allowSubgroups.includes(d.group)||!cfg.assistedSubgroups.includes(d.group))
     ? 'Недостаточно компьютерных мест; разреши подгруппы и сопровождающего'
     : 'Недостаточно доступных дней, пар или совместимых аудиторий с учётом ограничений';
