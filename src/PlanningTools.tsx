@@ -3,7 +3,9 @@ import { AlertTriangle, ArrowRight, CalendarDays, Check, ChevronRight, Copy, Hel
 import { DAYS, GROUPS, TIMES } from './data';
 import type { CalendarEvent, Lesson } from './data';
 import OfficialCalendar from './OfficialCalendar';
-import { WEEK_COUNT, deriveOffers, eventAffectedLessons, lessonDate, previewTemplate, previewAutofill, needsComputers, calendarIssues } from './plannerDomain';
+import { WEEK_COUNT, eventAffectedLessons, lessonDate, previewTemplate, previewAutofill, needsComputers, calendarIssues } from './plannerDomain';
+import { demoAcademicDemands, demoAcademicHorizon } from './academicPlanning';
+import { readCollegeWorkweek } from './productionCalendar';
 import type { PreviewPlan } from './plannerDomain';
 import { MiniSchedule, PeriodTimeline, LoadBars, PlanningSummary } from './ScheduleVisuals';
 
@@ -128,15 +130,19 @@ export function TemplateStudio({lessons,calendar,group,week,blocked,saved,onAppl
 
 type GeneratorProps={lessons:Lesson[];calendar:CalendarEvent[];week:number;group:string;onGroup:(v:string)=>void;blocked:string[];onApply:(next:Lesson[],count:number)=>void;onSubgroups:()=>void};
 export function GeneratorStudio({lessons,calendar,week,group,onGroup,blocked,onApply,onSubgroups}:GeneratorProps){
- const offerings=useMemo(()=>deriveOffers(lessons),[lessons]);
+ const offerings=useMemo(()=>demoAcademicDemands(calendar,readCollegeWorkweek(),demoAcademicHorizon(calendar)).map(d=>{
+  const scheduled=lessons.filter(l=>l.status!=='cancelled'&&l.groups.includes(d.group)&&
+   l.subject===d.subject&&l.teacher===d.teacher).length;
+  return {...d,key:d.id,planned:d.requiredPairs,scheduled,remaining:Math.max(0,d.requiredPairs-scheduled)};
+ }),[lessons,calendar]);
  const available=offerings.filter(o=>o.group===group);
  const [offerKey,setOfferKey]=useState('');
- const [count,setCount]=useState(2);
- const [dayLimit,setDayLimit]=useState(5);
+ const [dayLimit,setDayLimit]=useState(readCollegeWorkweek);
  const [slotLimit,setSlotLimit]=useState(4);
  const [preview,setPreview]=useState<ReturnType<typeof previewAutofill>|null>(null);
- const selected=available.find(o=>o.key===offerKey)||available[0];
- const hasSelection=Boolean(selected);
+ const selected=available.find(o=>o.key===offerKey)||available.find(o=>o.remaining>0)||available[0];
+ const count=Math.min(3,selected?.remaining||0);
+ const hasSelection=Boolean(selected&&count>0&&selected.availableWeeks?.includes(week));
  useEffect(()=>setPreview(null),[offerKey,count,dayLimit,slotLimit,group,week,lessons,calendar]);
  const options={days:Array.from({length:dayLimit},(_,i)=>i),slots:Array.from({length:slotLimit},(_,i)=>i+1),requirePc:Boolean(selected&&needsComputers(selected.subject))};
  const seed:Lesson={id:'proposal',week,day:0,slot:1,groups:[group],teacher:selected?.teacher||'',subject:selected?.subject||'',room:'',type:'regular',mode:'offline',hours:2};
@@ -148,21 +154,23 @@ export function GeneratorStudio({lessons,calendar,week,group,onGroup,blocked,onA
   onApply([...lessons,...updated.placed],updated.placed.length);setPreview(null);
  };
  return <div className="plan-page" data-testid="generator-studio">
-  <div className="plan-intro"><div><strong>Автосоставление — сначала предложение, потом согласование</strong><p>Выбираешь учебную нагрузку и желаемые рамки. Система ищет свободные часы, преподавателя и подходящие аудитории. На правой сетке видно результат до сохранения.</p></div><WandSparkles size={24}/></div>
+  <div className="plan-intro"><div><strong>Помощник размещения занятий</strong><p>Выбери группу и незакрытую дисциплину. Преподаватель и количество оставшихся часов уже известны из демонстрационного учебного плана. Помощник предложит подходящие свободные пары текущей недели; изменения появятся только после подтверждения.</p></div><WandSparkles size={24}/></div>
   <div className="plan-columns">
    <section className="plan-pane">
     <Heading step={1}>Какую нагрузку разместить?</Heading>
     <div className="plan-fields">
      <Field name="Учебная группа"><select value={group} onChange={e=>onGroup(e.target.value)}>{grouped.map(g=><option key={g} value={g}>{g}</option>)}</select></Field>
-     <Field name="Занятие из учебного назначения"><select aria-label="Учебное назначение для генератора" value={selected?.key||''} onChange={e=>setOfferKey(e.target.value)}>{available.map(o=><option value={o.key} key={o.key}>{o.subject} · {o.teacher}</option>)}</select></Field>
-     {selected&&<div className="plan-current"><Check size={14}/> {selected.teacher} · {selected.subject} · данные из деморасписания</div>}
-     <Field name="Сколько занятий добавить на этой неделе"><input type="number" min={1} max={10} value={count} onChange={e=>setCount(Math.max(1,Math.min(10,Number(e.target.value)||1)))}/></Field>
+     <Field name="Нераспределённая учебная нагрузка"><select aria-label="Учебное назначение для генератора" value={selected?.key||''} onChange={e=>setOfferKey(e.target.value)}>{available.map(o=><option value={o.key} key={o.key}>{o.subject} · {o.remaining*2} ч осталось · {o.teacher}</option>)}</select></Field>
+     {selected&&<div className="plan-current"><Check size={14}/> {selected.teacher} · {selected.subject} · <strong>план {selected.planned*2} ч, распределено {selected.scheduled*2} ч, осталось {selected.remaining*2} ч</strong> (демо)</div>}
+     <div className="plan-current">Помощник попробует разместить до <strong>{count} занятий</strong> из оставшейся нагрузки на текущей неделе. Число рассчитывается автоматически.</div>
+      {selected&&!selected.availableWeeks?.includes(week)&&<Info>Эта неделя не является теоретической для группы по учебному календарю. Выбери учебную неделю в расписании.</Info>}
+      {selected&&selected.remaining===0&&<Info>Все часы выбранной дисциплины уже распределены по демонстрационному плану.</Info>}
      <Heading step={2}>Ограничения и пожелания</Heading>
      <div className="plan-duo">
       <Field name="Дни"><select value={dayLimit} onChange={e=>setDayLimit(Number(e.target.value))}><option value={5}>Понедельник–пятница</option><option value={6}>Понедельник–суббота</option></select></Field>
       <Field name="До какой пары"><select value={slotLimit} onChange={e=>setSlotLimit(Number(e.target.value))}>{TIMES.map((x,i)=><option key={x} value={i+1}>До {i+1}-й пары</option>)}</select></Field>
      </div>
-     {selected&&needsComputers(selected.subject)&&<div className="plan-current"><Layers3 size={14}/> Для практики нужен компьютерный кабинет. Если мест недостаточно, создай подгруппы. <button type="button" className="plan-inline-link" onClick={onSubgroups}>Настроить подгруппы</button></div>}
+     {selected&&needsComputers(selected.subject)&&<div className="plan-current"><Layers3 size={14}/> Для компьютерных занятий сначала проверяется работа по 2–3 студента за ПК при достаточном числе посадочных мест. Подгруппы применяются только при обоснованной необходимости. <button type="button" className="plan-inline-link" onClick={onSubgroups}>Настройка подгрупп</button></div>}
      <Cmd disabled={!hasSelection} onClick={()=>setPreview(build())}><Sparkles size={14}/> Показать предложенный вариант</Cmd>
     </div>
    </section>
@@ -177,6 +185,6 @@ export function GeneratorStudio({lessons,calendar,week,group,onGroup,blocked,onA
     </>:<Info>Нажми «Показать предложенный вариант». Ничего не сохраняется, пока не примешь результат.</Info>}
    </section>
   </div>
-  <Info>Это прозрачная эвристика для тестового стенда, а не промышленный оптимизатор расписания всего колледжа. Тяжёлую оптимизацию будем выполнять через фоновые задачи NestJS/BullMQ с проверкой всех ограничений Academic Core.</Info>
+  <Info>Источник часов — отдельный демонстрационный набор учебных назначений, не реальный Academic Core. Расчёт служит для проверки сценариев и не подтверждает выполнение учебного плана реального колледжа. Промышленный оптимизатор будет работать в NestJS/BullMQ с проверкой общих правил.</Info>
  </div>;
 }
