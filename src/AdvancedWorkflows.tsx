@@ -6,6 +6,7 @@ import type { Lesson, Absence, CalendarEvent, Rule, Mode, Participant } from './
 import { exportCSV, exportJSON, findFree, validate, groupCount, workload, reportRows, QUALIFICATIONS, occupiedRooms } from './demoLogic';
 import { CalendarStudio, TemplateStudio, GeneratorStudio } from './PlanningTools';
 import { MiniSchedule, LoadBars, PeriodTimeline } from './ScheduleVisuals';
+import RoomManager from './RoomManager';
 
 type Screen=typeof NAV[number][0];
 type Snapshot={id:string;label:string;at:string;week:number;lessons:Lesson[];notice:string};
@@ -104,6 +105,7 @@ export default function AdvancedWorkflows(p:Props){
  const [studentIndex,setStudentIndex]=useState(0);
  const [roomType,setRoomType]=useState('Все');
  const [roomNeed,setRoomNeed]=useState(false);
+ const [,refreshRooms]=useState(0);
  const [parallelMethod,setParallelMethod]=useState('Кабинет + дистанционное подключение');
  const [partRoom,setPartRoom]=useState(ROOMS[1].id);
  const [copyAll,setCopyAll]=useState(false);
@@ -269,7 +271,7 @@ export default function AdvancedWorkflows(p:Props){
  };
  const makeResources=()=>{
   const list=ROOMS.filter(r=>(roomType==='Все'||r.kind===roomType)&&(!roomNeed||r.pc>0)&&(r.id+' '+r.kind+' '+r.building).toLowerCase().includes(query.toLowerCase()));
-  return <div className="studio-stack"><div className="studio-inline-filters">
+  return <div className="studio-stack"><RoomManager selected={selectedRoom} lessons={p.items} onSelect={setSelectedRoom} onChange={()=>refreshRooms(v=>v+1)} notify={p.notify}/><div className="studio-inline-filters">
    <Field title="Тип помещения"><Select value={roomType} onChange={setRoomType} items={opts(['Все',...Array.from(new Set(ROOMS.map(r=>r.kind)))])}/></Field>
    <label className="studio-checkbox"><input type="checkbox" checked={roomNeed} onChange={e=>setRoomNeed(e.target.checked)}/> Только с компьютерами</label>
    <input placeholder="Кабинет или корпус" value={query} onChange={e=>setQuery(e.target.value)}/>
@@ -402,7 +404,7 @@ export default function AdvancedWorkflows(p:Props){
  const contextTeacher=p.screen==='substitutions'?selectedAbsence?.teacher:p.screen==='teacher'?p.teacher:p.screen==='workload'?teacherHours:undefined;
  const contextRoom=p.screen==='resources'?selectedRoom:undefined;
  const viewTitle=p.screen==='substitutions'?'Преподаватель: '+(selectedAbsence?.teacher||''):p.screen==='resources'?'Аудитория '+selectedRoom:p.screen==='workload'||p.screen==='teacher'?'Преподаватель '+(contextTeacher||''):'Группа '+(contextGroup||'');
- if(['calendar','templates','generator'].includes(p.screen))return content;
+ if(['calendar','templates','generator','settings','academic','overview','reports','publication'].includes(p.screen))return content;
  return <div className="studio-stack">
   <section className="studio-context-box">
    <header><div><strong>Как это выглядит в расписании</strong><span>{viewTitle} · неделя {p.week+1}</span></div>
