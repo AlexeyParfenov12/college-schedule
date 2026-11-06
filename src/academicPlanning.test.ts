@@ -32,7 +32,7 @@ describe('demo Academic Core adapter: no invented official curriculum',()=>{
   expect(subject.periodAllocations?.reduce((sum,a)=>sum+a.requiredPairs,0)).toBe(subject.requiredPairs);
  });
  it('excludes weeks reserved for a specific group practice without affecting another group',()=>{
-  const practiceWeek=3;
+  const practiceWeek=4; // 7–13 Dec: every teaching day belongs to the practice block.
   const forPractice=teachingWeeks('П-31',calendar,5,demoAcademicHorizon(calendar),DEMO_SEMESTERS[0]);
   const forOther=teachingWeeks('П-21',calendar,5,demoAcademicHorizon(calendar),DEMO_SEMESTERS[0]);
   expect(forPractice).not.toContain(practiceWeek);
