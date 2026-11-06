@@ -43,6 +43,7 @@ export default function App(){
  const [selected,setSelected]=useState<Item|null>(null);
  const [sideMode,setSideMode]=useState<'assistant'|'edit'>('assistant');
  const [moveMode,setMoveMode]=useState(false);
+ const [draggingId,setDraggingId]=useState<string|null>(null);
  const [preview,setPreview]=useState<MoveOption|null>(null);
  const [weekMoving,setWeekMoving]=useState<Item|null>(null);
  const [contextMenu,setContextMenu]=useState<{x:number;y:number;lesson:Item}|null>(null);
@@ -80,7 +81,15 @@ export default function App(){
  const collisions=selected?cellConflict(selected,current):[];
  const issueCount=current.filter(x=>cellConflict(x,current).length>0).length;
  const displayName=NAV.find(x=>x[0]===screen)?.[1]||'Расписание';
- const choose=(x:Item)=>{setContextMenu(null);setSelected(x);setSideMode('assistant');setMoveMode(false);setPreview(null);setHoverMove(null)};
+ const choose=(x:Item)=>{setContextMenu(null);setSelected(x);setSideMode('assistant');setMoveMode(false);setDraggingId(null);setPreview(null);setHoverMove(null)};
+ const beginDrag=(event:DragEvent<HTMLButtonElement>,lesson:Item)=>{
+  if(lesson.status==='held'){event.preventDefault();setNotice('Проведённое занятие заблокировано для переноса');return}
+  event.dataTransfer.effectAllowed='move';
+  event.dataTransfer.setData('lessonId',lesson.id);
+  setContextMenu(null);setSelected(lesson);setSideMode('assistant');
+  setMoveMode(true);setDraggingId(lesson.id);setPreview(null);setHoverMove(null);
+ };
+ const finishDrag=()=>{setDraggingId(null);setMoveMode(false);setHoverMove(null)};
  const make=(day=0,slot=1)=>{const created:Item={id:id(),day,slot,week,subject:'',teacher:view==='teacher'?teacher:'',groups:view==='group'?[group]:[],room:view==='room'?room:'',type:'regular',mode:'offline'};setSelected(created);setSideMode('edit');setMoveMode(false);setPreview(null)};
 
  const save=(x:Item)=>{
@@ -134,7 +143,7 @@ export default function App(){
   setLastChange({before:[selected,other],changedIds:[selected.id,other.id]});
   setItems([...remaining,first,second]);setStatus('draft');setSelected(null);setMoveMode(false);setPreview(null);setNotice('Занятия обменены местами · доступна отмена');
  };
- const closeSelected=()=>{setSelected(null);setMoveMode(false);setPreview(null);setHoverMove(null);setContextMenu(null)};
+ const closeSelected=()=>{setSelected(null);setMoveMode(false);setDraggingId(null);setPreview(null);setHoverMove(null);setContextMenu(null)};
  const rightClick=(event:MouseEvent<HTMLButtonElement>,lesson:Item)=>{
   event.preventDefault();event.stopPropagation();
   setContextMenu({x:Math.min(event.clientX,Math.max(15,window.innerWidth-240)),y:Math.min(event.clientY,Math.max(15,window.innerHeight-235)),lesson});
@@ -168,7 +177,7 @@ export default function App(){
  };
  useEffect(()=>{
    const handler=(e:KeyboardEvent)=>{
-    if(e.key==='Escape'){setPreview(null);setMoveMode(false);setHoverMove(null);setContextMenu(null);setWeekMoving(null);return}
+    if(e.key==='Escape'){setPreview(null);setMoveMode(false);setDraggingId(null);setHoverMove(null);setContextMenu(null);setWeekMoving(null);return}
     const target=e.target as HTMLElement|null;
     if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'&&lastChange&&!['INPUT','TEXTAREA','SELECT'].includes(target?.tagName||'')){e.preventDefault();undo()}
    };
@@ -191,7 +200,7 @@ export default function App(){
    <Action onClick={()=>exportCSV()}><Download size={14}/> CSV</Action>
    {lastChange&&<Action onClick={undo} title="Ctrl+Z — отменить последнее изменение"><RotateCcw size={14}/> Отменить</Action>}
  </div>;
- const grid=<div className={'timetable-scroll '+(moveMode&&selected?'move-active':'')} data-testid="schedule-grid"><div className={'timetable '+density} style={{gridTemplateColumns:'74px repeat('+days+', minmax(140px,1fr))'}}>
+ const grid=<div className={'timetable-scroll '+(moveMode&&selected?'move-active ':'')+(draggingId?'dragging':'')} data-testid="schedule-grid"><div className={'timetable '+density} style={{gridTemplateColumns:'74px repeat('+days+', minmax(140px,1fr))'}}>
  <div className="grid-head">Пара</div>{DAYS.slice(0,days).map((d,i)=><div key={i} className="grid-head">{d}<small>{lessonDate(week,i).slice(8)}.{lessonDate(week,i).slice(5,7)}</small></div>)}
  {bellTimes.map((tm,row)=><div className="grid-fragment" key={row}>
   <div className="slot"><b>{row+1}</b><small>{tm}</small></div>
@@ -199,12 +208,14 @@ export default function App(){
    const target=targetByCell.get(day+':'+(row+1));
    const cellLessons=visible.filter(x=>x.day===day&&x.slot===row+1);
    return <div key={d} className={'slot-cell '+(moveMode&&selected&&target?'slot-'+target.kind:'')} title={moveMode&&target?target.reason:undefined}
-    onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();const key=e.dataTransfer.getData('lessonId');if(key)move(key,day,row+1)}}
+    onDragEnter={()=>{if(draggingId&&target)setHoverMove(target)}}
+    onDragOver={e=>{e.preventDefault();e.dataTransfer.dropEffect=target?.kind==='available'?'move':'none'}}
+    onDrop={e=>{e.preventDefault();const key=e.dataTransfer.getData('lessonId')||draggingId;if(key)move(key,day,row+1)}}
     onMouseEnter={()=>{if(moveMode&&target)setHoverMove(target)}}
     onMouseLeave={()=>setHoverMove(null)}>
-    {cellLessons.map(x=><button draggable={!preview} key={x.id}
+    {cellLessons.map(x=><button draggable={!preview&&x.status!=='held'} key={x.id}
       className={'lesson '+x.type+(selected?.id===x.id?' picked':'')}
-      onDragStart={(e:DragEvent<HTMLButtonElement>)=>{e.dataTransfer.setData('lessonId',x.id);choose(x)}}
+      onDragStart={(e:DragEvent<HTMLButtonElement>)=>beginDrag(e,x)} onDragEnd={finishDrag}
       onClick={()=>choose(x)} onContextMenu={e=>rightClick(e,x)} aria-label={'Открыть занятие: '+x.subject+', '+x.groups.join(' + ')}>{lessonLabel(x)}</button>)}
     {moveMode&&selected&&target&&cellLessons.length===0
      ? <button type="button" className={'target-overlay '+target.kind} data-testid={'target-'+day+'-'+(row+1)}
@@ -212,14 +223,18 @@ export default function App(){
        aria-label={(target.kind==='available'?'Доступен перенос: ':target.kind==='blocked'?'Недоступен перенос: ':'Исходное занятие: ')+target.label+' — '+target.reason}>
         {target.kind==='available'?<><Check size={14}/> Перенести</>:target.kind==='blocked'?<><X size={13}/> Занято</>:<><CalendarDays size={13}/> Сейчас</>}
        </button>
-     : <button className="empty-slot" aria-label={'Создать занятие: '+DAYS[day]+', пара '+(row+1)} title="Назначить занятие" onClick={()=>make(day,row+1)}><Plus size={15}/></button>}
+     : (!moveMode&&cellLessons.length===0?<button className="empty-slot" aria-label={'Создать занятие: '+DAYS[day]+', пара '+(row+1)} title="Назначить занятие" onClick={()=>make(day,row+1)}><Plus size={15}/></button>:null)}
+    {moveMode&&selected&&target&&cellLessons.length>0&&<span className={'drag-cell-indicator '+target.kind} title={target.reason}
+      aria-label={(target.kind==='available'?'Можно перенести: ':target.kind==='blocked'?'Перенос запрещён: ':'Исходная ячейка: ')+target.reason}>
+       {target.kind==='available'?<><Check size={12}/> Можно</>:target.kind==='blocked'?<><X size={12}/> Занято</>:<><CalendarDays size={12}/> Отсюда</>}
+    </span>}
    </div>
   })}
  </div>)}
  </div></div>;
  const legend=<div className="legend"><span><i className="swatch regular"/>Обычное</span><span><i className="swatch subgroup"/>Подгруппы</span><span><i className="swatch stream"/>Поток</span><span><i className="swatch parallel"/>Параллель</span><span><i className="swatch online"/>Онлайн/гибрид</span></div>;
  const schedule=<>
- {moveMode&&selected&&<div className="move-toolbar"><div><ArrowLeftRight size={16}/><b>Режим переноса</b><span>Выбрано: {selected.subject} · {selected.groups.join(' + ')}</span></div><div className="move-summary"><span className="marker available"/>{availableTargetCount} доступно <span className="marker blocked"/>{targets.filter(t=>t.kind==='blocked').length} недоступно</div><button onClick={()=>{setMoveMode(false);setPreview(null)}}>Закрыть режим <X size={13}/></button></div>}
+ {moveMode&&selected&&<div className="move-toolbar"><div><ArrowLeftRight size={16}/><b>{draggingId?'Перетаскивание занятия':'Режим переноса'}</b><span>Выбрано: {selected.subject} · {selected.groups.join(' + ')}</span></div><div className="move-summary"><span className="marker available"/>{availableTargetCount} доступно <span className="marker blocked"/>{targets.filter(t=>t.kind==='blocked').length} недоступно</div><span className="move-hover-reason" role="status">{hoverMove?hoverMove.reason:draggingId?'Наведи на ячейку: зелёная — можно, красная — нельзя':'Выбери доступную ячейку'}</span><button onClick={()=>{setMoveMode(false);setDraggingId(null);setPreview(null)}}>Закрыть режим <X size={13}/></button></div>}
  <div className="schedule-layout"><aside className="group-sidebar">
   <div className="sidebar-search"><Search size={14}/><input aria-label="Поиск групп, преподавателей, аудиторий" placeholder="Поиск..." value={search} onChange={e=>setSearch(e.target.value)}/></div>
   <div className="side-caption">{view==='group'?'Группы':view==='teacher'?'Преподаватели':'Аудитории'}</div>
