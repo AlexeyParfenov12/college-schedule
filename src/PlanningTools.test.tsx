@@ -72,4 +72,19 @@ describe('visual guided planning workflows',()=>{
   expect(screen.getByRole('combobox',{name:'Группа занятия'})).toBeTruthy();
   expect(screen.getByRole('combobox',{name:'Дисциплина занятия'})).toBeTruthy();
  },20000);
+ it('can assign one academic period to several selected groups without creating duplicate calendars',()=>{
+  render(<App/>);
+  navigation('Учебный календарь');
+  expect(screen.getByRole('combobox',{name:'Просмотр календаря группы'})).toBeTruthy();
+  fireEvent.change(screen.getByRole('combobox',{name:'Тип периода'}),{target:{value:'study'}});
+  fireEvent.change(screen.getByRole('combobox',{name:'На кого действует'}),{target:{value:'custom'}});
+  const groupLabels=[...document.querySelectorAll<HTMLLabelElement>('.plan-calendar-group-list label')];
+  const second=groupLabels.find(x=>x.textContent?.includes('П-22'));
+  expect(second).toBeTruthy();
+  fireEvent.click(second!.querySelector('input')!);
+  expect(screen.getByText('Выбрано групп: 2')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button',{name:'Сохранить учебный период'}));
+  expect(screen.getByText(/П-21, П-22/)).toBeTruthy();
+ },20000);
+
 });
