@@ -7,7 +7,7 @@ export type RoomFit={level:'ok'|'warning'|'blocked';reason:string;students:numbe
 export const studentsIn=(lesson:Lesson)=> lesson.participants?.reduce((sum,p)=>sum+(p.count||GROUPS.find(g=>g.id===p.group)?.count||0),0)
  ||lesson.groups.reduce((sum,id)=>sum+(GROUPS.find(g=>g.id===id)?.count||0),0);
 export function assessRoomFit(lesson:Lesson,room:Room,count=studentsIn(lesson)):RoomFit{
- const requiresPC=Boolean(lesson.requiresIndividualComputer||needsComputers(lesson.subject));
+ const requiresPC=Boolean(lesson.requiresIndividualComputer||lesson.requiresComputers||needsComputers(lesson.subject));
  const required=lesson.requiresIndividualComputer?1:(lesson.computerShare||room.recommendedStudentsPerComputer||2);
  const permitted=Math.max(1,Math.min(3,room.maxStudentsPerComputer||3));
  const requiredComputers=requiresPC?Math.ceil(count/required):0;
