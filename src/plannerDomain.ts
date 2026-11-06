@@ -51,7 +51,7 @@ export function suitableSubgroupPair(lesson:Lesson,lessons:Lesson[],blocked:stri
 }
 
 export const START_ISO='2026-11-09';
-export const WEEK_COUNT=16;
+export const WEEK_COUNT=40;
 export function lessonDate(week:number,day:number):string{
  const d=new Date(Date.UTC(2026,10,9+week*7+day));return d.toISOString().slice(0,10);
 }
@@ -70,7 +70,7 @@ export function eventAffectedLessons(event:CalendarEvent,lessons:Lesson[]):Lesso
  return lessons.filter(l=>{const date=lessonDate(l.week||0,l.day);return date>=event.from&&date<=event.to&&(event.groups.length===0||l.groups.some(g=>event.groups.includes(g)))});
 }
 export type WeekSummary={week:number;start:string;total:number;blocked:number;events:string[]};
-export function calendarWeekSummaries(events:CalendarEvent[],lessons:Lesson[],group:string,start=0,end=15):WeekSummary[]{
+export function calendarWeekSummaries(events:CalendarEvent[],lessons:Lesson[],group:string,start=0,end=WEEK_COUNT-1):WeekSummary[]{
  const result:WeekSummary[]=[];
  for(let week=start;week<=end;week++){
   const current=lessons.filter(x=>(x.week||0)===week&&x.groups.includes(group));
