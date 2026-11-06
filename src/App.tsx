@@ -236,7 +236,7 @@ export default function App(){
         {target.kind==='available'?<><Check size={14}/> Перенести</>:target.kind==='blocked'?<><X size={13}/> Занято</>:<><CalendarDays size={13}/> Сейчас</>}
        </button>
      : (!moveMode&&cellLessons.length===0?<button className="empty-slot" aria-label={'Создать занятие: '+DAYS[day]+', пара '+(row+1)} title="Назначить занятие" onClick={()=>make(day,row+1)}><Plus size={15}/></button>:null)}
-    {pickedCell&&<span className="selected-cell-marker" aria-hidden="true"><Check size={10}/> Выбрано</span>}
+    {pickedCell&&<span className="selected-cell-marker" aria-hidden="true"><i className="selected-cell-dot"/> Выбрано</span>}
     {moveMode&&selected&&target&&cellLessons.length>0&&<span className={'drag-cell-indicator '+target.kind} title={target.reason}
       aria-label={(target.kind==='available'?'Можно перенести: ':target.kind==='blocked'?'Перенос запрещён: ':'Исходная ячейка: ')+target.reason}>
        {target.kind==='available'?<><Check size={12}/> Можно</>:target.kind==='blocked'?<><X size={12}/> Занято</>:<><CalendarDays size={12}/> Отсюда</>}
