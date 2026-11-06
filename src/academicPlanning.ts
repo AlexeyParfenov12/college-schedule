@@ -81,12 +81,19 @@ export function demoAcademicDemands(calendar:CalendarEvent[],workweek:Workweek,w
  return DEMO_TEACHING_ASSIGNMENTS.map(assignment=>{
   const terms=eligibility.get(assignment.group)!;
   const allowedWeeks=[...new Set([...terms.autumn,...terms.spring])].sort((a,b)=>a-b);
-  const autumnPairs=terms.autumn.length?assignment.autumnHours/2:0;
-  const springPairs=terms.spring.length?assignment.springHours/2:0;
+  const horizonStart=lessonDate(0,0);
+  const horizonEnd=lessonDate(weeks-1,6);
+  const overlaps=(semester:SemesterFixture)=>semester.from<=horizonEnd&&semester.to>=horizonStart;
+  const autumnPairs=overlaps(DEMO_SEMESTERS[0])?assignment.autumnHours/2:0;
+  const springPairs=overlaps(DEMO_SEMESTERS[1])?assignment.springHours/2:0;
   return {
    id:assignment.id,group:assignment.group,teacher:assignment.teacher,
    subject:assignment.subject,pairsPerWeek:1,
    requiredPairs:autumnPairs+springPairs,availableWeeks:allowedWeeks,
+   periodAllocations:[
+    {id:'autumn',weeks:terms.autumn,requiredPairs:autumnPairs},
+    {id:'spring',weeks:terms.spring,requiredPairs:springPairs}
+   ],
    semesters:{autumnPairs,springPairs}
   };
  });
