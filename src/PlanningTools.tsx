@@ -14,17 +14,19 @@ function Field({name,children}:{name:string;children:React.ReactNode}){return <l
 function Info({children}:{children:React.ReactNode}){return <p className="plan-info"><HelpCircle size={15}/><span>{children}</span></p>}
 function Cmd({onClick,children,disabled=false}:{onClick:()=>void;children:React.ReactNode;disabled?:boolean}){return <button type="button" className="plan-command" disabled={disabled} onClick={onClick}>{children}</button>}
 
-type CalendarProps={events:CalendarEvent[];lessons:Lesson[];group:string;week:number;setWeek:(w:number)=>void;add:(v:CalendarEvent)=>void;remove:(id:string)=>void};
-export function CalendarStudio({events,lessons,group,week,setWeek,add,remove}:CalendarProps){
+type CalendarProps={events:CalendarEvent[];lessons:Lesson[];group:string;setGroup:(g:string)=>void;week:number;setWeek:(w:number)=>void;add:(v:CalendarEvent)=>void;remove:(id:string)=>void};
+export function CalendarStudio({events,lessons,group,setGroup,week,setWeek,add,remove}:CalendarProps){
  const [kind,setKind]=useState<CalendarEvent['kind']>('practice');
  const [title,setTitle]=useState('Учебная практика');
  const [from,setFrom]=useState('2026-11-16');
  const [to,setTo]=useState('2026-11-20');
  const [scope,setScope]=useState(group);
+ const [multiGroups,setMultiGroups]=useState<string[]>([group]);
+ const [groupQuery,setGroupQuery]=useState('');
  const [confirmed,setConfirmed]=useState(false);
- const candidate:CalendarEvent={id:'preview',kind,title,from,to,groups:scope==='all'?[]:[scope]};
- const conflicts=useMemo(()=>eventAffectedLessons(candidate,lessons),[kind,title,from,to,scope,lessons]);
- const isValid=Boolean(title.trim()&&from<=to);
+ const candidate:CalendarEvent={id:'preview',kind,title,from,to,groups:scope==='all'?[]:scope==='custom'?multiGroups:[scope]};
+ const conflicts=useMemo(()=>eventAffectedLessons(candidate,lessons),[kind,title,from,to,scope,multiGroups,lessons]);
+ const isValid=Boolean(title.trim()&&from<=to&&(scope!=='custom'||multiGroups.length>0));
  const blocking=kind==='vacation'||kind==='holiday'||kind==='practice';
  const eventsSorted=[...events].sort((a,b)=>a.from.localeCompare(b.from));
  const create=()=>{if(!isValid||blocking&&conflicts.length&&!confirmed)return;add({...candidate,id:'cal-'+Date.now().toString(36)});setConfirmed(false)};
