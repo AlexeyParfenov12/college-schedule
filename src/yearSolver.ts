@@ -125,7 +125,7 @@ export function practiceReservations(cfg:AnnualConfig,events:CalendarEvent[],wee
     const lesson:Lesson={id:'practice-'+block.id+'-'+week+'-'+day+'-'+slot,
      week,day,slot,groups:[block.group],subject:block.title||'Учебная практика',
      teacher:block.teacher||'Руководитель практики',room:block.kind==='college'?block.room:'Предприятие',
-     mode:'offline',type:'regular',hours:2,requiresComputers:block.requiresComputers,requiresIndividualComputer:block.requiresIndividualComputer,notes:'Непрерывный блок практики · '+(block.kind==='college'?'Закреплённый кабинет':'Внешняя организация')};
+     mode:'offline',type:'regular',hours:2,practiceBlockId:block.id,requiresComputers:block.requiresComputers,requiresIndividualComputer:block.requiresIndividualComputer,notes:'Непрерывный блок практики · '+(block.kind==='college'?'Закреплённый кабинет':'Внешняя организация')};
     const conflicts=hasSlotConflict(state,lesson);
     const availability=teacherRule(cfg,block.teacher);
     const unavailable=availability.daysOff.includes(day)||slot<availability.fromSlot||slot>availability.toSlot||
