@@ -95,4 +95,38 @@ describe('React interface smoke checks',()=>{
   expect(screen.getByTestId('lesson-assistant')).toBeTruthy();
   expect(document.querySelector('.timetable-scroll.move-active')).toBeNull();
  },20000);
+ it('starts availability heatmap on dragStart and clears it when a drag is cancelled',()=>{
+  render(<App/>);
+  const first=document.querySelector<HTMLButtonElement>('.lesson');
+  expect(first).toBeTruthy();
+  const key=first!.getAttribute('aria-label')||'';
+  const transfer={setData:(_type:string,_value:string)=>{},getData:(_type:string)=>'',effectAllowed:'',dropEffect:''};
+  fireEvent.dragStart(first!,{dataTransfer:transfer});
+  expect(document.querySelector('.timetable-scroll.move-active.dragging')).toBeTruthy();
+  expect(document.querySelectorAll('.slot-cell.slot-available').length).toBeGreaterThan(0);
+  expect(document.querySelectorAll('.slot-cell.slot-blocked').length).toBeGreaterThan(0);
+  expect(document.querySelectorAll('.drag-cell-indicator.blocked').length).toBeGreaterThan(0);
+  expect(screen.getByText('Перетаскивание занятия')).toBeTruthy();
+  fireEvent.dragEnd(first!,{dataTransfer:transfer});
+  expect(document.querySelector('.timetable-scroll.dragging')).toBeNull();
+  expect(document.querySelector('.timetable-scroll.move-active')).toBeNull();
+  expect(first?.getAttribute('aria-label')).toBe(key);
+ },20000);
+ it('drops into a green cell with a preview instead of silently moving',()=>{
+  render(<App/>);
+  const first=document.querySelector<HTMLButtonElement>('.lesson')!;
+  let lessonId='';
+  const transfer={setData:(_type:string,value:string)=>{lessonId=value},getData:(_type:string)=>lessonId,effectAllowed:'',dropEffect:''};
+  fireEvent.dragStart(first,{dataTransfer:transfer});
+  const available=document.querySelector<HTMLButtonElement>('.target-overlay.available');
+  expect(available).toBeTruthy();
+  const cell=available!.closest('.slot-cell');
+  expect(cell).toBeTruthy();
+  fireEvent.dragEnter(cell!,{dataTransfer:transfer});
+  fireEvent.drop(cell!,{dataTransfer:transfer});
+  fireEvent.dragEnd(first,{dataTransfer:transfer});
+  expect(screen.getByRole('dialog',{name:'Подтверждение переноса'})).toBeTruthy();
+  expect(document.querySelector('.timetable-scroll.dragging')).toBeNull();
+ },20000);
+
 });
