@@ -2,6 +2,7 @@ import { GROUPS, ROOMS, TEACHERS } from './data';
 import type { Lesson, CalendarEvent } from './data';
 import { deriveOffers, needsComputers, calendarIssues, lessonDate } from './plannerDomain';
 import { assessRoomFit } from './roomPolicy';
+import { readCollegeWorkweek } from './productionCalendar';
 
 export type TeacherPreference={
  daysOff:number[]; fromSlot:number; toSlot:number;
@@ -30,7 +31,7 @@ export type AnnualVariant={id:string;name:string;lessons:Lesson[];unplaced:Unpla
 export const ANNUAL_WEEK_LIMIT=40;
 export function defaultAnnualConfig():AnnualConfig{
  return {
-  weeks:40,days:5,slotsPerDay:6,commuteGap:1,
+  weeks:40,days:readCollegeWorkweek(),slotsPerDay:6,commuteGap:1,
   defaultOnlinePct:20,groupGapWeight:90,teacherGapWeight:65,
   activeRooms:ROOMS.filter(r=>r.active).map(r=>r.id),allowStreams:[],
   allowSubgroups:[],assistedSubgroups:[],teacherPreferences:{},practiceBlocks:[]
@@ -131,8 +132,7 @@ export function practiceReservations(cfg:AnnualConfig,events:CalendarEvent[],wee
     const unavailable=availability.daysOff.includes(day)||slot<availability.fromSlot||slot>availability.toSlot||
       availability.forbidden.some(b=>b.day===day&&slot>=b.from&&slot<=b.to);
     // A matching practice period is not a prohibition; vacations and holidays are.
-    const vacation=events.some(e=>['holiday','vacation'].includes(e.kind)&&
-      e.from<=lessonDate(week,day)&&lessonDate(week,day)<=e.to&&(!e.groups.length||e.groups.includes(block.group)));
+    const vacation=calendarIssues(lesson,events,cfg.days).length>0;
     if(vacation||conflicts||unavailable){
      issues.push({blockId:block.id,group:block.group,week,reason:vacation?'Практика пересекается с каникулами или выходным':unavailable?'Руководитель практики недоступен в заданный день или пару':'Группа, руководитель или кабинет заняты другой практикой/фиксированным занятием'});
      continue;
@@ -262,7 +262,7 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
        week,day,slot,groups:taskGroups,teacher:task.teacher,subject:task.subject,
        room:option.room,mode:option.mode,type:task.members?'stream':option.type,hours:2,
        notes:option.type==='subgroup'?'Демонстрация: одобрено разделение, сопровождающий необходим':undefined};
-      if(calendarIssues(l,events).length)continue;
+      if(calendarIssues(l,events,cfg.days).length)continue;
       const dailyTeacher=get(state.teacherByDay,k(task.teacher,day));
       if(taskGroups.some(g=>commuteViolations([...get(state.groupByDay,k(g,day)),l],cfg.commuteGap).length)||
          commuteViolations([...dailyTeacher,l],cfg.commuteGap).length)continue;
