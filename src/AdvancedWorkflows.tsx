@@ -170,10 +170,19 @@ export default function AdvancedWorkflows(p:Props){
  const makeAcademic=()=>{
   const grps=GROUPS.filter(g=>(g.id+' '+g.specialty+' '+g.department).toLowerCase().includes(query.toLowerCase()));
   return <div className="studio-stack"><div className="studio-headbar"><input placeholder="Найти группу, отделение, специальность..." value={query} onChange={e=>setQuery(e.target.value)}/><Pill color="green">{GROUPS.length} групп · {TEACHERS.length} преподавателя</Pill></div>
-    <Panel title="Академические группы — справочник Academic Core">
+    <Panel title="Академические группы · демонстрационный адаптер Academic Core">
       <Rows heads={['Группа','Отделение','Курс','Специальность','Студентов','Действия']} rows={grps.slice(0,limit).map(g=>[g.id,g.department,g.course,g.specialty,g.count,<MiniButton onClick={()=>{setGroupDetails(g.id);p.onNavigate('groups')}}>Состав</MiniButton>])}/>
       {grps.length>limit&&<Button onClick={()=>setLimit(v=>v+40)}>Показать ещё ({grps.length-limit})</Button>}
-    </Panel><div className="studio-columns"><Panel title="Кадровый справочник">{TEACHERS.slice(0,15).map(t=><div className="studio-list-row" key={t}><b>{t}</b><small>{QUALIFICATIONS[t]?.join(', ')}</small></div>)}</Panel><Panel title="Учебные дисциплины">{SUBJECTS.map(s=><div className="studio-chip" key={s}>{s}</div>)}</Panel></div>
+    </Panel>
+    <Panel title="Учебные назначения · демонстрационный Academic Core" aside={<Select value={p.group} onChange={p.setGroup} items={opts(GROUPS.map(g=>g.id))}/>}>
+      <Rows heads={['Дисциплина','Преподаватель','Осенний период, ч','Весенний период, ч','Итого, ч']} rows={demoAcademicDemands(db.calendar,p.days===5?5:6,demoAcademicHorizon(db.calendar)).filter(d=>d.group===p.group).map(d=>[
+       d.subject,d.teacher,(d.semesters?.autumnPairs||0)*2,(d.semesters?.springPairs||0)*2,d.requiredPairs*2
+      ])}/>
+      <div className="studio-inline-filters"><Notice>Часы и назначения получены из отдельного тестового учебного плана, а не из текущего расписания. Реальный Academic Core ещё не подключён.</Notice>
+       <Button onClick={()=>p.onNavigate('year')}>Проверить в годовом мастере</Button>
+      </div>
+    </Panel>
+    <div className="studio-columns"><Panel title="Кадровый справочник">{TEACHERS.slice(0,15).map(t=><div className="studio-list-row" key={t}><b>{t}</b><small>{QUALIFICATIONS[t]?.join(', ')}</small></div>)}</Panel><Panel title="Учебные дисциплины">{SUBJECTS.map(s=><div className="studio-chip" key={s}>{s}</div>)}</Panel></div>
    <Notice>Данные предназначены для демонстрации. Реальные преподаватели, студенты, TeachingAssignment и учебные планы должны поступать из общего Academic Core.</Notice></div>;
  };
  const makeCalendar=()=> <CalendarStudio events={db.calendar} lessons={p.items} group={p.group} setGroup={p.setGroup} week={p.week} setWeek={p.setWeek}
