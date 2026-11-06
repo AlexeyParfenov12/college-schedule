@@ -13,6 +13,7 @@ import type { MoveOption } from './scheduleAssist';
 import { validate } from './demoLogic';
 import { lessonDate, WEEK_COUNT } from './plannerDomain';
 import { auditAnnualDraft } from './yearAudit';
+import { readCollegeWorkweek } from './productionCalendar';
 
 type Item = Lesson & {week?:number};
 type View = 'group'|'teacher'|'room';
@@ -58,7 +59,7 @@ export default function App(){
  const [room,setRoom]=useState('102');
  const [week,setWeek]=useState(0);
  const [density,setDensity]=useState<'compact'|'standard'>('compact');
- const [days,setDays]=useState(6);
+ const [days,setDays]=useState<5|6>(readCollegeWorkweek);
  const [search,setSearch]=useState('');
  const [status,setStatus]=useState<'draft'|'published'>('draft');
  const [notice,setNotice]=useState('');
@@ -353,7 +354,7 @@ export default function App(){
       setItems(audit.next);setStatus('draft');setLastChange(null);setSelected(null);setWeek(0);setScreen('schedule');
       setNotice('Вариант применён к черновику: '+audit.changed+' занятий. Неразмещённых назначений: '+variant.unplaced.length+'. Доступен возврат.');
     }}/>
-  : <AdvancedWorkflows screen={screen} items={items} setItems={setItems} week={week} setWeek={setWeek} group={group} setGroup={setGroup} teacher={teacher} setTeacher={setTeacher} room={room} setRoom={setRoom} onNavigate={show} onEdit={setSelected} onFocusLesson={focusLesson} notify={setNotice} markDraft={()=>setStatus('draft')} status={status} setStatus={setStatus} density={density} setDensity={setDensity} days={days} setDays={setDays}/>;
+  : <AdvancedWorkflows screen={screen} items={items} setItems={setItems} week={week} setWeek={setWeek} group={group} setGroup={setGroup} teacher={teacher} setTeacher={setTeacher} room={room} setRoom={setRoom} onNavigate={show} onEdit={setSelected} onFocusLesson={focusLesson} notify={setNotice} markDraft={()=>setStatus('draft')} status={status} setStatus={setStatus} density={density} setDensity={setDensity} days={days} setDays={v=>setDays(v===5?5:6)}/>;
  return <div className="app">
   <aside className={'nav '+(collapsed?'closed':'')}>
    <div className="brand"><div className="brand-symbol">C</div>{!collapsed&&<div><strong>College</strong><span>Schedule</span></div>}<button onClick={()=>setCollapsed(v=>!v)} className="nav-toggle"><Menu size={16}/></button></div>
