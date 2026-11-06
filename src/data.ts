@@ -4,7 +4,7 @@ export type Participant = {group:string;subgroup?:number;teacher?:string;room:st
 export type Lesson = {
  id:string; day:number; slot:number; subject:string; teacher:string; groups:string[]; room:string;
  type:Type; mode:Mode; notes?:string; week?:number; participants?:Participant[]; hours?:number;
- computerShare?:1|2|3; requiresIndividualComputer?:boolean;
+ computerShare?:1|2|3; requiresIndividualComputer?:boolean; requiresComputers?:boolean;
  status?:'scheduled'|'cancelled'|'held'; replacementFor?:string; originalDay?:number; originalSlot?:number;
 };
 export const DAYS=['Пн','Вт','Ср','Чт','Пт','Сб'];
