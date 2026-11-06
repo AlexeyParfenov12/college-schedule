@@ -167,7 +167,7 @@ export function GeneratorStudio({lessons,calendar,week,group,onGroup,blocked,onA
       {selected&&selected.remaining===0&&<Info>Все часы выбранной дисциплины уже распределены по демонстрационному плану.</Info>}
      <Heading step={2}>Ограничения и пожелания</Heading>
      <div className="plan-duo">
-      <Field name="Дни"><select value={dayLimit} onChange={e=>setDayLimit(Number(e.target.value))}><option value={5}>Понедельник–пятница</option><option value={6}>Понедельник–суббота</option></select></Field>
+      <Field name="Дни"><select value={dayLimit} onChange={e=>setDayLimit(Number(e.target.value)===5?5:6)}><option value={5}>Понедельник–пятница</option><option value={6}>Понедельник–суббота</option></select></Field>
       <Field name="До какой пары"><select value={slotLimit} onChange={e=>setSlotLimit(Number(e.target.value))}>{TIMES.map((x,i)=><option key={x} value={i+1}>До {i+1}-й пары</option>)}</select></Field>
      </div>
      {selected&&needsComputers(selected.subject)&&<div className="plan-current"><Layers3 size={14}/> Для компьютерных занятий сначала проверяется работа по 2–3 студента за ПК при достаточном числе посадочных мест. Подгруппы применяются только при обоснованной необходимости. <button type="button" className="plan-inline-link" onClick={onSubgroups}>Настройка подгрупп</button></div>}
