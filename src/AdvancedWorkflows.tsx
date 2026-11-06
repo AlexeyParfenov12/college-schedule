@@ -354,7 +354,12 @@ export default function AdvancedWorkflows(p:Props){
  const makeSettings=()=>{
   return <div className="studio-stack"><div className="studio-columns"><Panel title="Компактность и интерфейс"><div className="studio-form">
    <Field title="Плотность расписания"><Select value={p.density} onChange={v=>p.setDensity(v as 'compact'|'standard')} items={[{id:'compact',label:'Компактная'},{id:'standard',label:'Стандартная'}]}/></Field>
-   <Field title="Учебных дней в неделю"><Select value={p.days} onChange={v=>p.setDays(Number(v))} items={[{id:5,label:'5 дней'},{id:6,label:'6 дней'}]}/></Field>
+   <Field title="Учебных дней в неделю"><Select value={p.days} onChange={v=>{
+ const days=Number(v)===5?5:6;
+ try{localStorage.setItem('college-schedule-workweek-v1',String(days))}catch{}
+ p.setDays(days);
+ }} items={[{id:5,label:'Пн–Пт · пятидневка'},{id:6,label:'Пн–Сб · шестидневка'}]}/></Field>
+   <Notice>Выходные и праздники автоматически исключаются из ручного назначения, шаблонов и годового расчёта. Для 2026 и 2027 годов применяются утверждённые переносы, при этом правила пятидневки и шестидневки отличаются. Региональные и колледжные периоды настраиваются в учебном календаре.</Notice>
    <Notice>Цветовая система: глубокий бирюзовый, светлая нейтральная поверхность и лаймовый акцент College Ecosystem.</Notice>
   </div></Panel><Panel title="Сетка звонков — редактирование для демонстрации">
    {db.times.map((t,i)=><div className="studio-list-row" key={i}><b>{i+1} пара</b><input value={t} onChange={e=>put(d=>({...d,times:d.times.map((x,j)=>j===i?e.target.value:x)}))}/></div>)}
