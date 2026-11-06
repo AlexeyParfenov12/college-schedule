@@ -1,3 +1,4 @@
+import { classifyCalendarDay, readCollegeWorkweek } from './productionCalendar';
 export type Type = 'regular' | 'subgroup' | 'stream' | 'parallel';
 export type Mode = 'offline' | 'online' | 'hybrid' | 'async';
 export type Participant = {group:string;subgroup?:number;teacher?:string;room:string;mode:Mode;count?:number};
@@ -81,8 +82,11 @@ export const NAV=[
 export const totalDatasetDays=16;
 export function buildSeed(weeks=16):Lesson[]{
  const base=[...INITIAL];let counter=1;
+ const workweek=readCollegeWorkweek();
  for(let w=0;w<weeks;w++){
-   for(let day=0;day<6;day++){
+   for(let day=0;day<workweek;day++){
+    const iso=new Date(Date.UTC(2026,10,9+w*7+day)).toISOString().slice(0,10);
+    if(classifyCalendarDay(iso,workweek).nonWorking)continue;
     for(let slot=1;slot<=5;slot++){
       const usedTeachers=new Set(base.filter(x=>x.week===w&&x.day===day&&x.slot===slot).map(x=>x.teacher));
       const usedRooms=new Set(base.filter(x=>x.week===w&&x.day===day&&x.slot===slot).flatMap(x=>x.room.split(/\s*[+/]\s*/).filter(s=>/^\d+$/.test(s))));
