@@ -8,7 +8,7 @@ import type { AnnualConfig, AnnualVariant, YearDemand, PracticeBlock, TeacherPre
 import { lessonDate } from './plannerDomain';
 import { assessRoomFit } from './roomPolicy';
 
-type Props={lessons:Lesson[];calendar:CalendarEvent[];onApply:(variant:AnnualVariant,weeks:number)=>void;notify:(s:string)=>void};
+type Props={lessons:Lesson[];calendar:CalendarEvent[];onApply:(variant:AnnualVariant,weeks:number,workweek:5|6)=>void;notify:(s:string)=>void};
 type Tab='load'|'teachers'|'rooms'|'groups'|'practice'|'distance'|'results';
 const tabs:{id:Tab;name:string}[]=[
  {id:'load',name:'Нагрузка'},{id:'teachers',name:'Преподаватели'},{id:'rooms',name:'Кабинеты'},
@@ -109,7 +109,7 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
    ?'ВНИМАНИЕ: вариант неполный. Неразмещённых назначений: '+gaps+'. Проблем практики: '+practice+'. Они сохранятся для разбора учебной частью. '
    :'По рассчитанной демонстрационной нагрузке неразмещённых назначений нет. ';
   if(!window.confirm(details+'Применить расписание на '+cfg.weeks+' недель к черновику? Проведённые занятия сохраняются, предыдущий вариант можно восстановить.'))return;
-  onApply(selected,cfg.weeks);
+  onApply(selected,cfg.weeks,cfg.days);
  };
  const nextTab=()=>{const i=tabs.findIndex(t=>t.id===tab);setTab(tabs[Math.min(i+1,tabs.length-1)].id)};
  return <div className="year-planner" data-testid="year-planner">
