@@ -41,6 +41,7 @@ export default function SmartLessonEditor({item,existing,all,catalog,view,contex
  const [manual,setManual]=useState(false);
  const [secondRoom,setSecondRoom]=useState('');
  const [msg,setMsg]=useState('');
+ const [equipmentApproved,setEquipmentApproved]=useState(false);
  const blocked=readBlockedRooms();
  const key=blocked.join('|');
  const primaryGroup=view==='group'?(contextGroup||item.groups[0]):form.groups[0]||'';
@@ -55,7 +56,7 @@ export default function SmartLessonEditor({item,existing,all,catalog,view,contex
  const availableGroups=(view==='teacher'?assignedGroups:GROUPS.map(g=>g.id)).filter(name=>!groupIsBusy(name));
  const roomSuggestion=(value:Lesson)=>view==='room'&&contextRoom&&value.mode!=='online'&&value.mode!=='async'?contextRoom:deriveRoom(value,all);
  useEffect(()=>{
-  setExpanded(false);setSearchOpen(false);setMsg('');
+  setExpanded(false);setSearchOpen(false);setMsg('');setEquipmentApproved(false);
   const fixedGroup=view==='group'?(contextGroup||item.groups[0]):item.groups[0];
   const fixedTeacher=view==='teacher'?(contextTeacher||item.teacher):item.teacher;
   const base:Lesson=existing?{...item}:{
@@ -72,13 +73,13 @@ export default function SmartLessonEditor({item,existing,all,catalog,view,contex
   // Only reset on opening another lesson; not while editing fields.
   // eslint-disable-next-line react-hooks/exhaustive-deps
  },[item.id]);
- const patch=(p:Partial<Lesson>)=>setForm(x=>({...x,...p}));
+ const patch=(p:Partial<Lesson>)=>{setEquipmentApproved(false);setForm(x=>({...x,...p}))};
  const selectTeacher=(teacher:string)=>{
   const options=offers.filter(o=>o.group===primaryGroup&&o.teacher===teacher);
   const nextSubject=options.some(o=>o.subject===form.subject)?form.subject:options.length===1?options[0].subject:'';
   const updated={...form,teacher,subject:nextSubject};
   updated.room=nextSubject?roomSuggestion(updated):view==='room'?contextRoom||'':'';
-  setForm(updated);setSecondRoom(roomId(updated.room)[1]||'');setMsg('');
+  setForm(updated);setSecondRoom(roomId(updated.room)[1]||'');setMsg('');setEquipmentApproved(false);
  };
  const selectGroup=(group:string)=>{
   const teacher=view==='teacher'?(contextTeacher||form.teacher):'';
@@ -100,7 +101,7 @@ export default function SmartLessonEditor({item,existing,all,catalog,view,contex
  const selectable=allRooms.filter(r=>r.available);
  const currentVenue=selectable.some(r=>r.id===chosen[0])?chosen[0]:'';
  const groupSize=groupCount(form.groups);
- const minNeeded=needsComputers(form.subject)&&form.type==='regular'&&groupSize>0&&preferred.length===0;
+ const minNeeded=needsComputers(form.subject)&&form.type==='regular'&&groupSize>0&&selectable.length===0;
  const switchType=(type:Type)=>{
   const comparable=offers.find(o=>o.teacher===form.teacher&&o.subject===form.subject&&o.group!==primaryGroup);
   const nextGroups=type==='regular'||type==='subgroup'?[primaryGroup]:form.groups.length>1?form.groups:comparable?[primaryGroup,comparable.group]:[primaryGroup];
@@ -113,11 +114,13 @@ export default function SmartLessonEditor({item,existing,all,catalog,view,contex
   const room=form.type==='subgroup'?first&&second?first+' / '+second:'':form.type==='parallel'?first+' + онлайн':first;
   patch({room});
  };
- const issues=validate(roomCandidate,all).filter(i=>i.hard);
+ const allIssues=validate(roomCandidate,all);
+ const issues=allIssues.filter(i=>i.hard);
+ const softIssues=allIssues.filter(i=>!i.hard);
  const dateIssues=calendarIssues(roomCandidate,currentDemoCalendar());
  const multiple= form.type==='stream'||form.type==='parallel';
- const isValid=Boolean(form.groups.length&&(!multiple||form.groups.length>=2)&&form.subject&&form.teacher&&(manual||subjectNames.includes(form.subject))&&(form.mode==='online'||form.mode==='async'||roomId(form.room).length>0)&&!issues.length&&!dateIssues.length);
- const saveForm=(e:FormEvent)=>{e.preventDefault();if(!isValid){setMsg(issues[0]?.message||'Заполни доступные варианты занятия');return}save(roomCandidate)};
+ const isValid=Boolean(form.groups.length&&(!multiple||form.groups.length>=2)&&form.subject&&form.teacher&&(manual||subjectNames.includes(form.subject))&&(form.mode==='online'||form.mode==='async'||roomId(form.room).length>0)&&!issues.length&&!dateIssues.length&&(!softIssues.length||equipmentApproved));
+ const saveForm=(e:FormEvent)=>{e.preventDefault();if(!isValid){setMsg(issues[0]?.message||softIssues[0]?.message||'Заполни доступные варианты занятия');return}save(roomCandidate)};
  const typeLabel=Object.entries(TYPES);
  const isOnline=form.mode==='online'||form.mode==='async';
  const showRoom=!isOnline;
@@ -163,13 +166,25 @@ export default function SmartLessonEditor({item,existing,all,catalog,view,contex
     {(form.type==='stream'||form.type==='parallel')&&<div className="smart-group-picker"><span>Участники ({form.groups.length}) · нужно минимум две группы</span><div>{form.groups.map(g=><button type="button" key={g} onClick={()=>g===contextGroup&&view==='group'?undefined:patch({groups:form.groups.filter(x=>x!==g)})} disabled={view==='group'&&g===contextGroup}>{g}<X size={11}/></button>)}</div><button type="button" className="smart-text" onClick={()=>setSearchOpen(v=>!v)}>+ Добавить группу</button>
      {searchOpen&&<div className="smart-drop"><input aria-label="Поиск дополнительных групп" placeholder="Поиск…" value={groupSearch} onChange={e=>setGroupSearch(e.target.value)}/><div>{GROUPS.filter(g=>!form.groups.includes(g.id)&&g.id.toLowerCase().includes(groupSearch.toLowerCase())).map(g=><button type="button" key={g.id} onClick={()=>patch({groups:[...form.groups,g.id]})}>{g.id} <Plus size={11}/></button>)}</div></div>}
     </div>}
+    {showRoom&&needsComputers(form.subject)&&<div className="smart-pc-policy">
+     <label className="smart-field"><span>Студентов за компьютером</span>
+       <select aria-label="Студентов за компьютером" disabled={Boolean(form.requiresIndividualComputer)}
+         value={form.requiresIndividualComputer?1:form.computerShare||2}
+         onChange={e=>patch({computerShare:Number(e.target.value) as 1|2|3})}>
+         {[1,2,3].map(n=><option value={n} key={n}>{n} {n===1?'студент':'студента'} / ПК</option>)}
+       </select>
+     </label>
+     <label className="smart-pc-individual"><input type="checkbox" checked={Boolean(form.requiresIndividualComputer)}
+       onChange={e=>patch({requiresIndividualComputer:e.target.checked,computerShare:e.target.checked?1:2})}/>
+       Обязательный индивидуальный компьютер (экзамен, аттестация)</label>
+    </div>}
     {showRoom&&<div className="smart-room">
       {form.type==='subgroup'?<>
        <label className="smart-field"><span>Кабинет 1-й подгруппы</span><select aria-label="Аудитория первой подгруппы" value={currentVenue} onChange={e=>setRoom(e.target.value)}><option value="">Выбрать кабинет</option>{selectable.map(r=><option key={r.id} value={r.id}>{r.label} · {r.reason}</option>)}</select></label>
        <label className="smart-field"><span>Кабинет 2-й подгруппы</span><select aria-label="Аудитория второй подгруппы" value={secondRoom} onChange={e=>setRoom(currentVenue,e.target.value)}><option value="">Выбрать кабинет</option>{selectable.filter(x=>x.id!==currentVenue).map(r=><option key={r.id} value={r.id}>{r.label} · {r.reason}</option>)}</select></label>
        <span className="smart-subline">{groupSize} студентов → две подгруппы примерно по {Math.ceil(groupSize/2)} человек.</span>
       </>:<>
-       <label className="smart-field"><span>Аудитория · {preferred.length} подходящих</span><select aria-label="Аудитория занятия" value={currentVenue} onChange={e=>setRoom(e.target.value)}><option value="">Подбери аудиторию</option>{selectable.map(r=><option key={r.id} value={r.id}>{r.label} · {r.reason}</option>)}</select></label>
+       <label className="smart-field"><span>Аудитория · {selectable.length} доступных</span><select aria-label="Аудитория занятия" value={currentVenue} onChange={e=>setRoom(e.target.value)}><option value="">Подбери аудиторию</option>{selectable.map(r=><option key={r.id} value={r.id}>{r.label} · {r.reason}</option>)}</select></label>
        {form.type==='parallel'&&<span className="smart-subline">Первая группа очно; остальные подключаются онлайн. При другом формате используй отдельный конструктор параллелей.</span>}
       </>}
       {minNeeded&&<div className="smart-suggest"><Laptop size={15}/><span>Для всех {groupSize} студентов недостаточно компьютерных мест. Раздели практическое занятие на подгруппы.</span><button type="button" onClick={()=>switchType('subgroup')}>Разделить</button></div>}
@@ -185,6 +200,11 @@ export default function SmartLessonEditor({item,existing,all,catalog,view,contex
      <button type="button" className="smart-text" onClick={()=>setManual(x=>!x)}>{manual?'Скрыть':'Развернуть'} ручной выбор дисциплины/преподавателя</button>
      {manual&&<><label className="smart-field"><span>Дисциплина (деморежим)</span><select value={form.subject} onChange={e=>patch({subject:e.target.value})}>{options(SUBJECTS)}</select></label><label className="smart-field"><span>Преподаватель (деморежим)</span><select value={form.teacher} onChange={e=>patch({teacher:e.target.value})}>{options(TEACHERS)}</select></label><div className="smart-warning">Ручное изменение учебного назначения требует проверки полномочий и связи TeachingAssignment в общей системе.</div></>}
    </div>}
+   {softIssues.length>0&&<div className="smart-equipment-warning" role="note"><CircleAlert size={14}/>
+     <span>{softIssues[0].message}. Это предупреждение, а не автоматический запрет.
+     <label><input type="checkbox" checked={equipmentApproved} onChange={e=>setEquipmentApproved(e.target.checked)}/>
+      Условия размещения проверены и согласованы учебной частью (деморежим)</label></span>
+    </div>}
    {issues.length>0&&<div className="smart-warning"><CircleAlert size={14}/> {issues[0].message}</div>}
    {dateIssues.length>0&&<div className="smart-warning"><CalendarDays size={14}/> {dateIssues[0]} — выбери другую дату или согласуй календарь.</div>}
    {msg&&<div className="smart-warning">{msg}</div>}
