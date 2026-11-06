@@ -6,7 +6,7 @@ import type { Lesson, Absence, CalendarEvent, Rule, Mode, Participant } from './
 import { exportCSV, exportJSON, findFree, validate, groupCount, workload, reportRows, QUALIFICATIONS, occupiedRooms } from './demoLogic';
 import { CalendarStudio, TemplateStudio, GeneratorStudio } from './PlanningTools';
 import { MiniSchedule, LoadBars, PeriodTimeline } from './ScheduleVisuals';
-import { WEEK_COUNT } from './plannerDomain';
+import { WEEK_COUNT, calendarIssues } from './plannerDomain';
 import RoomManager from './RoomManager';
 
 type Screen=typeof NAV[number][0];
@@ -121,7 +121,10 @@ export default function AdvancedWorkflows(p:Props){
   <div className="studio-group-select">{GROUPS.filter(g=>g.id.toLowerCase().includes(groupFilter.toLowerCase())).map(g=><button key={g.id} className={groups.includes(g.id)?'chosen':''} onClick={()=>onGroup(g.id)}>{groups.includes(g.id)?<Check size={12}/>:<Plus size={12}/>} {g.id}</button>)}</div>
  </div>;
  const ifOpen=(x:Lesson)=>p.onFocusLesson(x);
- const findProblems=useMemo(()=>curr.flatMap(x=>validate(x,curr).filter(issue=>issue.hard).map(issue=>({lesson:x,issue}))).filter((v,i,a)=>a.findIndex(z=>z.lesson.id===v.lesson.id&&z.issue.message===v.issue.message)===i),[curr]);
+ const findProblems=useMemo(()=>curr.filter(x=>x.status!=='cancelled').flatMap(x=>
+  [...validate(x,curr).filter(issue=>issue.hard),
+   ...calendarIssues(x,db.calendar,p.days===5?5:6).map(message=>({kind:'calendar' as const,hard:true,message}))].map(issue=>({lesson:x,issue}))
+ ).filter((v,i,a)=>a.findIndex(z=>z.lesson.id===v.lesson.id&&z.issue.message===v.issue.message)===i),[curr,db.calendar,p.days]);
  const softWarnings=useMemo(()=>curr.flatMap(x=>validate(x,curr).filter(issue=>!issue.hard).map(issue=>({lesson:x,issue}))),[curr]);
  const involved=useMemo(()=>selectedAbsence?curr.filter(x=>x.teacher===selectedAbsence.teacher&&x.day>=selectedAbsence.from&&x.day<=selectedAbsence.to&&x.status!=='cancelled'):[],[curr,selectedAbsence]);
  const selectedRoster=db.roster[groupDetails]||[];
