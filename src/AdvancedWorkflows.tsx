@@ -172,7 +172,7 @@ export default function AdvancedWorkflows(p:Props){
     </Panel><div className="studio-columns"><Panel title="Кадровый справочник">{TEACHERS.slice(0,15).map(t=><div className="studio-list-row" key={t}><b>{t}</b><small>{QUALIFICATIONS[t]?.join(', ')}</small></div>)}</Panel><Panel title="Учебные дисциплины">{SUBJECTS.map(s=><div className="studio-chip" key={s}>{s}</div>)}</Panel></div>
    <Notice>Данные предназначены для демонстрации. Реальные преподаватели, студенты, TeachingAssignment и учебные планы должны поступать из общего Academic Core.</Notice></div>;
  };
- const makeCalendar=()=> <CalendarStudio events={db.calendar} lessons={p.items} group={p.group} week={p.week} setWeek={p.setWeek}
+ const makeCalendar=()=> <CalendarStudio events={db.calendar} lessons={p.items} group={p.group} setGroup={p.setGroup} week={p.week} setWeek={p.setWeek}
    add={event=>{put(d=>({...d,calendar:[...d.calendar,event]}));p.notify('Период добавлен в учебный календарь (демо)')}}
    remove={id=>put(d=>({...d,calendar:d.calendar.filter(e=>e.id!==id)}))}/>;
  const makeTemplates=()=> <TemplateStudio lessons={p.items} calendar={db.calendar} group={p.group} week={p.week} saved={db.templates}
