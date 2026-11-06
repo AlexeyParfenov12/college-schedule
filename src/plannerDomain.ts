@@ -58,7 +58,7 @@ export function lessonDate(week:number,day:number):string{
 export function calendarIssues(lesson:Lesson,calendar:CalendarEvent[]):string[]{
  const day=lessonDate(lesson.week||0,lesson.day);
  return calendar.filter(e=>e.from<=day&&day<=e.to&&(e.groups.length===0||lesson.groups.some(g=>e.groups.includes(g))))
-  .filter(e=>e.kind==='holiday'||e.kind==='vacation'||e.kind==='practice')
+  .filter(e=>e.kind==='holiday'||e.kind==='vacation'||(e.kind==='practice'&&!lesson.practiceBlockId))
   .map(e=>'Учебный календарь: '+e.title+' ('+day+')');
 }
 export function calendarWarnings(lesson:Lesson,calendar:CalendarEvent[]):string[]{
