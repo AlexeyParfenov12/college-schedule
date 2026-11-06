@@ -3,7 +3,8 @@ import { AlertTriangle, ArrowRight, BookOpen, Check, CheckCircle2, ChevronLeft, 
 import { DAYS, GROUPS, ROOMS, TEACHERS } from './data';
 import type { Lesson, CalendarEvent } from './data';
 import { MiniSchedule, LoadBars } from './ScheduleVisuals';
-import { defaultAnnualConfig, deriveAnnualDemands, streamKey, teacherRule, practiceWeekActive } from './yearSolver';
+import { defaultAnnualConfig, streamKey, teacherRule, practiceWeekActive } from './yearSolver';
+import { academicGroupStats, demoAcademicDemands, demoAcademicHorizon, DEMO_SEMESTERS } from './academicPlanning';
 import type { AnnualConfig, AnnualVariant, YearDemand, PracticeBlock, TeacherPreference } from './yearSolver';
 import { lessonDate } from './plannerDomain';
 import { assessRoomFit } from './roomPolicy';
@@ -20,13 +21,14 @@ const read=():AnnualConfig=>{try{const data=localStorage.getItem('college-year-p
 const key=(name:string,subject:string)=>streamKey(name,subject);
 const periodOptions=(weeks:number)=>Array.from({length:weeks},(_,w)=><option key={w} value={w}>{w+1}-я · {lessonDate(w,0)}</option>);
 export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
- const [cfg,setCfg]=useState<AnnualConfig>(read);
+ const horizon=useMemo(()=>demoAcademicHorizon(calendar),[calendar]);
+ const [cfg,setCfg]=useState<AnnualConfig>(()=>({...read(),weeks:demoAcademicHorizon(calendar)}));
  const backlog=useMemo(()=>{
   try{return JSON.parse(localStorage.getItem('college-year-unplaced-v1')||'null') as {at:string;weeks:number;unplaced:{group:string;subject:string;reason:string}[];practiceIssues:{group:string;week:number;reason:string}[]}|null}
   catch{return null}
  },[]);
  const [tab,setTab]=useState<Tab>('load');
- const [demands,setDemands]=useState<YearDemand[]>(()=>deriveAnnualDemands(lessons,40,4));
+ const demands=useMemo(()=>demoAcademicDemands(calendar,cfg.days,cfg.weeks),[calendar,cfg.days,cfg.weeks]);
  const [teacher,setTeacher]=useState(TEACHERS[0]),[teacherSearch,setTeacherSearch]=useState('');
  const [roomSearch,setRoomSearch]=useState(''),[group,setGroup]=useState('П-21');
  const [practiceGroup,setPracticeGroup]=useState('П-21'),[practiceKind,setPracticeKind]=useState<'college'|'company'>('college');
@@ -44,6 +46,9 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
   setVariants([]);
  };
  useEffect(()=>()=>{worker.current?.terminate()},[]);
+ useEffect(()=>{
+  if(cfg.weeks!==horizon)change(current=>({...current,weeks:horizon}));
+ },[cfg.weeks,horizon]);
  const rule=teacherRule(cfg,teacher);
  const teacherOptions=TEACHERS.filter(x=>x.toLowerCase().includes(teacherSearch.toLowerCase()));
  const activeRooms=ROOMS.filter(r=>r.active&&cfg.activeRooms.includes(r.id));
@@ -66,6 +71,7 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
   return [...map.entries()].filter(([,v])=>v.groups.length>1);
  },[demands]);
  const selectedDemands=demands.filter(x=>x.group===group);
+ const groupStats=academicGroupStats(demands,group);
  const selected=variants[active];
  const issues=(selected?.unplaced||[]).filter(x=>(x.group+x.subject+x.teacher+x.reason).toLowerCase().includes(issueSearch.toLowerCase()));
  const totalHours=demands.reduce((s,d)=>s+d.requiredPairs*2,0);
@@ -118,13 +124,29 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
   {backlog&&backlog.unplaced.length+backlog.practiceIssues.length>0&&
    <div className="year-note" role="status"><strong>Остатки после последнего применения:</strong> {backlog.unplaced.length} назначений и {backlog.practiceIssues.length} проблем практики.
    Они сохранены в этом браузере и требуют решения учебной части. Пересчитай план после изменения ограничений.</div>}
-  <div className="year-kpis"><div><b>{GROUPS.length}</b><small>групп</small></div><div><b>{demands.length}</b><small>дисциплин / назначений</small></div><div><b>{totalHours.toLocaleString('ru-RU')}</b><small>плановых часов</small></div><div><b>{activeRooms.length}</b><small>кабинетов</small></div><div><b>{cfg.practiceBlocks.length}</b><small>блоков практики</small></div></div>
+  <div className="year-kpis"><div><b>{GROUPS.length}</b><small>групп</small></div><div><b>{demands.length}</b><small>дисциплин / назначений</small></div><div><b>{totalHours.toLocaleString('ru-RU')}</b><small>часов по демо-учебным назначениям</small></div><div><b>{activeRooms.length}</b><small>кабинетов</small></div><div><b>{cfg.practiceBlocks.length}</b><small>блоков практики</small></div></div>
   <div className="year-tabs" role="tablist" aria-label="Настройка годового расписания">{tabs.map(x=><button role="tab" aria-selected={tab===x.id} className={tab===x.id?'active':''} key={x.id} onClick={()=>setTab(x.id)}>{x.name}</button>)}</div>
   {tab==='load'&&<div className="year-cols"><section className="year-card"><h3><BookOpen size={16}/> Требования к учебным часам</h3>
-   <p>В демоверсии предметы и плановые часы восстановлены из примеров расписания. В реальной системе сюда подключаются учебные планы, TeachingAssignment и подтверждённые нагрузки Academic Core.</p>
-   <div className="year-fields"><F name="Период"><select value={cfg.weeks} onChange={e=>{const weeks=Number(e.target.value);change(c=>({...c,weeks,practiceBlocks:c.practiceBlocks.filter(p=>p.startWeek+p.durationWeeks<=weeks)}));setDemands(d=>d.map(x=>({...x,requiredPairs:x.pairsPerWeek*weeks})))}}><option value={16}>16 недель</option><option value={32}>32 недели</option><option value={40}>40 недель · учебный год</option></select></F>
-   <F name="Группа"><select value={group} onChange={e=>setGroup(e.target.value)}>{GROUPS.map(g=><option key={g.id} value={g.id}>{g.id}</option>)}</select></F></div>
-   <div className="year-table-scroll"><table><thead><tr><th>Дисциплина</th><th>Преподаватель</th><th>Пар за год</th></tr></thead><tbody>{selectedDemands.map(d=><tr key={d.id}><td>{d.subject}</td><td>{d.teacher}</td><td><input type="number" min={0} max={600} aria-label={'Пар за год '+d.subject} value={d.requiredPairs} onChange={e=>{setDemands(old=>old.map(x=>x.id===d.id?{...x,requiredPairs:Math.max(0,Number(e.target.value)||0)}:x));setVariants([])}}/></td></tr>)}</tbody></table></div>
+   <p>Демонстрационные учебные планы и назначения преподавателей заданы отдельно от готовых занятий. Часы берутся из тестовых записей учебных планов, а доступные недели — из учебного календаря каждой группы. Это <strong>не утверждённые часы реального колледжа</strong>: позже здесь будет подключён Academic Core.</p>
+   <div className="year-fields">
+    <F name="Период определяется автоматически"><div className="year-auto-period" role="status">
+      <strong>{cfg.weeks} недель календарного горизонта</strong>
+      <small>{lessonDate(0,0)} — {lessonDate(cfg.weeks-1,6)}</small>
+     </div></F>
+    <F name="Группа"><select value={group} onChange={e=>setGroup(e.target.value)}>{GROUPS.map(g=><option key={g.id} value={g.id}>{g.id}</option>)}</select></F>
+   </div>
+   <div className="year-auto-stats">
+    <span>{groupStats.assignments} учебных назначений</span>
+    <span>{groupStats.teachingWeeks} учебных недель у группы</span>
+    <span>{groupStats.plannedHours} академических часов по демоплану</span>
+   </div>
+   <div className="year-table-scroll"><table><thead><tr>
+    <th>Дисциплина</th><th>Преподаватель</th><th>Осень, ч</th><th>Весна, ч</th><th>Всего, ч</th>
+   </tr></thead><tbody>{selectedDemands.map(d=><tr key={d.id}>
+    <td>{d.subject}</td><td>{d.teacher}</td><td>{(d.semesters?.autumnPairs||0)*2}</td>
+    <td>{(d.semesters?.springPairs||0)*2}</td><td><strong>{d.requiredPairs*2}</strong></td>
+   </tr>)}</tbody></table></div>
+   <div className="year-note">Часы не редактируются в расписании: изменения утверждённого учебного плана выполняются в Academic Core. Демонстрационные назначения охватывают {DEMO_SEMESTERS.length} учебных периода; периоды можно настроить в учебном календаре.</div>
    </section><section className="year-card"><h3><Clock3 size={16}/> Общие ограничения</h3><div className="year-fields">
     <F name="Учебных дней"><select value={cfg.days} onChange={e=>change(c=>({...c,days:Number(e.target.value) as 5|6}))}><option value={5}>Пн–Пт</option><option value={6}>Пн–Сб</option></select></F>
     <F name="Пар в день"><select value={cfg.slotsPerDay} onChange={e=>change(c=>({...c,slotsPerDay:Number(e.target.value)}))}>{[3,4,5,6].map(x=><option key={x} value={x}>{x}</option>)}</select></F></div>
@@ -147,9 +169,9 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
   {tab==='rooms'&&<div className="year-cols"><section className="year-card"><h3>Работающие аудитории</h3><div className="year-search"><Search size={14}/><input aria-label="Найти аудиторию для годового плана" placeholder="Номер, корпус, тип..." value={roomSearch} onChange={e=>setRoomSearch(e.target.value)}/></div>
     <div className="year-list rooms">{ROOMS.filter(r=>(r.id+' '+r.kind+' '+r.building).toLowerCase().includes(roomSearch.toLowerCase())).map(r=><label key={r.id}><input type="checkbox" checked={cfg.activeRooms.includes(r.id)} onChange={e=>change(c=>({...c,activeRooms:e.target.checked?[...c.activeRooms,r.id]:c.activeRooms.filter(x=>x!==r.id)}))}/><b>{r.id}</b><small>{r.kind} · {r.pc?r.pc+' ПК':r.capacity+' мест'} · корпус {r.building}</small></label>)}</div>
    </section><section className="year-card"><h3>Доступный фонд</h3><div className="year-room-kpis"><div><b>{activeRooms.length}</b><small>всего</small></div><div><b>{activeRooms.filter(r=>r.pc>0).length}</b><small>компьютерных</small></div><div><b>{activeRooms.filter(r=>r.capacity>=60).length}</b><small>больших залов</small></div></div><p>Закрытая аудитория исключается из подбора. Зарезервированные под практику кабинеты будут недоступны другим группам в закреплённые пары всех недель практики.</p><button className="year-next" onClick={nextTab}>Потоки и подгруппы <ArrowRight size={14}/></button></section></div>}
-  {tab==='groups'&&<div className="year-cols"><section className="year-card"><h3>Разрешённые потоки</h3><p>Настрой, какие общие лекции разрешено объединять. Для потоков обязательны один преподаватель и дисциплина, а также аудитория на всех участников. В прототипе это пока разрешения для будущего решателя: фактическая автоматическая группировка потоков не выполняется.</p>
+  {tab==='groups'&&<div className="year-cols"><section className="year-card"><h3>Разрешённые потоки</h3><p>Настрой, какие общие лекции разрешено объединять. Для потоков обязательны один преподаватель и дисциплина, а также аудитория на всех участников. Годовой решатель может объединять совместимые назначения в одно занятие нескольких групп, учитывая учебные часы каждой группы.</p>
     <div className="year-list">{[...new Map(demands.map(d=>[streamKey(d.teacher,d.subject),{teacher:d.teacher,subject:d.subject}])).values()].filter(v=>demands.filter(d=>d.teacher===v.teacher&&d.subject===v.subject).length>1).map(v=>{const code=streamKey(v.teacher,v.subject);return <label key={code}><input type="checkbox" checked={cfg.allowStreams.includes(code)} onChange={e=>change(c=>({...c,allowStreams:e.target.checked?[...c.allowStreams,code]:c.allowStreams.filter(x=>x!==code)}))}/><span>{v.subject} · {v.teacher}</span></label>})}</div>
-   </section><section className="year-card"><h3>Подгруппы и сопровождающие</h3><p>Для практики с недостаточным количеством компьютеров разреши разделение группы и наличие сопровождающего. Только тогда предлагаются два кабинета одновременно.</p>
+   </section><section className="year-card"><h3>Подгруппы и сопровождающие</h3><p>При необходимости разреши подгруппы и назначь сопровождающего. Сначала проверь возможность работы по 2–3 человека за компьютером: нехватка персональных ПК не означает обязательного разделения.</p>
    <div className="year-list">{GROUPS.map(g=><div className="year-group-row" key={g.id}><b>{g.id} · {g.count} человек</b><label><input type="checkbox" checked={cfg.allowSubgroups.includes(g.id)} onChange={e=>change(c=>({...c,allowSubgroups:e.target.checked?[...c.allowSubgroups,g.id]:c.allowSubgroups.filter(x=>x!==g.id)}))}/> Делить</label><label><input type="checkbox" checked={cfg.assistedSubgroups.includes(g.id)} onChange={e=>change(c=>({...c,assistedSubgroups:e.target.checked?[...c.assistedSubgroups,g.id]:c.assistedSubgroups.filter(x=>x!==g.id)}))}/> Сопровождение</label></div>)}</div>
     <button className="year-next" onClick={nextTab}>Закрепить практики <ArrowRight size={14}/></button></section></div>}
   {tab==='practice'&&<div className="year-cols"><section className="year-card"><h3><BookOpen size={16}/> Непрерывная практика · 1–несколько недель</h3>
