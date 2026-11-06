@@ -234,7 +234,12 @@ export default function App(){
  </div></div>;
  const legend=<div className="legend"><span><i className="swatch regular"/>Обычное</span><span><i className="swatch subgroup"/>Подгруппы</span><span><i className="swatch stream"/>Поток</span><span><i className="swatch parallel"/>Параллель</span><span><i className="swatch online"/>Онлайн/гибрид</span></div>;
  const schedule=<>
- {moveMode&&selected&&<div className="move-toolbar"><div><ArrowLeftRight size={16}/><b>{draggingId?'Перетаскивание занятия':'Режим переноса'}</b><span>Выбрано: {selected.subject} · {selected.groups.join(' + ')}</span></div><div className="move-summary"><span className="marker available"/>{availableTargetCount} доступно <span className="marker blocked"/>{targets.filter(t=>t.kind==='blocked').length} недоступно</div><span className="move-hover-reason" role="status">{hoverMove?hoverMove.reason:draggingId?'Наведи на ячейку: зелёная — можно, красная — нельзя':'Выбери доступную ячейку'}</span><button onClick={()=>{setMoveMode(false);setDraggingId(null);setPreview(null)}}>Закрыть режим <X size={13}/></button></div>}
+ {moveMode&&selected&&!draggingId&&<div className="move-toolbar"><div><ArrowLeftRight size={16}/><b>{draggingId?'Перетаскивание занятия':'Режим переноса'}</b><span>Выбрано: {selected.subject} · {selected.groups.join(' + ')}</span></div><div className="move-summary"><span className="marker available"/>{availableTargetCount} доступно <span className="marker blocked"/>{targets.filter(t=>t.kind==='blocked').length} недоступно</div><span className="move-hover-reason" role="status">{hoverMove?hoverMove.reason:draggingId?'Наведи на ячейку: зелёная — можно, красная — нельзя':'Выбери доступную ячейку'}</span><button onClick={()=>{setMoveMode(false);setDraggingId(null);setPreview(null)}}>Закрыть режим <X size={13}/></button></div>}
+ {draggingId&&selected&&<div className="drag-floating-feedback" role="status" data-testid="drag-guide">
+   <strong>Перемещаем: {selected.subject}</strong>
+   <span><Check size={13}/> {availableTargetCount} доступно <X size={13}/> {targets.filter(t=>t.kind==='blocked').length} запрещено</span>
+   <small>{hoverMove?.reason||'Наведи на ячейку: зелёная — можно, красная — нельзя'}</small>
+ </div>}
  <div className="schedule-layout"><aside className="group-sidebar">
   <div className="sidebar-search"><Search size={14}/><input aria-label="Поиск групп, преподавателей, аудиторий" placeholder="Поиск..." value={search} onChange={e=>setSearch(e.target.value)}/></div>
   <div className="side-caption">{view==='group'?'Группы':view==='teacher'?'Преподаватели':'Аудитории'}</div>
