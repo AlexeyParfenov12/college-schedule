@@ -11,7 +11,8 @@ import AnnualPlanner from './AnnualPlanner';
 import { moveOptions, explainCandidate, readBlockedRooms, swapOptions } from './scheduleAssist';
 import type { MoveOption } from './scheduleAssist';
 import { validate } from './demoLogic';
-import { lessonDate, WEEK_COUNT } from './plannerDomain';
+import { lessonDate, WEEK_COUNT, calendarIssues, currentDemoCalendar } from './plannerDomain';
+import { classifyCalendarDay } from './productionCalendar';
 import { auditAnnualDraft } from './yearAudit';
 import { readCollegeWorkweek } from './productionCalendar';
 
@@ -83,7 +84,7 @@ export default function App(){
  const resetSeed=()=>{if(window.confirm('Сбросить все изменения в расписании? Синтетическая база останется, черновики будут удалены.')){localStorage.removeItem('college-schedule-edits-v3');localStorage.removeItem('college-schedule-extras-v1');window.location.reload()}};
  const visible=current.filter(x=>view==='group'?x.groups.includes(group):view==='teacher'?x.teacher===teacher:x.room.includes(room));
  const collisions=selected?cellConflict(selected,current):[];
- const issueCount=current.filter(x=>cellConflict(x,current).length>0).length;
+ const issueCount=current.filter(x=>x.status!=='cancelled'&&(cellConflict(x,current).length>0||calendarIssues(x,currentDemoCalendar(),days).length>0)).length;
  const displayName=NAV.find(x=>x[0]===screen)?.[1]||'Расписание';
  const choose=(x:Item)=>{setFocusId(null);setContextMenu(null);setSelected(x);setSideMode('assistant');setMoveMode(false);setDraggingId(null);setPreview(null);setHoverMove(null)};
  const beginDrag=(event:DragEvent<HTMLButtonElement>,lesson:Item)=>{
@@ -237,10 +238,17 @@ export default function App(){
    }}><RotateCcw size={14}/> Вернуть прошлый вариант</Action>}
  </div>;
  const grid=<div className={'timetable-scroll '+(moveMode&&selected?'move-active ':'')+(draggingId?'dragging':'')} data-testid="schedule-grid"><div className={'timetable '+density} style={{gridTemplateColumns:'74px repeat('+days+', minmax(140px,1fr))'}}>
- <div className="grid-head">Пара</div>{DAYS.slice(0,days).map((d,i)=><div key={i} className={'grid-head'+(selectedCell?.day===i?' selected-column-head':'')}>{d}<small>{lessonDate(week,i).slice(8)}.{lessonDate(week,i).slice(5,7)}</small></div>)}
+ <div className="grid-head">Пара</div>{DAYS.slice(0,days).map((d,i)=>{
+ const federal=classifyCalendarDay(lessonDate(week,i),days);
+ return <div key={i} title={federal.label} className={'grid-head'+(selectedCell?.day===i?' selected-column-head':'')+(federal.nonWorking?' nonworking-head':'')}>
+ {d}<small>{lessonDate(week,i).slice(8)}.{lessonDate(week,i).slice(5,7)}</small>
+ {federal.nonWorking&&<span className="federal-day-caption">{federal.kind==='holiday'?'Праздник':'Выходной'}</span>}
+ </div>;
+ })}
  {bellTimes.map((tm,row)=><div className="grid-fragment" key={row}>
   <div className={'slot'+(selectedCell?.slot===row+1?' selected-row-head':'')}><b>{row+1}</b><small>{tm}</small></div>
   {DAYS.slice(0,days).map((d,day)=>{
+   const federal=classifyCalendarDay(lessonDate(week,day),days);
    const target=targetByCell.get(day+':'+(row+1));
    const cellLessons=visible.filter(x=>x.day===day&&x.slot===row+1);
    const pickedCell=selectedCell?.day===day&&selectedCell.slot===row+1;
@@ -248,9 +256,9 @@ export default function App(){
    const crosshairColumn=selectedCell?.day===day;
    return <div key={d} data-testid={pickedCell?'selected-schedule-cell':undefined}
     data-selected={pickedCell?'true':undefined}
-    className={'slot-cell '+(moveMode&&selected&&target?'slot-'+target.kind:'')+
+    className={'slot-cell '+(federal.nonWorking?' federal-closed-cell':'')+' '+(moveMode&&selected&&target?'slot-'+target.kind:'')+
       (pickedCell?' selected-slot-cell':crosshairRow?' selected-slot-row':crosshairColumn?' selected-slot-column':'')}
-    title={moveMode&&target?target.reason:pickedCell?'Выбрано: '+DAYS[day]+', '+(row+1)+'-я пара':undefined}
+    title={moveMode&&target?target.reason:federal.nonWorking?federal.label:pickedCell?'Выбрано: '+DAYS[day]+', '+(row+1)+'-я пара':undefined}
     onDragEnter={()=>{if(draggingId&&target)setHoverMove(target)}}
     onDragOver={e=>{e.preventDefault();e.dataTransfer.dropEffect=target?.kind==='available'?'move':'none'}}
     onDrop={e=>{e.preventDefault();const key=e.dataTransfer.getData('lessonId')||draggingId;if(key)move(key,day,row+1)}}
@@ -266,7 +274,10 @@ export default function App(){
        aria-label={(target.kind==='available'?'Доступен перенос: ':target.kind==='blocked'?'Недоступен перенос: ':'Исходное занятие: ')+target.label+' — '+target.reason}>
         {target.kind==='available'?<><Check size={14}/> Перенести</>:target.kind==='blocked'?<><X size={13}/> Занято</>:<><CalendarDays size={13}/> Сейчас</>}
        </button>
-     : (!moveMode&&cellLessons.length===0?<button className="empty-slot" aria-label={'Создать занятие: '+DAYS[day]+', пара '+(row+1)} title="Назначить занятие" onClick={()=>make(day,row+1)}><Plus size={15}/></button>:null)}
+     : (!moveMode&&cellLessons.length===0?<button className={'empty-slot'+(federal.nonWorking?' federal-disabled-slot':'')}
+ disabled={federal.nonWorking} aria-label={federal.nonWorking?'Нерабочий день: '+federal.label:'Создать занятие: '+DAYS[day]+', пара '+(row+1)}
+ title={federal.nonWorking?federal.label:'Назначить занятие'} onClick={()=>make(day,row+1)}>
+ {federal.nonWorking?<span className="federal-no-class">Выходной</span>:<Plus size={15}/>}</button>:null)}
     {pickedCell&&<span className="selected-cell-marker" aria-hidden="true"><i className="selected-cell-dot"/> Выбрано</span>}
     {moveMode&&selected&&target&&cellLessons.length>0&&<span className={'drag-cell-indicator '+target.kind} title={target.reason}
       aria-label={(target.kind==='available'?'Можно перенести: ':target.kind==='blocked'?'Перенос запрещён: ':'Исходная ячейка: ')+target.reason}>
