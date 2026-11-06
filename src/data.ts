@@ -4,6 +4,7 @@ export type Participant = {group:string;subgroup?:number;teacher?:string;room:st
 export type Lesson = {
  id:string; day:number; slot:number; subject:string; teacher:string; groups:string[]; room:string;
  type:Type; mode:Mode; notes?:string; week?:number; participants?:Participant[]; hours?:number;
+ computerShare?:1|2|3; requiresIndividualComputer?:boolean;
  status?:'scheduled'|'cancelled'|'held'; replacementFor?:string; originalDay?:number; originalSlot?:number;
 };
 export const DAYS=['Пн','Вт','Ср','Чт','Пт','Сб'];
@@ -17,10 +18,11 @@ export const GROUPS=[
  ...['С-11','С-12','С-21','С-22','С-31','С-32','С-41','С-42'].map((id,i)=>({id,count:23+(i*2)%8,department:'Сети',course:Number(id.split('-')[1][0]),specialty:'Сетевое и системное администрирование',shift:i<4?1:2})),
  ...['Э-11','Э-12','Э-21','Э-22','Э-31','Э-32','Э-41','Э-42'].map((id,i)=>({id,count:22+(i*5)%10,department:'Экономика',course:Number(id.split('-')[1][0]),specialty:'Экономика и бухгалтерский учёт',shift:i<4?1:2}))
 ];
-export const ROOMS=Array.from({length:56},(_,i)=>{
+export type Room={id:string;kind:string;capacity:number;pc:number;building:string;features:string[];active:boolean;title?:string;recommendedStudentsPerComputer?:1|2|3;maxStudentsPerComputer?:1|2|3};
+export const ROOMS:Room[]=Array.from({length:56},(_,i)=>{
  const building=i<34?'А':i<48?'Б':'В';const num=i<34?101+i:i<48?201+i-34:301+i-48;
  const lab=i%6===0||i%6===1;const lect=i%13===0;
- return {id:String(num),kind:lect?'Лекционный зал':lab?'Компьютерный класс':'Учебная аудитория',capacity:lect?96:lab?15:32,pc:lab?15:0,building,features:lab?['ПК','Проектор','Интернет']:lect?['Проектор','Микрофоны']:['Доска','Проектор'],active:true};
+ return {id:String(num),kind:lect?'Лекционный зал':lab?'Компьютерный класс':'Учебная аудитория',capacity:lect?96:32,pc:lab?15:0,building,recommendedStudentsPerComputer:2 as const,maxStudentsPerComputer:3 as const,features:lab?['ПК','Проектор','Интернет']:lect?['Проектор','Микрофоны']:['Доска','Проектор'],active:true};
 });
 export const TYPES:Record<Type,string>={regular:'Обычное',subgroup:'Подгруппы',stream:'Поток',parallel:'Параллель'};
 export const MODES:Record<Mode,string>={offline:'Очно',online:'Онлайн',hybrid:'Гибрид',async:'Асинхронно'};
