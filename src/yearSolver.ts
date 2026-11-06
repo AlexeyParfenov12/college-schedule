@@ -222,9 +222,27 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
   tasks.sort((a,b)=>Number(needsComputers(b.subject))-Number(needsComputers(a.subject))||
    teacherRule(cfg,a.teacher).daysOff.length-teacherRule(cfg,b.teacher).daysOff.length||
    (a.teacher+a.subject+a.group).localeCompare(b.teacher+b.subject+b.group,'ru'));
-  for(const task of tasks){
-   // Two groups may share a real lecture only if explicitly permitted and teacher/subject coincide.
-   // Current demo leaves streams for dedicated manual scheduling where complete academic contracts exist.
+  const queue:Task[]=[];
+  const absorbed=new Set<number>();
+  for(let i=0;i<tasks.length;i++){
+   if(absorbed.has(i))continue;
+   const task=tasks[i];
+   if(cfg.allowStreams.includes(streamKey(task.teacher,task.subject))){
+    const partner=tasks.findIndex((other,j)=>j>i&&!absorbed.has(j)&&other.teacher===task.teacher&&
+     other.subject===task.subject&&other.group!==task.group);
+    if(partner>=0){
+     const a=GROUPS.find(g=>g.id===task.group),b=GROUPS.find(g=>g.id===tasks[partner].group);
+     const count=(a?.count||0)+(b?.count||0);
+     if(ROOMS.some(room=>cfg.activeRooms.includes(room.id)&&room.active&&suited(task.subject,room,count))){
+      absorbed.add(partner);queue.push({...task,members:[task,tasks[partner]]});continue;
+     }
+    }
+   }
+   queue.push(task);
+  }
+  for(let taskIndex=0;taskIndex<queue.length;taskIndex++){
+   const task=queue[taskIndex];
+   const taskGroups=task.members?.map(m=>m.group)||[task.group];
    const preference=teacherRule(cfg,task.teacher);
    const choices:{l:Lesson;score:number}[]=[];
    const onlineEligible=!needsComputers(task.subject)&&
