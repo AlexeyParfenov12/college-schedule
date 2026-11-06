@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowRight, CalendarDays, Check, ChevronRight, Copy, HelpCircle, Layers3, RotateCcw, Search, ShieldCheck, Sparkles, WandSparkles } from 'lucide-react';
 import { DAYS, GROUPS, TIMES } from './data';
 import type { CalendarEvent, Lesson } from './data';
-import { deriveOffers, eventAffectedLessons, lessonDate, previewTemplate, previewAutofill, needsComputers, calendarIssues } from './plannerDomain';
+import { WEEK_COUNT, deriveOffers, eventAffectedLessons, lessonDate, previewTemplate, previewAutofill, needsComputers, calendarIssues } from './plannerDomain';
 import type { PreviewPlan } from './plannerDomain';
 import { MiniSchedule, PeriodTimeline, LoadBars, PlanningSummary } from './ScheduleVisuals';
 
-const weekOptions=Array.from({length:16},(_,i)=>({value:i,label:'Неделя '+(i+1)+' · '+lessonDate(i,0)}));
+const weekOptions=Array.from({length:WEEK_COUNT},(_,i)=>({value:i,label:'Неделя '+(i+1)+' · '+lessonDate(i,0)}));
 const kinds:Record<CalendarEvent['kind'],string>={study:'Учебные недели',exam:'Сессия',vacation:'Каникулы',practice:'Практика',holiday:'Нерабочий день'};
 const grouped=GROUPS.map(x=>x.id);
 function Heading({step,children}:{step:number;children:React.ReactNode}){return <div className="plan-step"><b>{step}</b><strong>{children}</strong></div>}
@@ -60,8 +60,8 @@ export function TemplateStudio({lessons,calendar,group,week,blocked,saved,onAppl
  const [startMode,setStartMode]=useState(group);
  const [sourceWeek,setSourceWeek]=useState(week);
  const [cycle,setCycle]=useState<1|2|3|4>(1);
- const [targetStart,setTargetStart]=useState(Math.min(15,week+1));
- const [targetEnd,setTargetEnd]=useState(15);
+ const [targetStart,setTargetStart]=useState(Math.min(WEEK_COUNT-1,week+1));
+ const [targetEnd,setTargetEnd]=useState(WEEK_COUNT-1);
  const [name,setName]=useState('Основной цикл группы '+group);
  const [replace,setReplace]=useState(true);
  const [preview,setPreview]=useState<PreviewPlan|null>(null);
