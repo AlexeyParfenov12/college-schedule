@@ -5,7 +5,7 @@
  * They intentionally do not read Lesson[] or infer plans from an existing timetable.
  * Replace this boundary with Academic Core CurriculumSubject + TeachingAssignment API.
  */
-import { GROUPS, TEACHERS } from './data';
+import { GROUPS, TEACHERS, CALENDAR } from './data';
 import type { CalendarEvent } from './data';
 import { lessonDate, WEEK_COUNT } from './plannerDomain';
 import { classifyCalendarDay } from './productionCalendar';
@@ -102,4 +102,28 @@ export function academicGroupStats(demands:YearDemand[],group:string){
  const selected=demands.filter(d=>d.group===group);
  return {assignments:selected.length,plannedHours:selected.reduce((sum,d)=>sum+d.requiredPairs*2,0),
   teachingWeeks:new Set(selected.flatMap(d=>d.availableWeeks||[])).size};
+}
+
+/** One-time non-destructive migration for previously saved demo academic calendars.
+ * Adds a missing spring study period, preserving custom events and later deletions.
+ */
+export function migrateDemoAcademicCalendar(){
+ if(typeof localStorage==='undefined')return;
+ const marker='college-academic-fixture-v2-migrated';
+ const storage='college-schedule-extras-v1';
+ try{
+  if(localStorage.getItem(marker)==='done')return;
+  const raw=localStorage.getItem(storage);
+  if(raw){
+   const parsed:unknown=JSON.parse(raw);
+   if(parsed&&typeof parsed==='object'&&'calendar' in parsed){
+    const data=parsed as {calendar?:CalendarEvent[]};
+    if(Array.isArray(data.calendar)&&!data.calendar.some(event=>event.kind==='study'&&event.from>='2027-01-01')){
+     const spring=CALENDAR.find(event=>event.id==='cal-6');
+     if(spring)localStorage.setItem(storage,JSON.stringify({...parsed,calendar:[...data.calendar,spring]}));
+    }
+   }
+  }
+  localStorage.setItem(marker,'done');
+ }catch{/** Keep existing browser state if storage is blocked or malformed. */}
 }
