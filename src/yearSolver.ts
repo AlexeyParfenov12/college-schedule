@@ -3,6 +3,7 @@ import type { Lesson, CalendarEvent } from './data';
 import { deriveOffers, needsComputers, calendarIssues, lessonDate } from './plannerDomain';
 import { assessRoomFit } from './roomPolicy';
 import { readCollegeWorkweek } from './productionCalendar';
+import { isTeachingDate } from './academicPlanning';
 
 export type TeacherPreference={
  daysOff:number[]; fromSlot:number; toSlot:number;
@@ -280,6 +281,7 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
        room:option.room,mode:option.mode,type:task.members?'stream':option.type,hours:2,
        notes:option.type==='subgroup'?'Демонстрация: одобрено разделение, сопровождающий необходим':undefined};
       if(calendarIssues(l,events,cfg.days).length)continue;
+      if(task.demand.availableWeeks&&events.some(event=>event.kind==='study')&&taskGroups.some(group=>!isTeachingDate(lessonDate(week,day),group,events,cfg.days)))continue;
       const dailyTeacher=get(state.teacherByDay,k(task.teacher,day));
       if(taskGroups.some(g=>commuteViolations([...get(state.groupByDay,k(g,day)),l],cfg.commuteGap).length)||
          commuteViolations([...dailyTeacher,l],cfg.commuteGap).length)continue;
