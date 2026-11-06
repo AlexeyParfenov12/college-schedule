@@ -6,6 +6,7 @@ import type { Lesson, Absence, CalendarEvent, Rule, Mode, Participant } from './
 import { exportCSV, exportJSON, findFree, validate, groupCount, workload, reportRows, QUALIFICATIONS, occupiedRooms } from './demoLogic';
 import { CalendarStudio, TemplateStudio, GeneratorStudio } from './PlanningTools';
 import { MiniSchedule, LoadBars, PeriodTimeline } from './ScheduleVisuals';
+import { WEEK_COUNT } from './plannerDomain';
 import RoomManager from './RoomManager';
 
 type Screen=typeof NAV[number][0];
@@ -40,7 +41,7 @@ function Button({children,onClick,primary=false,disabled=false,danger=false}:{ch
 function Select({value,onChange,items}:{value:string|number;onChange:(value:string)=>void;items:{id:string|number;label:string}[]}){return <select value={value} onChange={e=>onChange(e.target.value)}>{items.map((v,i)=><option key={i} value={v.id}>{v.label}</option>)}</select>}
 function Field({title,children}:{title:string;children:ReactNode}){return <label className="studio-field"><span>{title}</span>{children}</label>}
 const opts=(xs:string[])=>xs.map(x=>({id:x,label:x}));
-const weekOpts=Array.from({length:16},(_,i)=>({id:i,label:'Учебная неделя '+(i+1)}));
+const weekOpts=Array.from({length:WEEK_COUNT},(_,i)=>({id:i,label:'Учебная неделя '+(i+1)}));
 function Pill({children,color='gray'}:{children:ReactNode;color?:'gray'|'green'|'red'|'amber'|'blue'|'lime'}){return <span className={'studio-pill '+color}>{children}</span>}
 function Rows({heads,rows}:{heads:string[];rows:ReactNode[][]}){
  const [query,setQuery]=useState('');
