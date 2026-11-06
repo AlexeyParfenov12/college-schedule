@@ -8,5 +8,6 @@ import './ux.css';
 import './planner.css';
 import './year.css';
 import './room-manager.css';
+import './official-calendar.css';
 refreshRoomCatalog();
 createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);
