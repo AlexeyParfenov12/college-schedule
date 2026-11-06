@@ -327,14 +327,25 @@ export default function App(){
       try{const v=JSON.parse(localStorage.getItem('college-schedule-extras-v1')||'{}');return Array.isArray(v.calendar)?v.calendar:CALENDAR}
       catch{return CALENDAR}
     })()} notify={setNotice} onApply={(variant,weeks)=>{
-      const preserved=items.filter(x=>(x.week||0)>=weeks||x.status==='held');
-      const fixedIds=new Set(preserved.map(x=>x.id));
-      const generated=variant.lessons.filter(x=>!fixedIds.has(x.id));
-      const next=[...preserved,...generated];
-      const approx=JSON.stringify(next).length;
-      if(approx>4_600_000){setNotice('Годовой черновик превышает безопасный размер браузерного хранилища. Скачай JSON варианта.');return}
-      setItems(next);setStatus('draft');setLastChange(null);setSelected(null);setWeek(0);setScreen('schedule');
-      setNotice('Вариант на '+weeks+' недель применён к демочерновику: '+generated.length+' занятий');
+      const calendar=(()=>{
+        try{const value=JSON.parse(localStorage.getItem('college-schedule-extras-v1')||'{}');return Array.isArray(value.calendar)?value.calendar:CALENDAR}
+        catch{return CALENDAR}
+      })();
+      const audit=auditAnnualDraft(items,variant.lessons,weeks,calendar,readBlockedRooms());
+      if(audit.hardIssues.length){
+       setNotice('Годовой вариант не применён: '+audit.hardIssues.length+' обязательных конфликтов. Первый: '+audit.hardIssues[0].reason);return
+      }
+      if(JSON.stringify(audit.next).length>4_600_000){
+       setNotice('Годовой черновик превышает безопасный размер браузерного хранилища. Скачай JSON варианта.');return
+      }
+      try{
+       localStorage.setItem('college-year-unplaced-v1',JSON.stringify({
+        at:new Date().toISOString(),weeks,unplaced:variant.unplaced,practiceIssues:variant.practiceIssues
+       }));
+      }catch{setNotice('Не удалось сохранить остатки нагрузки в браузере');return}
+      setYearBackup({items,status});
+      setItems(audit.next);setStatus('draft');setLastChange(null);setSelected(null);setWeek(0);setScreen('schedule');
+      setNotice('Вариант применён к черновику: '+audit.changed+' занятий. Неразмещённых назначений: '+variant.unplaced.length+'. Доступен возврат.');
     }}/>
   : <AdvancedWorkflows screen={screen} items={items} setItems={setItems} week={week} setWeek={setWeek} group={group} setGroup={setGroup} teacher={teacher} setTeacher={setTeacher} room={room} setRoom={setRoom} onNavigate={show} onEdit={setSelected} onFocusLesson={focusLesson} notify={setNotice} markDraft={()=>setStatus('draft')} status={status} setStatus={setStatus} density={density} setDensity={setDensity} days={days} setDays={setDays}/>;
  return <div className="app">
