@@ -215,7 +215,13 @@ export default function App(){
  const addRow=()=>make(0,1);
  const teachersTotal=[{name:TEACHERS[0],plan:144,assigned:132,done:98},{name:TEACHERS[1],plan:108,assigned:96,done:64},{name:TEACHERS[2],plan:108,assigned:88,done:56},{name:TEACHERS[3],plan:72,assigned:60,done:48}];
  const stats=(<div className="metrics"><div><strong>{current.length}</strong><span>Назначено занятий</span></div><div><strong>{current.filter(x=>x.replacementFor).length}</strong><span>Замены за неделю</span></div><div><strong>{issueCount}</strong><span>Требуют проверки</span></div><div><strong>—</strong><span>Остаток часов · нет Academic Core</span></div></div>);
- const lessonLabel=(x:Item)=><><strong>{x.subject}</strong><small>{x.room} · {x.teacher}</small><span className="tiny">{TYPES[x.type]}{x.mode!=='offline'?' · '+MODES[x.mode]:''}</span></>;
+ const lessonLabel=(x:Item)=>{
+  const context=view==='teacher'?names(x.groups)+' · '+x.room
+    :view==='room'?names(x.groups)+' · '+x.teacher
+    :x.room+' · '+x.teacher;
+  return <><strong>{x.subject}</strong><small title={context}>{context}</small>
+   <span className="tiny">{TYPES[x.type]}{x.mode!=='offline'?' · '+MODES[x.mode]:''}</span></>;
+ };
  const weekDate=useMemo(()=>{const d=new Date(2026,10,9+week*7);const e=new Date(d);e.setDate(e.getDate()+5);return d.toLocaleDateString('ru-RU',{day:'numeric',month:'short'})+' – '+e.toLocaleDateString('ru-RU',{day:'numeric',month:'short',year:'numeric'})},[week]);
  const weekHeader=<div className="toolbar">
    <div className="control-group"><button className={view==='group'?'active':''} onClick={()=>{setView('group');closeSelected()}}><Users size={15}/> Группы</button><button className={view==='teacher'?'active':''} onClick={()=>{setView('teacher');closeSelected()}}>Преподаватели</button><button className={view==='room'?'active':''} onClick={()=>{setView('room');closeSelected()}}>Аудитории</button></div>
