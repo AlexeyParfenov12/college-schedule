@@ -15,7 +15,7 @@ export function assessRoomFit(lesson:Lesson,room:Room,count=studentsIn(lesson)):
  if(count>room.capacity)return {...base,level:'blocked',hard:true,reason:'Не хватает посадочных мест: '+count+' студентов, '+room.capacity+' мест'};
  if(!room.active)return {...base,level:'blocked',hard:true,reason:'Аудитория закрыта'};
  if(!requiresPC)return {...base,level:'ok',hard:false,reason:'Подходит · '+room.capacity+' мест'};
- if(room.pc===0)return {...base,level:'blocked',hard:true,reason:'Для этой дисциплины необходим компьютерный кабинет'};
+ if(room.pc===0)return lesson.requiresComputers||lesson.requiresIndividualComputer?{...base,level:'blocked',hard:true,reason:'Для занятия обязателен компьютерный кабинет'}:{...base,level:'warning',hard:false,reason:'Для дисциплины рекомендованы компьютеры, но в аудитории нет ПК. Требуется согласование формата работы'};
  if(lesson.requiresIndividualComputer&&room.pc<count)return {...base,level:'blocked',hard:true,reason:'Индивидуальная работа 1:1: '+count+' студентов, '+room.pc+' ПК'};
  if(required>permitted)return {...base,level:'blocked',hard:true,reason:'Режим '+required+' студента за ПК запрещён для кабинета (максимум '+permitted+')'};
  if(room.pc*required>=count)return {...base,level:'ok',hard:false,reason:'Подходит: '+count+' студентов, '+room.pc+' ПК, по '+required+' чел./ПК'};
