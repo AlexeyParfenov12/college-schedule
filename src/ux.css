@@ -282,3 +282,7 @@ input[type="checkbox"]{appearance:auto;width:15px!important;height:15px!importan
  .selected-cell-marker{font-size:8px;padding:3px 4px;gap:3px;top:3px;right:3px}
  .selected-cell-dot{width:4px;height:4px}
 }
+
+/* Persistent and understated target indication when following a deep link from another section. */
+.timetable .lesson.jump-focused{position:relative;z-index:3;outline:2px solid #268777;outline-offset:2px;box-shadow:0 2px 10px rgba(14,98,73,.18)}
+.timetable .lesson.jump-focused::after{content:"";position:absolute;right:5px;bottom:4px;width:5px;height:5px;border-radius:50%;background:#C4D95F;box-shadow:0 0 0 2px rgba(255,255,255,.93);pointer-events:none}
