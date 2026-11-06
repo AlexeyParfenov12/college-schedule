@@ -1,9 +1,12 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import { refreshRoomCatalog } from './roomRegistry';
 import './styles.css';
 import './studio.css';
 import './ux.css';
 import './planner.css';
 import './year.css';
+import './room-manager.css';
+refreshRoomCatalog();
 createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);
