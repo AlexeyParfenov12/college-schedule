@@ -4,7 +4,7 @@ import { DAYS, GROUPS, TIMES } from './data';
 import type { CalendarEvent, Lesson } from './data';
 import OfficialCalendar from './OfficialCalendar';
 import { WEEK_COUNT, eventAffectedLessons, lessonDate, previewTemplate, previewAutofill, needsComputers, calendarIssues } from './plannerDomain';
-import { demoAcademicDemands, demoAcademicHorizon } from './academicPlanning';
+import { demoAcademicDemands, demoAcademicHorizon, isTeachingDate } from './academicPlanning';
 import { readCollegeWorkweek } from './productionCalendar';
 import type { PreviewPlan } from './plannerDomain';
 import { MiniSchedule, PeriodTimeline, LoadBars, PlanningSummary } from './ScheduleVisuals';
@@ -144,7 +144,7 @@ export function GeneratorStudio({lessons,calendar,week,group,onGroup,blocked,onA
  const count=Math.min(3,selected?.remaining||0);
  const hasSelection=Boolean(selected&&count>0&&selected.availableWeeks?.includes(week));
  useEffect(()=>setPreview(null),[offerKey,count,dayLimit,slotLimit,group,week,lessons,calendar]);
- const options={days:Array.from({length:dayLimit},(_,i)=>i),slots:Array.from({length:slotLimit},(_,i)=>i+1),requirePc:Boolean(selected&&needsComputers(selected.subject))};
+ const options={days:Array.from({length:dayLimit},(_,i)=>i).filter(day=>!calendar.some(e=>e.kind==='study')||isTeachingDate(lessonDate(week,day),group,calendar,readCollegeWorkweek())),slots:Array.from({length:slotLimit},(_,i)=>i+1),requirePc:Boolean(selected&&needsComputers(selected.subject))};
  const seed:Lesson={id:'proposal',week,day:0,slot:1,groups:[group],teacher:selected?.teacher||'',subject:selected?.subject||'',room:'',type:'regular',mode:'offline',hours:2};
  const build=()=>previewAutofill(seed,lessons,calendar,blocked,count,options);
  const apply=()=>{
