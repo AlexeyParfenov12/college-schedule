@@ -1,7 +1,7 @@
 import { describe,expect,it } from 'vitest';
 import { GROUPS, ROOMS, TEACHERS } from './data';
 import type { Lesson, CalendarEvent } from './data';
-import { defaultAnnualConfig, solveAnnualVariant, commuteViolations, practiceWeekActive, deriveAnnualDemands } from './yearSolver';
+import { defaultAnnualConfig, solveAnnualVariant, commuteViolations, practiceWeekActive, deriveAnnualDemands, streamKey } from './yearSolver';
 import type { PracticeBlock } from './yearSolver';
 
 const block=(change:Partial<PracticeBlock>={}):PracticeBlock=>({
@@ -93,6 +93,37 @@ describe('Practice blocks with fixed rooms',()=>{
   expect(practiceWeekActive(p,5)).toBe(false);
  });
 });
+describe('annual academic streams',()=>{
+ it('combines two compatible group demands into one allowed shared teacher meeting',()=>{
+  const cfg=defaultAnnualConfig();cfg.weeks=1;cfg.defaultOnlinePct=0;
+  const teacher=TEACHERS[1],subject='Математика';
+  cfg.allowStreams=[streamKey(teacher,subject)];
+  const demands=[
+   {id:'P21-math',group:'П-21',teacher,subject,pairsPerWeek:1,requiredPairs:1},
+   {id:'P22-math',group:'П-22',teacher,subject,pairsPerWeek:1,requiredPairs:1}
+  ];
+  const plan=solveAnnualVariant(demands,cfg,[],0);
+  expect(plan.streamCount).toBe(1);
+  const stream=plan.lessons.find(l=>l.type==='stream');
+  expect(stream?.groups).toEqual(['П-21','П-22']);
+  expect(plan.placedPairs).toBe(2);
+  expect(plan.coveredHours).toBe(4);
+  expect(plan.unplaced).toHaveLength(0);
+ });
+ it('keeps subjects separate if an allowed stream would exceed all physical/equipment limits',()=>{
+  const cfg=defaultAnnualConfig();cfg.weeks=1;
+  const teacher=TEACHERS[1],subject='Программирование';
+  cfg.allowStreams=[streamKey(teacher,subject)];
+  const demands=[
+   {id:'P21-programming',group:'П-21',teacher,subject,pairsPerWeek:1,requiredPairs:1},
+   {id:'P22-programming',group:'П-22',teacher,subject,pairsPerWeek:1,requiredPairs:1}
+  ];
+  const plan=solveAnnualVariant(demands,cfg,[],0);
+  expect(plan.streamCount).toBe(0);
+  expect(plan.lessons.filter(l=>l.subject===subject)).toHaveLength(2);
+ });
+});
+
 describe('Home versus campus changeover',()=>{
  it('requires a free pair for the road and forbids multiple daily location changes',()=>{
   expect(commuteViolations([lesson('a',1,'offline'),lesson('b',2,'online')],1).length).toBeGreaterThan(0);
