@@ -51,7 +51,7 @@ describe('Practice blocks with fixed rooms',()=>{
  });
  it('rejects a computer practice if every student needs a PC in a small lab',()=>{
   const cfg=defaultAnnualConfig();cfg.weeks=1;
-  cfg.practiceBlocks=[block({startWeek:0,durationWeeks:1,room:'102',days:[0],fromSlot:1,toSlot:2,requiresComputers:true})];
+  cfg.practiceBlocks=[block({startWeek:0,durationWeeks:1,room:'102',days:[0],fromSlot:1,toSlot:2,requiresComputers:true,requiresIndividualComputer:true})];
   const result=solveAnnualVariant([],cfg,[],0);
   expect(result.practicePairs).toBe(0);
   expect(result.practiceIssues.some(x=>x.reason.includes('компьютеров'))).toBe(true);
