@@ -344,12 +344,12 @@ export default function App(){
   : screen==='year'?<AnnualPlanner lessons={items} calendar={(()=>{
       try{const v=JSON.parse(localStorage.getItem('college-schedule-extras-v1')||'{}');return Array.isArray(v.calendar)?v.calendar:CALENDAR}
       catch{return CALENDAR}
-    })()} notify={setNotice} onApply={(variant,weeks)=>{
+    })()} notify={setNotice} onApply={(variant,weeks,workweek)=>{
       const calendar=(()=>{
         try{const value=JSON.parse(localStorage.getItem('college-schedule-extras-v1')||'{}');return Array.isArray(value.calendar)?value.calendar:CALENDAR}
         catch{return CALENDAR}
       })();
-      const audit=auditAnnualDraft(items,variant.lessons,weeks,calendar,readBlockedRooms());
+      const audit=auditAnnualDraft(items,variant.lessons,weeks,calendar,readBlockedRooms(),workweek);
       if(audit.hardIssues.length){
        setNotice('Годовой вариант не применён: '+audit.hardIssues.length+' обязательных конфликтов. Первый: '+audit.hardIssues[0].reason);return
       }
