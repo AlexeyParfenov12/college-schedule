@@ -198,4 +198,14 @@ describe('React interface smoke checks',()=>{
   expect(select.value).toBe('25');
  },20000);
 
+ it('shows groups rather than repeating the selected teacher in teacher timetable cards',()=>{
+  render(<App/>);
+  fireEvent.click(screen.getByRole('button',{name:'Преподаватели'}));
+  const lesson=document.querySelector<HTMLButtonElement>('.lesson');
+  expect(lesson).toBeTruthy();
+  const meta=lesson!.querySelector('small')!;
+  expect(meta.textContent).toMatch(/[ПРСЭ]-\\d{2}/);
+  expect(meta.textContent).not.toContain('Петров М. С.');
+ },20000);
+
 });
