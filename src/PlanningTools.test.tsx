@@ -28,7 +28,8 @@ describe('visual guided planning workflows',()=>{
   render(<App/>);
   navigation('Автосоставление');
   expect(screen.getByTestId('generator-studio')).toBeTruthy();
-  expect(screen.getByText(/Автосоставление — сначала предложение/)).toBeTruthy();
+  expect(screen.getByText(/Помощник размещения занятий/)).toBeTruthy();
+  expect(screen.getByText(/Число рассчитывается автоматически/)).toBeTruthy();
   expect(screen.getByTestId('mini-schedule')).toBeTruthy();
   expect(screen.getByRole('button',{name:'Показать предложенный вариант'})).toBeTruthy();
  },20000);
