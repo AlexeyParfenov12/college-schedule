@@ -252,20 +252,19 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
     for(let slot=1;slot<=cfg.slotsPerDay;slot++){
      if(slot<preference.fromSlot||slot>preference.toSlot)continue;
      if(preference.forbidden.some(x=>x.day===day&&slot>=x.from&&slot<=x.to))continue;
-     if(state.groupBusy.has(busyKey(task.group,day,slot))||state.teacherBusy.has(busyKey(task.teacher,day,slot)))continue;
+     if(taskGroups.some(g=>state.groupBusy.has(busyKey(g,day,slot)))||state.teacherBusy.has(busyKey(task.teacher,day,slot)))continue;
      const roomChoices=suitableRooms(task,cfg,state,day,slot);
      const modes:{mode:'offline'|'online';room:string;type:'regular'|'subgroup'}[]=
        [...roomChoices.map(x=>({mode:'offline' as const,room:x.room,type:x.type})),
         ...(onlineEligible?[{mode:'online' as const,room:'Онлайн',type:'regular' as const}]:[])];
      for(const option of modes){
       const l:Lesson={id:'year-'+variant+'-'+week+'-'+task.demand.id+'-'+day+'-'+slot,
-       week,day,slot,groups:[task.group],teacher:task.teacher,subject:task.subject,
-       room:option.room,mode:option.mode,type:option.type,hours:2,
+       week,day,slot,groups:taskGroups,teacher:task.teacher,subject:task.subject,
+       room:option.room,mode:option.mode,type:task.members?'stream':option.type,hours:2,
        notes:option.type==='subgroup'?'Демонстрация: одобрено разделение, сопровождающий необходим':undefined};
       if(calendarIssues(l,events).length)continue;
-      const dailyGroup=get(state.groupByDay,k(task.group,day));
       const dailyTeacher=get(state.teacherByDay,k(task.teacher,day));
-      if(commuteViolations([...dailyGroup,l],cfg.commuteGap).length||
+      if(taskGroups.some(g=>commuteViolations([...get(state.groupByDay,k(g,day)),l],cfg.commuteGap).length)||
          commuteViolations([...dailyTeacher,l],cfg.commuteGap).length)continue;
       const score=candidateScore(state,l,cfg,variant);
       choices.push({l,score});
@@ -275,10 +274,11 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
    choices.sort((a,b)=>b.score-a.score);
    if(choices.length){
     const l=choices[0].l;append(state,l);placed.push(l);
-    covered.set(task.demand.id,(covered.get(task.demand.id)||0)+1);
+    for(const member of task.members||[task])covered.set(member.demand.id,(covered.get(member.demand.id)||0)+1);
+    if(l.type==='stream')streamCount++;
     if(l.mode==='online')usedOnline.set(l.teacher,(usedOnline.get(l.teacher)||0)+1);
     if(l.type==='subgroup')subgroupCount++;
-   }
+   }else if(task.members){queue.push(...task.members)}
   }
   // Remaining due is carried over into later weeks.
  }
