@@ -31,4 +31,16 @@ describe('Annual scheduler navigation and group practices',()=>{
   fireEvent.click(screen.getByRole('tab',{name:'Кабинеты'}));
   expect(screen.getByRole('textbox',{name:'Найти аудиторию для годового плана'})).toBeTruthy();
  },20000);
+ it('reads semester workloads from the independent demo Academic Core adapter instead of editable timetable-derived inputs',()=>{
+  open();
+  expect(screen.getByText(/Демонстрационные учебные планы и назначения преподавателей заданы отдельно/)).toBeTruthy();
+  expect(screen.getByText(/Период определяется автоматически/)).toBeTruthy();
+  expect(screen.queryByRole('spinbutton',{name:/Пар за год/})).toBeNull();
+  expect(screen.getByText(/учебных недель у группы/)).toBeTruthy();
+  const table=document.querySelector('.year-table-scroll table')!;
+  expect(table.textContent).toContain('Осень, ч');
+  expect(table.textContent).toContain('Весна, ч');
+  expect(table.textContent).toContain('Всего, ч');
+ },20000);
+
 });
