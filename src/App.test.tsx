@@ -131,4 +131,46 @@ describe('React interface smoke checks',()=>{
   expect(document.querySelector('.timetable-scroll.dragging')).toBeNull();
  },20000);
 
+ it('visibly marks exactly the chosen lesson cell, its day, and its period',()=>{
+  render(<App/>);
+  const lessons=document.querySelectorAll<HTMLButtonElement>('.lesson');
+  expect(lessons.length).toBeGreaterThan(2);
+  fireEvent.click(lessons[0]);
+  const first=screen.getByTestId('selected-schedule-cell');
+  expect(first.classList.contains('selected-slot-cell')).toBe(true);
+  expect(first.querySelector('.selected-cell-marker')?.textContent).toContain('Выбрано');
+  expect(document.querySelectorAll('.grid-head.selected-column-head')).toHaveLength(1);
+  expect(document.querySelectorAll('.slot.selected-row-head')).toHaveLength(1);
+  fireEvent.click(lessons[1]);
+  const second=screen.getByTestId('selected-schedule-cell');
+  expect(document.querySelectorAll('.slot-cell.selected-slot-cell')).toHaveLength(1);
+  expect(second.querySelector('.lesson.picked')).toBeTruthy();
+  fireEvent.click(screen.getByTitle('Закрыть помощник'));
+  expect(screen.queryByTestId('selected-schedule-cell')).toBeNull();
+  expect(document.querySelector('.grid-head.selected-column-head')).toBeNull();
+ },20000);
+ it('highlights an empty cell being edited and clears it on cancel',()=>{
+  render(<App/>);
+  const empty=document.querySelector<HTMLButtonElement>('.empty-slot');
+  expect(empty).toBeTruthy();
+  fireEvent.click(empty!);
+  const highlighted=screen.getByTestId('selected-schedule-cell');
+  expect(highlighted.querySelector('.selected-cell-marker')?.textContent).toContain('Выбрано');
+  expect(screen.getByTestId('smart-lesson-editor')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button',{name:'Отмена'}));
+  expect(screen.queryByTestId('selected-schedule-cell')).toBeNull();
+ },20000);
+ it('does not confuse selected-cell crosshair with drag-and-drop conflict colors',()=>{
+  render(<App/>);
+  const lesson=document.querySelector<HTMLButtonElement>('.lesson')!;
+  fireEvent.click(lesson);
+  expect(screen.getByTestId('selected-schedule-cell')).toBeTruthy();
+  const transfer={setData:(_type:string,_value:string)=>{},getData:(_type:string)=>'',effectAllowed:'',dropEffect:''};
+  fireEvent.dragStart(lesson,{dataTransfer:transfer});
+  expect(document.querySelector('.timetable-scroll.move-active.dragging')).toBeTruthy();
+  expect(screen.queryByTestId('selected-schedule-cell')).toBeNull();
+  fireEvent.dragEnd(lesson,{dataTransfer:transfer});
+  expect(screen.getByTestId('selected-schedule-cell')).toBeTruthy();
+ },20000);
+
 });
