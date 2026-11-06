@@ -203,3 +203,29 @@ input[type="checkbox"]{appearance:auto;width:15px!important;height:15px!importan
 .drag-floating-feedback span svg:nth-of-type(2){color:#BD6763;margin-left:6px}
 .drag-floating-feedback small{color:#6F827A;font-size:10px;line-height:1.3}
 @media(max-width:780px){.drag-floating-feedback{max-width:calc(100vw - 20px);bottom:8px;gap:6px;padding:8px}.drag-floating-feedback strong{max-width:130px}}
+
+/* Clear selection: one strong chosen cell, subtle row/day crosshair. */
+.timetable-scroll .slot-cell.selected-slot-row{background:#F2F9F0;border-color:#CDE5D3}
+.timetable-scroll .slot-cell.selected-slot-column{background:#F2F8F7;border-color:#D0E7E1}
+.timetable-scroll .slot-cell.selected-slot-cell{
+ position:relative;z-index:1;background:#E0F3E9!important;
+ border-color:#158578!important;
+ box-shadow:inset 0 0 0 2px #168A78,0 0 0 1px rgba(28,116,94,.18);
+}
+.timetable-scroll .slot-cell.selected-slot-cell .lesson{
+ outline:2px solid #168578;outline-offset:-2px;
+ box-shadow:0 2px 9px rgba(17,96,76,.20);
+}
+.timetable-scroll .slot-cell.selected-slot-cell .empty-slot{color:#146C60}
+.timetable .grid-head.selected-column-head{background:#DFF1E9!important;color:#1D6B5D;box-shadow:inset 0 -3px 0 #168578}
+.timetable .slot.selected-row-head{background:#DFF1E9!important;color:#1D6B5D;box-shadow:inset -3px 0 0 #168578}
+.selected-cell-marker{
+ position:absolute;z-index:5;right:3px;top:3px;
+ display:inline-flex;gap:3px;align-items:center;
+ font-size:9px;font-weight:800;line-height:1;
+ padding:4px 5px;border-radius:4px;
+ color:#fff;background:#167C70;pointer-events:none;
+ box-shadow:0 1px 4px rgba(13,80,66,.18);
+}
+.selected-cell-marker svg{flex:none}
+@media(max-width:640px){.selected-cell-marker{font-size:8px;padding:3px}.selected-cell-marker svg{width:9px;height:9px}}
