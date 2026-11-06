@@ -14,7 +14,7 @@ describe('academic-derived smart lesson entry',()=>{
  });
  it('recommends only feasible rooms and highlights missing computer capacity',()=>{
   const practical=l({subject:'Программирование',room:''});
-  expect(chooseRooms(practical,[]).some(x=>x.available)).toBe(false);
+  expect(chooseRooms(practical,[]).some(x=>x.available&&x.recommended&&x.computers>=14)).toBe(true);
   const split={...practical,type:'subgroup' as const};
   const pair=suitableSubgroupPair(split,[]);
   expect(pair[0]).toBeTruthy();
@@ -64,10 +64,11 @@ describe('semester template preview and auto scheduling',()=>{
   expect(result.placed.every(x=>[0,1,2].includes(x.day)&&x.slot<=3)).toBe(true);
   expect(result.placed[0].id).not.toBe(result.placed[1].id);
  });
- it('does not pretend that all students fit in a 15-computer laboratory',()=>{
+ it('allows paired computer work without inventing unnecessary subgroups',()=>{
   const base=l({subject:'Программирование',teacher:TEACHERS[68],room:''});
   const result=previewAutofill(base,[],[],[],2,{days:[0,1],slots:[1,2],requirePc:true});
-  expect(result.placed).toHaveLength(0);
-  expect(result.rejected).toHaveLength(1);
+  expect(result.placed).toHaveLength(2);
+  expect(result.rejected).toHaveLength(0);
+  expect(result.placed.every(x=>ROOMS.find(r=>r.id===x.room)?.pc)).toBe(true);
  });
 });
