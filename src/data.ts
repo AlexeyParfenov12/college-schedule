@@ -54,6 +54,7 @@ export type CalendarEvent={id:string;title:string;kind:'study'|'exam'|'vacation'
 export const CALENDAR:CalendarEvent[]=[
  {id:'cal-1',title:'Учебные недели',kind:'study',from:'2026-09-01',to:'2026-12-28',groups:[]},
  {id:'cal-2',title:'Экзаменационная сессия',kind:'exam',from:'2027-01-11',to:'2027-01-25',groups:[]},
+ {id:'cal-6',title:'Теоретическое обучение · весна',kind:'study',from:'2027-02-09',to:'2027-06-25',groups:[]},
  {id:'cal-3',title:'Производственная практика',kind:'practice',from:'2026-12-01',to:'2026-12-20',groups:['П-31','П-32']},
  {id:'cal-4',title:'Зимние каникулы',kind:'vacation',from:'2027-01-26',to:'2027-02-08',groups:[]},
  {id:'cal-5',title:'Нерабочий праздничный день',kind:'holiday',from:'2026-11-04',to:'2026-11-04',groups:[]}
