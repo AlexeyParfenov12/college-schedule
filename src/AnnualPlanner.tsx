@@ -20,6 +20,10 @@ const key=(name:string,subject:string)=>streamKey(name,subject);
 const periodOptions=(weeks:number)=>Array.from({length:weeks},(_,w)=><option key={w} value={w}>{w+1}-я · {lessonDate(w,0)}</option>);
 export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
  const [cfg,setCfg]=useState<AnnualConfig>(read);
+ const backlog=useMemo(()=>{
+  try{return JSON.parse(localStorage.getItem('college-year-unplaced-v1')||'null') as {at:string;weeks:number;unplaced:{group:string;subject:string;reason:string}[];practiceIssues:{group:string;week:number;reason:string}[]}|null}
+  catch{return null}
+ },[]);
  const [tab,setTab]=useState<Tab>('load');
  const [demands,setDemands]=useState<YearDemand[]>(()=>deriveAnnualDemands(lessons,40,4));
  const [teacher,setTeacher]=useState(TEACHERS[0]),[teacherSearch,setTeacherSearch]=useState('');
@@ -89,13 +93,20 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
  };
  const applyVariant=()=>{
   if(!selected)return;
-  if(!window.confirm('Заменить черновое расписание '+cfg.weeks+' недель для всех групп выбранным вариантом? Проведённые занятия сохраняются. Продолжить?'))return;
+  const gaps=selected.unplaced.length,practice=selected.practiceIssues.length;
+  const details=gaps||practice
+   ?'ВНИМАНИЕ: вариант неполный. Неразмещённых назначений: '+gaps+'. Проблем практики: '+practice+'. Они сохранятся для разбора учебной частью. '
+   :'По рассчитанной демонстрационной нагрузке неразмещённых назначений нет. ';
+  if(!window.confirm(details+'Применить расписание на '+cfg.weeks+' недель к черновику? Проведённые занятия сохраняются, предыдущий вариант можно восстановить.'))return;
   onApply(selected,cfg.weeks);
  };
  const nextTab=()=>{const i=tabs.findIndex(t=>t.id===tab);setTab(tabs[Math.min(i+1,tabs.length-1)].id)};
  return <div className="year-planner" data-testid="year-planner">
   <div className="year-hero"><div><span>Мастер учебной части · демо-решатель</span><h2>Годовое расписание всех групп</h2><p>Построй четыре альтернативы на основе нагрузок, пожеланий преподавателей, рабочих кабинетов, подгрупп, практик и домашнего дистанта.</p></div>
    <button className="year-primary" onClick={run} disabled={working}><Play size={15}/> Рассчитать 4 варианта</button></div>
+  {backlog&&backlog.unplaced.length+backlog.practiceIssues.length>0&&
+   <div className="year-note" role="status"><strong>Остатки после последнего применения:</strong> {backlog.unplaced.length} назначений и {backlog.practiceIssues.length} проблем практики.
+   Они сохранены в этом браузере и требуют решения учебной части. Пересчитай план после изменения ограничений.</div>}
   <div className="year-kpis"><div><b>{GROUPS.length}</b><small>групп</small></div><div><b>{demands.length}</b><small>дисциплин / назначений</small></div><div><b>{totalHours.toLocaleString('ru-RU')}</b><small>плановых часов</small></div><div><b>{activeRooms.length}</b><small>кабинетов</small></div><div><b>{cfg.practiceBlocks.length}</b><small>блоков практики</small></div></div>
   <div className="year-tabs" role="tablist" aria-label="Настройка годового расписания">{tabs.map(x=><button role="tab" aria-selected={tab===x.id} className={tab===x.id?'active':''} key={x.id} onClick={()=>setTab(x.id)}>{x.name}</button>)}</div>
   {tab==='load'&&<div className="year-cols"><section className="year-card"><h3><BookOpen size={16}/> Требования к учебным часам</h3>
