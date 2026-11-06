@@ -139,6 +139,7 @@ describe('React interface smoke checks',()=>{
   const first=screen.getByTestId('selected-schedule-cell');
   expect(first.classList.contains('selected-slot-cell')).toBe(true);
   expect(first.querySelector('.selected-cell-marker')?.textContent).toContain('Выбрано');
+  expect(first.querySelectorAll('.selected-cell-dot')).toHaveLength(1);
   expect(document.querySelectorAll('.grid-head.selected-column-head')).toHaveLength(1);
   expect(document.querySelectorAll('.slot.selected-row-head')).toHaveLength(1);
   fireEvent.click(lessons[1]);
