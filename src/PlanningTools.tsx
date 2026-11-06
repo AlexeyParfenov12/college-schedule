@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowRight, CalendarDays, Check, ChevronRight, Copy, HelpCircle, Layers3, RotateCcw, Search, ShieldCheck, Sparkles, WandSparkles } from 'lucide-react';
 import { DAYS, GROUPS, TIMES } from './data';
 import type { CalendarEvent, Lesson } from './data';
+import OfficialCalendar from './OfficialCalendar';
 import { WEEK_COUNT, deriveOffers, eventAffectedLessons, lessonDate, previewTemplate, previewAutofill, needsComputers, calendarIssues } from './plannerDomain';
 import type { PreviewPlan } from './plannerDomain';
 import { MiniSchedule, PeriodTimeline, LoadBars, PlanningSummary } from './ScheduleVisuals';
@@ -32,6 +33,7 @@ export function CalendarStudio({events,lessons,group,setGroup,week,setWeek,add,r
  const create=()=>{if(!isValid||blocking&&conflicts.length&&!confirmed)return;add({...candidate,id:'cal-'+Date.now().toString(36)});setConfirmed(false)};
  return <div className="plan-page" data-testid="calendar-studio">
   <div className="plan-intro"><div><strong>Учебный календарь — когда колледж учится</strong><p>Определяет учебные недели, практики, сессии, каникулы и выходные. Расписание строится внутри разрешённых периодов. Календарь не заменяет расписание занятий.</p></div><CalendarDays size={25}/></div>
+  <OfficialCalendar/>
   <Heading step={1}>Посмотри учебные периоды выбранной группы</Heading>
   <div className="plan-calendar-group"><Field name="Просмотр календаря группы"><select aria-label="Просмотр календаря группы" value={group} onChange={e=>setGroup(e.target.value)}>{GROUPS.map(g=><option key={g.id} value={g.id}>{g.id} · {g.department} · {g.course} курс</option>)}</select></Field><span>Общие события колледжа и периоды конкретной группы.</span></div>
   <PeriodTimeline calendar={events} lessons={lessons} group={group} activeWeek={week} onWeek={setWeek}/>
