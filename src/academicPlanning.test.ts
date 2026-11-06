@@ -67,4 +67,20 @@ describe('annual solver respects semester quota and group eligibility',()=>{
   expect(result.requiredHours).toBe(4);
   expect(result.coveredHours).toBe(0);
  });
+ it('does not silently transfer missed autumn hours into spring semester',()=>{
+  const cfg=defaultAnnualConfig();cfg.weeks=3;cfg.slotsPerDay=3;cfg.days=5;
+  const demand={id:'semester-locked',group:'П-21',teacher:TEACHERS[0],subject:'Математика',
+   requiredPairs:3,pairsPerWeek:1,availableWeeks:[0,2],
+   periodAllocations:[{id:'autumn',requiredPairs:2,weeks:[0]},{id:'spring',requiredPairs:1,weeks:[2]}]};
+  const blockedAutumn:CalendarEvent[]=[{id:'holiday',kind:'holiday',title:'Закрыта осенняя неделя',
+    from:'2026-11-09',to:'2026-11-15',groups:['П-21']}];
+  const result=solveAnnualVariant([demand],cfg,blockedAutumn,0);
+  expect(result.lessons.filter(l=>l.subject==='Математика').map(l=>l.week)).toEqual([2]);
+  expect(result.coveredHours).toBe(2);
+  expect(result.requiredHours).toBe(6);
+  expect(result.unplaced).toHaveLength(1);
+  expect(result.unplaced[0].reason).toContain('Осенний период');
+  expect(result.unplaced[0].reason).toContain('2 пар');
+ });
+
 });
