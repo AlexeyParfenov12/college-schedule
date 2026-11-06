@@ -22,7 +22,10 @@ export type AnnualConfig={
  teacherPreferences:Record<string,TeacherPreference>;
  practiceBlocks:PracticeBlock[];
 };
-export type YearDemand={id:string;group:string;teacher:string;subject:string;pairsPerWeek:number;requiredPairs:number};
+export type YearDemand={id:string;group:string;teacher:string;subject:string;pairsPerWeek:number;requiredPairs:number;
+ availableWeeks?:number[];
+ periodAllocations?:{id:string;weeks:number[];requiredPairs:number}[];
+ semesters?:{autumnPairs:number;springPairs:number};};
 export type Unplaced={id:string;week:number;group:string;subject:string;teacher:string;reason:string};
 export type AnnualVariant={id:string;name:string;lessons:Lesson[];unplaced:Unplaced[];
  totalPairs:number;placedPairs:number;coveredHours:number;requiredHours:number;
@@ -214,8 +217,22 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
   const tasks:Task[]=[];
   for(const d of regularDemands){
    if(reservations.activeGroups.has(d.group))continue;
+   if(d.availableWeeks&&!d.availableWeeks.includes(week))continue;
    const done=covered.get(d.id)||0;
-   const quotaNow=Math.ceil((week+1)*d.requiredPairs/cfg.weeks);
+   let quotaNow=Math.ceil((week+1)*d.requiredPairs/cfg.weeks);
+   if(d.periodAllocations){
+    quotaNow=0;
+    for(const segment of d.periodAllocations){
+     const eligible=segment.weeks.filter(w=>w>=0&&w<cfg.weeks);
+     if(!eligible.length)continue;
+     const elapsed=eligible.filter(w=>w<=week).length;
+     quotaNow+=Math.ceil(elapsed*segment.requiredPairs/eligible.length);
+    }
+   }else if(d.availableWeeks){
+    const eligible=d.availableWeeks.filter(w=>w>=0&&w<cfg.weeks);
+    const elapsed=eligible.filter(w=>w<=week).length;
+    quotaNow=eligible.length?Math.ceil(elapsed*d.requiredPairs/eligible.length):0;
+   }
    const due=Math.max(0,Math.min(3,quotaNow-done));
    for(let j=0;j<due;j++)tasks.push({demand:d,group:d.group,teacher:d.teacher,subject:d.subject,week});
   }
@@ -286,9 +303,12 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
   const missing=d.requiredPairs-(covered.get(d.id)||0);
   if(missing>0){
    const group=GROUPS.find(g=>g.id===d.group);
-   const reason=needsComputers(d.subject)&&group&&!ROOMS.some(r=>cfg.activeRooms.includes(r.id)&&suited(d.subject,r,group.count))
+   const noTeachingPeriod=Boolean(d.availableWeeks&&!d.availableWeeks.some(w=>w>=0&&w<cfg.weeks));
+   const reason=noTeachingPeriod
+    ? 'В учебном календаре группы отсутствуют доступные недели теоретического обучения'
+    :needsComputers(d.subject)&&group&&!ROOMS.some(r=>cfg.activeRooms.includes(r.id)&&suited(d.subject,r,group.count))
      &&(!cfg.allowSubgroups.includes(d.group)||!cfg.assistedSubgroups.includes(d.group))
-    ? 'Недостаточно компьютерных мест; разреши подгруппы и сопровождающего'
+    ? 'Недостаточно совместимых компьютерных мест. Проверь режим 2–3 студента за ПК и другие кабинеты; подгруппы — последний вариант'
     : 'Недостаточно доступных дней, пар или совместимых аудиторий с учётом ограничений';
    unplaced.push({id:d.id,week:cfg.weeks-1,group:d.group,subject:d.subject,teacher:d.teacher,reason:reason+' · остаток '+missing+' пар'});
   }
