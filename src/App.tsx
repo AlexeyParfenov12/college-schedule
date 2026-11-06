@@ -187,6 +187,11 @@ export default function App(){
  const show=(to:Screen)=>{setScreen(to);closeSelected()};
  const sideGroups=view==='group'?GROUPS.map(g=>g.id):view==='teacher'?TEACHERS:ROOMS.map(r=>r.id);
  const sideValue=view==='group'?group:view==='teacher'?teacher:room;
+ // A chosen lesson (or an empty slot being edited) has exactly one visibly selected cell.
+ // Hide this navigation crosshair while the collision heatmap is active.
+ const selectedCell=selected&&(selected.week||0)===week&&!moveMode&&!draggingId
+  ? {day:preview?.day??selected.day,slot:preview?.slot??selected.slot}
+  : null;
  const setSide=(s:string)=>{view==='group'?setGroup(s):view==='teacher'?setTeacher(s):setRoom(s);closeSelected()};
  const addRow=()=>make(0,1);
  const teachersTotal=[{name:TEACHERS[0],plan:144,assigned:132,done:98},{name:TEACHERS[1],plan:108,assigned:96,done:64},{name:TEACHERS[2],plan:108,assigned:88,done:56},{name:TEACHERS[3],plan:72,assigned:60,done:48}];
@@ -201,13 +206,20 @@ export default function App(){
    {lastChange&&<Action onClick={undo} title="Ctrl+Z — отменить последнее изменение"><RotateCcw size={14}/> Отменить</Action>}
  </div>;
  const grid=<div className={'timetable-scroll '+(moveMode&&selected?'move-active ':'')+(draggingId?'dragging':'')} data-testid="schedule-grid"><div className={'timetable '+density} style={{gridTemplateColumns:'74px repeat('+days+', minmax(140px,1fr))'}}>
- <div className="grid-head">Пара</div>{DAYS.slice(0,days).map((d,i)=><div key={i} className="grid-head">{d}<small>{lessonDate(week,i).slice(8)}.{lessonDate(week,i).slice(5,7)}</small></div>)}
+ <div className="grid-head">Пара</div>{DAYS.slice(0,days).map((d,i)=><div key={i} className={'grid-head'+(selectedCell?.day===i?' selected-column-head':'')}>{d}<small>{lessonDate(week,i).slice(8)}.{lessonDate(week,i).slice(5,7)}</small></div>)}
  {bellTimes.map((tm,row)=><div className="grid-fragment" key={row}>
-  <div className="slot"><b>{row+1}</b><small>{tm}</small></div>
+  <div className={'slot'+(selectedCell?.slot===row+1?' selected-row-head':'')}><b>{row+1}</b><small>{tm}</small></div>
   {DAYS.slice(0,days).map((d,day)=>{
    const target=targetByCell.get(day+':'+(row+1));
    const cellLessons=visible.filter(x=>x.day===day&&x.slot===row+1);
-   return <div key={d} className={'slot-cell '+(moveMode&&selected&&target?'slot-'+target.kind:'')} title={moveMode&&target?target.reason:undefined}
+   const pickedCell=selectedCell?.day===day&&selectedCell.slot===row+1;
+   const crosshairRow=selectedCell?.slot===row+1;
+   const crosshairColumn=selectedCell?.day===day;
+   return <div key={d} data-testid={pickedCell?'selected-schedule-cell':undefined}
+    data-selected={pickedCell?'true':undefined}
+    className={'slot-cell '+(moveMode&&selected&&target?'slot-'+target.kind:'')+
+      (pickedCell?' selected-slot-cell':crosshairRow?' selected-slot-row':crosshairColumn?' selected-slot-column':'')}
+    title={moveMode&&target?target.reason:pickedCell?'Выбрано: '+DAYS[day]+', '+(row+1)+'-я пара':undefined}
     onDragEnter={()=>{if(draggingId&&target)setHoverMove(target)}}
     onDragOver={e=>{e.preventDefault();e.dataTransfer.dropEffect=target?.kind==='available'?'move':'none'}}
     onDrop={e=>{e.preventDefault();const key=e.dataTransfer.getData('lessonId')||draggingId;if(key)move(key,day,row+1)}}
@@ -224,6 +236,7 @@ export default function App(){
         {target.kind==='available'?<><Check size={14}/> Перенести</>:target.kind==='blocked'?<><X size={13}/> Занято</>:<><CalendarDays size={13}/> Сейчас</>}
        </button>
      : (!moveMode&&cellLessons.length===0?<button className="empty-slot" aria-label={'Создать занятие: '+DAYS[day]+', пара '+(row+1)} title="Назначить занятие" onClick={()=>make(day,row+1)}><Plus size={15}/></button>:null)}
+    {pickedCell&&<span className="selected-cell-marker" aria-hidden="true"><Check size={10}/> Выбрано</span>}
     {moveMode&&selected&&target&&cellLessons.length>0&&<span className={'drag-cell-indicator '+target.kind} title={target.reason}
       aria-label={(target.kind==='available'?'Можно перенести: ':target.kind==='blocked'?'Перенос запрещён: ':'Исходная ячейка: ')+target.reason}>
        {target.kind==='available'?<><Check size={12}/> Можно</>:target.kind==='blocked'?<><X size={12}/> Занято</>:<><CalendarDays size={12}/> Отсюда</>}
@@ -247,7 +260,7 @@ export default function App(){
   <div className="side-bottom"><Action onClick={addRow}><Plus size={14}/> Занятие</Action></div>
  </aside>
  <section className="schedule-body">
-  <div className="table-heading"><div><b>{sideValue}</b><small>{view==='group'?'Занятия группы':view==='teacher'?'Занятия преподавателя':'Занятость аудитории'}</small></div><Tag tone={status==='published'?'green':'muted'}>{status==='published'?'Опубликовано (демо)':'Черновик'}</Tag></div>
+  <div className="table-heading"><div><b>{sideValue}</b><small>{selectedCell?'Выбрано: '+DAYS[selectedCell.day]+', '+selectedCell.slot+'-я пара':view==='group'?'Занятия группы':view==='teacher'?'Занятия преподавателя':'Занятость аудитории'}</small></div><Tag tone={status==='published'?'green':'muted'}>{status==='published'?'Опубликовано (демо)':'Черновик'}</Tag></div>
   {grid}{legend}
   <div className="bottom-line"><span>Потоки и параллели переносятся целиком с участниками</span><span className="push-right">{hoverMove&&moveMode?hoverMove.reason:'Нажми на занятие — увидишь доступные варианты'}</span></div>
  </section>
