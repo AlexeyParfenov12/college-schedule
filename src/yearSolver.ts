@@ -11,7 +11,7 @@ export type TeacherPreference={
 export type PracticeBlock={
  id:string;group:string;kind:'college'|'company';title:string;teacher:string;
  startWeek:number;durationWeeks:number;days:number[];fromSlot:number;toSlot:number;
- room:string;requiresComputers?:boolean;requiresIndividualComputer?:boolean;
+ room:string;requiresComputers?:boolean;requiresIndividualComputer?:boolean;computerShare?:1|2|3;
 };
 export type PracticeAudit={blockId:string;group:string;week:number;reason:string};
 export type AnnualConfig={
@@ -49,8 +49,8 @@ export function deriveAnnualDemands(seed:Lesson[],weeks:number,maxSubjects=6):Ye
   .map(o=>({id:o.key,group:g.id,teacher:o.teacher,subject:o.subject,
     pairsPerWeek:o.count>=3?2:1,requiredPairs:(o.count>=3?2:1)*weeks})));
 }
-const suited=(subject:string,room:typeof ROOMS[number],count:number,requiredPc=false,individual=false)=>assessRoomFit(
- {id:'check',day:0,slot:1,groups:[],teacher:'',subject,room:room.id,type:'regular',mode:'offline',requiresComputers:requiredPc,requiresIndividualComputer:individual},room,count
+const suited=(subject:string,room:typeof ROOMS[number],count:number,requiredPc=false,individual=false,computerShare:1|2|3=2)=>assessRoomFit(
+ {id:'check',day:0,slot:1,groups:[],teacher:'',subject,room:room.id,type:'regular',mode:'offline',requiresComputers:requiredPc,requiresIndividualComputer:individual,computerShare},room,count
 ).level==='ok';
 const location=(l:Lesson)=>l.mode==='online'?'home':l.room==='Предприятие'?'company':'college';
 /** Hard condition for both teacher and every participating group: at most one home/campus switch per day,
@@ -114,8 +114,8 @@ export function practiceReservations(cfg:AnnualConfig,events:CalendarEvent[],wee
    if(!room||!cfg.activeRooms.includes(block.room)||!room.active){
     issues.push({blockId:block.id,group:block.group,week,reason:'Закреплённый кабинет практики закрыт или не существует'});continue;
    }
-   if(!suited(block.title,room,group.count,block.requiresComputers,block.requiresIndividualComputer)){
-    const fit=assessRoomFit({id:'practice-test',week,day:0,slot:1,groups:[block.group],teacher:block.teacher,subject:block.title,room:room.id,type:'regular',mode:'offline',requiresComputers:block.requiresComputers,requiresIndividualComputer:block.requiresIndividualComputer},room,group.count);
+   if(!suited(block.title,room,group.count,block.requiresComputers,block.requiresIndividualComputer,block.computerShare)){
+    const fit=assessRoomFit({id:'practice-test',week,day:0,slot:1,groups:[block.group],teacher:block.teacher,subject:block.title,room:room.id,type:'regular',mode:'offline',requiresComputers:block.requiresComputers,requiresIndividualComputer:block.requiresIndividualComputer,computerShare:block.computerShare},room,group.count);
     issues.push({blockId:block.id,group:block.group,week,reason:fit.reason});continue;
    }
   }
@@ -125,7 +125,7 @@ export function practiceReservations(cfg:AnnualConfig,events:CalendarEvent[],wee
     const lesson:Lesson={id:'practice-'+block.id+'-'+week+'-'+day+'-'+slot,
      week,day,slot,groups:[block.group],subject:block.title||'Учебная практика',
      teacher:block.teacher||'Руководитель практики',room:block.kind==='college'?block.room:'Предприятие',
-     mode:'offline',type:'regular',hours:2,practiceBlockId:block.id,requiresComputers:block.requiresComputers,requiresIndividualComputer:block.requiresIndividualComputer,notes:'Непрерывный блок практики · '+(block.kind==='college'?'Закреплённый кабинет':'Внешняя организация')};
+     mode:'offline',type:'regular',hours:2,practiceBlockId:block.id,requiresComputers:block.requiresComputers,requiresIndividualComputer:block.requiresIndividualComputer,computerShare:block.computerShare,notes:'Непрерывный блок практики · '+(block.kind==='college'?'Закреплённый кабинет':'Внешняя организация')};
     const conflicts=hasSlotConflict(state,lesson);
     const availability=teacherRule(cfg,block.teacher);
     const unavailable=availability.daysOff.includes(day)||slot<availability.fromSlot||slot>availability.toSlot||
