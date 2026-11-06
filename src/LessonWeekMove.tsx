@@ -3,13 +3,13 @@ import { CheckCircle2, ChevronLeft, ChevronRight, X, AlertTriangle, ArrowLeftRig
 import { DAYS, TIMES, TYPES } from './data';
 import type { Lesson } from './data';
 import { explainCandidate } from './scheduleAssist';
-import { lessonDate } from './plannerDomain';
+import { lessonDate, WEEK_COUNT } from './plannerDomain';
 
 type Props={lesson:Lesson;lessons:Lesson[];blockedRooms:string[];onCancel:()=>void;onMove:(next:Lesson)=>void};
 type Cell={day:number;slot:number;errors:string[];current:boolean;date:string};
 export default function LessonWeekMove({lesson,lessons,blockedRooms,onCancel,onMove}:Props){
  const originWeek=lesson.week||0;
- const [targetWeek,setTargetWeek]=useState(Math.min(originWeek+1,15));
+ const [targetWeek,setTargetWeek]=useState(Math.min(originWeek+1,WEEK_COUNT-1));
  const [chosen,setChosen]=useState<{day:number;slot:number}|null>(null);
  const cells=useMemo(()=>Array.from({length:6*6},(_,i):Cell=>{
   const day=i%6,slot=Math.floor(i/6)+1;
@@ -29,8 +29,8 @@ export default function LessonWeekMove({lesson,lessons,blockedRooms,onCancel,onM
     <span>Преподаватель: {lesson.teacher} · {lesson.room}</span></div>
    <div className="week-move-nav"><button aria-label="Неделя назад" disabled={targetWeek===0} onClick={()=>{setTargetWeek(v=>v-1);setChosen(null)}}><ChevronLeft size={17}/></button>
     <label>Целевая неделя<select aria-label="Целевая неделя" value={targetWeek} onChange={e=>{setTargetWeek(Number(e.target.value));setChosen(null)}}>
-    {Array.from({length:16},(_,w)=><option key={w} value={w}>{w+1}-я · с {lessonDate(w,0)}</option>)}</select></label>
-    <button aria-label="Неделя вперёд" disabled={targetWeek===15} onClick={()=>{setTargetWeek(v=>v+1);setChosen(null)}}><ChevronRight size={17}/></button>
+    {Array.from({length:WEEK_COUNT},(_,w)=><option key={w} value={w}>{w+1}-я · с {lessonDate(w,0)}</option>)}</select></label>
+    <button aria-label="Неделя вперёд" disabled={targetWeek===WEEK_COUNT-1} onClick={()=>{setTargetWeek(v=>v+1);setChosen(null)}}><ChevronRight size={17}/></button>
     <span className="week-move-free">{eligible} доступных ячеек</span></div>
    <p className="week-move-guide">Выбери день и пару на целевой неделе. Зелёные ячейки свободны для всей группы, преподавателя и аудиторий; красные показывают причину запрета.</p>
    <div className="week-move-grid">
