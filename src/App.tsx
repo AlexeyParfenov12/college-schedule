@@ -11,7 +11,8 @@ import AnnualPlanner from './AnnualPlanner';
 import { moveOptions, explainCandidate, readBlockedRooms, swapOptions } from './scheduleAssist';
 import type { MoveOption } from './scheduleAssist';
 import { validate } from './demoLogic';
-import { lessonDate } from './plannerDomain';
+import { lessonDate, WEEK_COUNT } from './plannerDomain';
+import { auditAnnualDraft } from './yearAudit';
 
 type Item = Lesson & {week?:number};
 type View = 'group'|'teacher'|'room';
@@ -49,6 +50,7 @@ export default function App(){
  const [weekMoving,setWeekMoving]=useState<Item|null>(null);
  const [contextMenu,setContextMenu]=useState<{x:number;y:number;lesson:Item}|null>(null);
  const [lastChange,setLastChange]=useState<{before:Item[];changedIds:string[]}|null>(null);
+ const [yearBackup,setYearBackup]=useState<{items:Item[];status:'draft'|'published'}|null>(null);
  const [hoverMove,setHoverMove]=useState<MoveOption|null>(null);
  const [view,setView]=useState<View>('group');
  const [group,setGroup]=useState('П-21');
@@ -212,15 +214,20 @@ export default function App(){
  const setSide=(s:string)=>{view==='group'?setGroup(s):view==='teacher'?setTeacher(s):setRoom(s);closeSelected()};
  const addRow=()=>make(0,1);
  const teachersTotal=[{name:TEACHERS[0],plan:144,assigned:132,done:98},{name:TEACHERS[1],plan:108,assigned:96,done:64},{name:TEACHERS[2],plan:108,assigned:88,done:56},{name:TEACHERS[3],plan:72,assigned:60,done:48}];
- const stats=(<div className="metrics"><div><strong>{current.length}</strong><span>Назначено занятий</span></div><div><strong>6</strong><span>Замены за неделю</span></div><div><strong>{issueCount}</strong><span>Требуют проверки</span></div><div><strong>12</strong><span>Не распределено</span></div></div>);
+ const stats=(<div className="metrics"><div><strong>{current.length}</strong><span>Назначено занятий</span></div><div><strong>{current.filter(x=>x.replacementFor).length}</strong><span>Замены за неделю</span></div><div><strong>{issueCount}</strong><span>Требуют проверки</span></div><div><strong>—</strong><span>Остаток часов · нет Academic Core</span></div></div>);
  const lessonLabel=(x:Item)=><><strong>{x.subject}</strong><small>{x.room} · {x.teacher}</small><span className="tiny">{TYPES[x.type]}{x.mode!=='offline'?' · '+MODES[x.mode]:''}</span></>;
  const weekDate=useMemo(()=>{const d=new Date(2026,10,9+week*7);const e=new Date(d);e.setDate(e.getDate()+5);return d.toLocaleDateString('ru-RU',{day:'numeric',month:'short'})+' – '+e.toLocaleDateString('ru-RU',{day:'numeric',month:'short',year:'numeric'})},[week]);
  const weekHeader=<div className="toolbar">
    <div className="control-group"><button className={view==='group'?'active':''} onClick={()=>{setView('group');closeSelected()}}><Users size={15}/> Группы</button><button className={view==='teacher'?'active':''} onClick={()=>{setView('teacher');closeSelected()}}>Преподаватели</button><button className={view==='room'?'active':''} onClick={()=>{setView('room');closeSelected()}}>Аудитории</button></div>
-   <div className="control-group"><button aria-label="Предыдущая неделя" onClick={()=>{setWeek(w=>Math.max(0,w-1));closeSelected()}}><ChevronLeft size={15}/></button><b>{weekDate}</b><button aria-label="Следующая неделя" onClick={()=>{setWeek(w=>Math.min(39,w+1));closeSelected()}}><ChevronRight size={15}/></button></div>
+   <div className="control-group"><button aria-label="Предыдущая неделя" onClick={()=>{setWeek(w=>Math.max(0,w-1));closeSelected()}}><ChevronLeft size={15}/></button><b>{weekDate}</b><button aria-label="Следующая неделя" onClick={()=>{setWeek(w=>Math.min(WEEK_COUNT-1,w+1));closeSelected()}}><ChevronRight size={15}/></button></div>
    <div className="control-group right"><button className={density==='compact'?'active':''} onClick={()=>setDensity('compact')}>Компактно</button><button className={density==='standard'?'active':''} onClick={()=>setDensity('standard')}>Подробнее</button></div>
    <Action onClick={()=>exportCSV()}><Download size={14}/> CSV</Action>
    {lastChange&&<Action onClick={undo} title="Ctrl+Z — отменить последнее изменение"><RotateCcw size={14}/> Отменить</Action>}
+   {yearBackup&&<Action title="Восстановить черновик до годового расчёта" onClick={()=>{
+     if(!window.confirm('Вернуть предыдущий черновик? Последующие изменения тоже будут отменены.'))return;
+     setItems(yearBackup.items);setStatus(yearBackup.status);setYearBackup(null);setLastChange(null);
+     setNotice('Предыдущий черновик восстановлен');
+   }}><RotateCcw size={14}/> Вернуть прошлый вариант</Action>}
  </div>;
  const grid=<div className={'timetable-scroll '+(moveMode&&selected?'move-active ':'')+(draggingId?'dragging':'')} data-testid="schedule-grid"><div className={'timetable '+density} style={{gridTemplateColumns:'74px repeat('+days+', minmax(140px,1fr))'}}>
  <div className="grid-head">Пара</div>{DAYS.slice(0,days).map((d,i)=><div key={i} className={'grid-head'+(selectedCell?.day===i?' selected-column-head':'')}>{d}<small>{lessonDate(week,i).slice(8)}.{lessonDate(week,i).slice(5,7)}</small></div>)}
@@ -337,7 +344,7 @@ export default function App(){
    <div className="nav-footer"><School size={17}/>{!collapsed&&<span>Демо · Диспетчер</span>}</div>
   </aside>
   <div className="main">
-   <header className="main-head"><div className="page-title"><CalendarDays size={22}/><div><h1>{displayName}</h1><p>ИТ-отделение · II семестр 2026/2027</p></div></div><div className="head-actions"><Tag tone="muted">Колледж · Демостенд</Tag><button className="icon-btn" onClick={()=>setNotice('Все изменения сохраняются только в браузере')} title="Уведомления"><Bell size={17}/></button><Action onClick={()=>{setScreen('publication');setSelected(null)}} primary><Check size={15}/> Публикация</Action></div></header>
+   <header className="main-head"><div className="page-title"><CalendarDays size={22}/><div><h1>{displayName}</h1><p>Демонстрационный учебный год 2026/2027</p></div></div><div className="head-actions"><Tag tone="muted">Колледж · Демостенд</Tag><button className="icon-btn" onClick={()=>setNotice('Все изменения сохраняются только в браузере')} title="Уведомления"><Bell size={17}/></button><Action onClick={()=>{setScreen('publication');setSelected(null)}} primary><Check size={15}/> Публикация</Action></div></header>
    <main className="workspace">{render()}</main>
    <footer className="app-foot"><span>College Schedule · тестовый стенд · {GROUPS.length} групп, {TEACHERS.length} преподавателя, {ROOMS.length} аудиторий · {items.length.toLocaleString('ru-RU')} занятий</span><button type="button" className="reset-button" onClick={resetSeed}>Сбросить демоданные</button></footer>
   </div>
