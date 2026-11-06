@@ -195,3 +195,15 @@
 .smart-equipment-warning>span{display:flex;flex-direction:column;gap:8px}
 .smart-equipment-warning label{display:flex;align-items:flex-start;gap:6px;color:#826739;cursor:pointer}
 .smart-equipment-warning input{accent-color:#BA9951;margin-top:2px}
+
+.plan-calendar-group{display:flex;align-items:center;gap:11px;flex-wrap:wrap;padding:9px 11px;border:1px solid #DCEAE0;border-radius:7px;background:#F7FBF7}
+.plan-calendar-group .plan-field{min-width:220px;max-width:390px;flex:1}
+.plan-calendar-group>span{font-size:10.5px;color:#7E9887}
+.plan-calendar-multiselect{display:flex;flex-direction:column;gap:7px;border:1px solid #DCEAE3;border-radius:7px;padding:9px;background:#F9FCF9}
+.plan-calendar-multiselect>div:first-child{display:flex;align-items:center;justify-content:space-between;gap:9px}
+.plan-calendar-multiselect input[aria-label="Поиск групп календаря"]{flex:1;min-width:0;border:1px solid #D9E9DE;border-radius:5px;background:white;padding:7px;font-size:11px}
+.plan-calendar-multiselect>div:first-child span{white-space:nowrap;font-size:10px;color:#568575}
+.plan-calendar-group-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;max-height:150px;overflow-y:auto;scrollbar-width:thin}
+.plan-calendar-group-list label{display:flex;align-items:center;gap:5px;font-size:10px;color:#5F806F;padding:6px;background:#FFF;border:1px solid #E2ECE5;border-radius:5px;cursor:pointer}
+.plan-calendar-group-list input{accent-color:#218B75}
+@media(max-width:630px){.plan-calendar-group-list{grid-template-columns:repeat(2,minmax(0,1fr))}.plan-calendar-group .plan-field{min-width:0}}
