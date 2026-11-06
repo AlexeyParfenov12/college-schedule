@@ -106,10 +106,12 @@ describe('React interface smoke checks',()=>{
   expect(document.querySelectorAll('.slot-cell.slot-available').length).toBeGreaterThan(0);
   expect(document.querySelectorAll('.slot-cell.slot-blocked').length).toBeGreaterThan(0);
   expect(document.querySelectorAll('.drag-cell-indicator.blocked').length).toBeGreaterThan(0);
-  expect(screen.getByText('Перетаскивание занятия')).toBeTruthy();
+  expect(screen.getByTestId('drag-guide')).toBeTruthy();
+  expect(screen.getByText(/Перемещаем:/)).toBeTruthy();
   fireEvent.dragEnd(first!,{dataTransfer:transfer});
   expect(document.querySelector('.timetable-scroll.dragging')).toBeNull();
   expect(document.querySelector('.timetable-scroll.move-active')).toBeNull();
+  expect(screen.queryByTestId('drag-guide')).toBeNull();
   expect(first?.getAttribute('aria-label')).toBe(key);
  },20000);
  it('drops into a green cell with a preview instead of silently moving',()=>{
