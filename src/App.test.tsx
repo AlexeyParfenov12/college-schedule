@@ -204,7 +204,7 @@ describe('React interface smoke checks',()=>{
   const lesson=document.querySelector<HTMLButtonElement>('.lesson');
   expect(lesson).toBeTruthy();
   const meta=lesson!.querySelector('small')!;
-  expect(meta.textContent).toMatch(/[ПРСЭ]-\\d{2}/);
+  expect(meta.textContent).toMatch(/[ПРСЭ]-\d{2}/);
   expect(meta.textContent).not.toContain('Петров М. С.');
  },20000);
 
