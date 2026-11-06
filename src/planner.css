@@ -184,3 +184,14 @@
 .smart-summary.compact span{white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .smart-step-title{margin-top:2px}
 .smart-field select:disabled{background:#F5F7F5;color:#9AAFA7;cursor:not-allowed}
+
+/* Shared-computer policy is an explicit academic choice, not an automatic subgroup requirement. */
+.smart-pc-policy{display:flex;flex-direction:column;gap:7px;padding:9px;background:#F6FAF7;border:1px solid #DDECE2;border-radius:7px}
+.smart-pc-policy>.smart-field{max-width:100%}
+.smart-pc-individual{display:flex;align-items:flex-start;gap:6px;color:#648273;font-size:10.5px;line-height:1.4;cursor:pointer}
+.smart-pc-individual input{accent-color:#1F8A74;margin-top:1px}
+.smart-equipment-warning{display:flex;align-items:flex-start;gap:8px;border:1px solid #E9D9B6;background:#FFF9EC;color:#826739;padding:9px 10px;border-radius:7px;font-size:10.5px;line-height:1.5}
+.smart-equipment-warning svg{flex:none;margin-top:2px}
+.smart-equipment-warning>span{display:flex;flex-direction:column;gap:8px}
+.smart-equipment-warning label{display:flex;align-items:flex-start;gap:6px;color:#826739;cursor:pointer}
+.smart-equipment-warning input{accent-color:#BA9951;margin-top:2px}
