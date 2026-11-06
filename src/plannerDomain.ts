@@ -2,6 +2,8 @@ import { DAYS, GROUPS, ROOMS, TEACHERS, SUBJECTS, CALENDAR } from './data';
 import type { Lesson, CalendarEvent } from './data';
 import { occupiedRooms, validate } from './demoLogic';
 import { assessRoomFit, needsComputers } from './roomPolicy';
+import { classifyCalendarDay, readCollegeWorkweek } from './productionCalendar';
+import type { Workweek } from './productionCalendar';
 export { needsComputers } from './roomPolicy';
 
 export type TeachingOffer = {key:string;group:string;teacher:string;subject:string;count:number;sampleRoom:string};
@@ -55,11 +57,14 @@ export const WEEK_COUNT=40;
 export function lessonDate(week:number,day:number):string{
  const d=new Date(Date.UTC(2026,10,9+week*7+day));return d.toISOString().slice(0,10);
 }
-export function calendarIssues(lesson:Lesson,calendar:CalendarEvent[]):string[]{
- const day=lessonDate(lesson.week||0,lesson.day);
- return calendar.filter(e=>e.from<=day&&day<=e.to&&(e.groups.length===0||lesson.groups.some(g=>e.groups.includes(g))))
+export function calendarIssues(lesson:Lesson,calendar:CalendarEvent[],workweek:Workweek=readCollegeWorkweek()):string[]{
+ const date=lessonDate(lesson.week||0,lesson.day);
+ const automatic=classifyCalendarDay(date,workweek);
+ const results=automatic.nonWorking?['Производственный календарь: '+automatic.label+' ('+date+')']:[];
+ const custom=calendar.filter(e=>e.from<=date&&date<=e.to&&(e.groups.length===0||lesson.groups.some(g=>e.groups.includes(g))))
   .filter(e=>e.kind==='holiday'||e.kind==='vacation'||(e.kind==='practice'&&!lesson.practiceBlockId))
-  .map(e=>'Учебный календарь: '+e.title+' ('+day+')');
+  .map(e=>'Учебный календарь: '+e.title+' ('+date+')');
+ return [...new Set([...results,...custom])];
 }
 export function calendarWarnings(lesson:Lesson,calendar:CalendarEvent[]):string[]{
  const day=lessonDate(lesson.week||0,lesson.day);
