@@ -44,9 +44,13 @@ describe('hard scheduling constraints',()=>{
   const b=basic({id:'b',groups:['П-22'],teacher:TEACHERS[1]});
   expect(validate(b,[a]).some(x=>x.kind==='room')).toBe(true);
  });
- it('checks room capacity for an undivided group',()=>{
-  const normal=basic({room:'102'}); // 15 PCs, group has 28 participants
-  expect(validate(normal,[]).some(x=>x.kind==='capacity')).toBe(true);
+ it('accepts 28 students with 15 PCs when paired work fits 32 physical seats',()=>{
+  const normal=basic({room:'102'});
+  expect(validate(normal,[]).filter(x=>x.hard)).toHaveLength(0);
+ });
+ it('blocks a true physical overflow in the same room',()=>{
+  const stream=basic({type:'stream',groups:['П-21','П-22'],room:'102'});
+  expect(validate(stream,[]).some(x=>x.kind==='capacity'&&x.hard)).toBe(true);
  });
  it('lets two 14-student computer subgroups use two 15-PC rooms',()=>{
   const split=basic({type:'subgroup',room:'102 / 107'});
@@ -71,7 +75,7 @@ describe('hard scheduling constraints',()=>{
  });
  it('does not count combined groups as separate independent appointments',()=>{
   const stream=basic({type:'stream',groups:['П-21','П-22'],room:'101'});
-  expect(validate(stream,[stream])).toHaveLength(0);
+  expect(validate(stream,[stream]).filter(x=>x.hard)).toHaveLength(0);
  });
 });
 describe('planner suggestions and reports',()=>{
