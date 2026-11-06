@@ -42,3 +42,10 @@
 .federal-calendar-explain .federal-calendar-footnote{margin-top:auto;padding-top:7px;border-top:1px solid #e5eee7}
 @media(max-width:900px){.federal-calendar-body{grid-template-columns:1fr}.federal-calendar-explain{border-top:1px solid #e5eee7;border-left:0}.federal-calendar-top{flex-wrap:wrap}}
 @media(max-width:480px){.federal-calendar-main{padding:11px}.federal-calendar-top{padding:11px}.federal-calendar-nav{gap:4px}.federal-calendar-count{width:100%;margin:4px 0 0}.federal-day{height:32px}}
+
+/* Timetable uses exactly the same federal work-calendar rules as the planner. */
+.timetable .grid-head.nonworking-head{background:#fff7ec;color:#8a6845}
+.timetable .grid-head.nonworking-head .federal-day-caption{display:inline-block;margin-top:3px;font-size:9px;line-height:1.15;color:#a17c4f;font-weight:700}
+.timetable .slot-cell.federal-closed-cell{background:repeating-linear-gradient(135deg,#f9f8f3,#f9f8f3 9px,#f5f6f1 9px,#f5f6f1 18px)}
+.timetable .empty-slot.federal-disabled-slot{display:flex;align-items:center;justify-content:center;cursor:not-allowed;opacity:1;color:#9d9a8c;background:transparent}
+.timetable .federal-no-class{font-size:9px;opacity:.83}
