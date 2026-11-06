@@ -144,7 +144,7 @@ export function practiceReservations(cfg:AnnualConfig,events:CalendarEvent[],wee
  return {created,issues,activeGroups};
 }
 
-type Task={demand:YearDemand;group:string;teacher:string;subject:string;week:number};
+type Task={demand:YearDemand;group:string;teacher:string;subject:string;week:number;members?:Task[]};
 function hardReason(task:Task,state:WeekState,cfg:AnnualConfig,calendar:CalendarEvent[],roomCandidates:typeof ROOMS,teacherOnline:number,onlineQuota:number,variant:number){
  const rule=teacherRule(cfg,task.teacher);
  if(rule.daysOff.length>=cfg.days)return 'Преподаватель исключил все доступные дни';
@@ -157,12 +157,13 @@ function hardReason(task:Task,state:WeekState,cfg:AnnualConfig,calendar:Calendar
 }
 function suitableRooms(task:Task,cfg:AnnualConfig,state:WeekState,day:number,slot:number){
  const group=GROUPS.find(g=>g.id===task.group)!;
+ const groupCount=(task.members?.length?task.members.map(m=>m.group):[task.group]).reduce((n,id)=>n+(GROUPS.find(g=>g.id===id)?.count||0),0);
  const active=ROOMS.filter(r=>cfg.activeRooms.includes(r.id)&&r.active);
- const normal=active.filter(r=>suited(task.subject,r,group.count)
+ const normal=active.filter(r=>suited(task.subject,r,groupCount)
   &&!state.roomBusy.has(busyKey(r.id,day,slot)));
  if(normal.length)return normal.slice().sort((a,b)=>a.capacity-b.capacity).slice(0,6)
   .map(r=>({room:r.id,type:'regular' as const}));
- if(needsComputers(task.subject)&&cfg.allowSubgroups.includes(task.group)&&cfg.assistedSubgroups.includes(task.group)){
+ if(!task.members&&needsComputers(task.subject)&&cfg.allowSubgroups.includes(task.group)&&cfg.assistedSubgroups.includes(task.group)){
   const half=Math.ceil(group.count/2);
   const labs=active.filter(r=>suited(task.subject,r,half)&&r.pc>0&&!state.roomBusy.has(busyKey(r.id,day,slot)));
   if(labs.length>=2)return [{room:labs[0].id+' / '+labs[1].id,type:'subgroup' as const}];
