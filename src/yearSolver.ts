@@ -148,7 +148,7 @@ export function practiceReservations(cfg:AnnualConfig,events:CalendarEvent[],wee
  return {created,issues,activeGroups};
 }
 
-type Task={demand:YearDemand;group:string;teacher:string;subject:string;week:number;members?:Task[]};
+type Task={demand:YearDemand;group:string;teacher:string;subject:string;week:number;periodId?:string;members?:Task[]};
 function hardReason(task:Task,state:WeekState,cfg:AnnualConfig,calendar:CalendarEvent[],roomCandidates:typeof ROOMS,teacherOnline:number,onlineQuota:number,variant:number){
  const rule=teacherRule(cfg,task.teacher);
  if(rule.daysOff.length>=cfg.days)return 'Преподаватель исключил все доступные дни';
@@ -205,6 +205,7 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
  for(const d of regularDemands){const limit=quota.get(d.teacher)||0;quota.set(d.teacher,limit+d.requiredPairs)}
  for(const [teacher,total] of quota)quota.set(teacher,Math.floor(total*Math.max(0,Math.min(100,teacherRule(cfg,teacher).maxOnlinePct))/100));
  const covered=new Map<string,number>();
+ const coveredByPeriod=new Map<string,number>();
  const practiceIssues:PracticeAudit[]=[];
  let practicePairs=0;
  let streamCount=0,subgroupCount=0;
@@ -220,22 +221,27 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
    if(reservations.activeGroups.has(d.group))continue;
    if(d.availableWeeks&&!d.availableWeeks.includes(week))continue;
    const done=covered.get(d.id)||0;
-   let quotaNow=Math.ceil((week+1)*d.requiredPairs/cfg.weeks);
+   let due=0;
+   let periodId:string|undefined;
    if(d.periodAllocations){
-    quotaNow=0;
-    for(const segment of d.periodAllocations){
-     const eligible=segment.weeks.filter(w=>w>=0&&w<cfg.weeks);
-     if(!eligible.length)continue;
-     const elapsed=eligible.filter(w=>w<=week).length;
-     quotaNow+=Math.ceil(elapsed*segment.requiredPairs/eligible.length);
-    }
-   }else if(d.availableWeeks){
-    const eligible=d.availableWeeks.filter(w=>w>=0&&w<cfg.weeks);
+    const period=d.periodAllocations.find(p=>p.weeks.includes(week));
+    if(!period)continue;
+    periodId=period.id;
+    const eligible=period.weeks.filter(w=>w>=0&&w<cfg.weeks);
     const elapsed=eligible.filter(w=>w<=week).length;
-    quotaNow=eligible.length?Math.ceil(elapsed*d.requiredPairs/eligible.length):0;
+    const assigned=coveredByPeriod.get(d.id+'|'+period.id)||0;
+    const expected=eligible.length?Math.ceil(elapsed*period.requiredPairs/eligible.length):0;
+    due=Math.max(0,Math.min(3,expected-assigned));
+   }else{
+    let quotaNow=Math.ceil((week+1)*d.requiredPairs/cfg.weeks);
+    if(d.availableWeeks){
+     const eligible=d.availableWeeks.filter(w=>w>=0&&w<cfg.weeks);
+     const elapsed=eligible.filter(w=>w<=week).length;
+     quotaNow=eligible.length?Math.ceil(elapsed*d.requiredPairs/eligible.length):0;
+    }
+    due=Math.max(0,Math.min(3,quotaNow-done));
    }
-   const due=Math.max(0,Math.min(3,quotaNow-done));
-   for(let j=0;j<due;j++)tasks.push({demand:d,group:d.group,teacher:d.teacher,subject:d.subject,week});
+   for(let j=0;j<due;j++)tasks.push({demand:d,group:d.group,teacher:d.teacher,subject:d.subject,week,periodId});
   }
   tasks.sort((a,b)=>Number(needsComputers(b.subject))-Number(needsComputers(a.subject))||
    teacherRule(cfg,a.teacher).daysOff.length-teacherRule(cfg,b.teacher).daysOff.length||
@@ -247,7 +253,7 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
    const task=tasks[i];
    if(cfg.allowStreams.includes(streamKey(task.teacher,task.subject))){
     const partner=tasks.findIndex((other,j)=>j>i&&!absorbed.has(j)&&other.teacher===task.teacher&&
-     other.subject===task.subject&&other.group!==task.group);
+     other.subject===task.subject&&other.group!==task.group&&other.periodId===task.periodId);
     if(partner>=0){
      const a=GROUPS.find(g=>g.id===task.group),b=GROUPS.find(g=>g.id===tasks[partner].group);
      const count=(a?.count||0)+(b?.count||0);
@@ -293,7 +299,13 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
    choices.sort((a,b)=>b.score-a.score);
    if(choices.length){
     const l=choices[0].l;append(state,l);placed.push(l);
-    for(const member of task.members||[task])covered.set(member.demand.id,(covered.get(member.demand.id)||0)+1);
+    for(const member of task.members||[task]){
+      covered.set(member.demand.id,(covered.get(member.demand.id)||0)+1);
+      if(member.periodId){
+       const key=member.demand.id+'|'+member.periodId;
+       coveredByPeriod.set(key,(coveredByPeriod.get(key)||0)+1);
+      }
+     }
     if(l.type==='stream')streamCount++;
     if(l.mode==='online')usedOnline.set(l.teacher,(usedOnline.get(l.teacher)||0)+1);
     if(l.type==='subgroup')subgroupCount++;
@@ -312,7 +324,18 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
      &&(!cfg.allowSubgroups.includes(d.group)||!cfg.assistedSubgroups.includes(d.group))
     ? 'Недостаточно совместимых компьютерных мест. Проверь режим 2–3 студента за ПК и другие кабинеты; подгруппы — последний вариант'
     : 'Недостаточно доступных дней, пар или совместимых аудиторий с учётом ограничений';
-   unplaced.push({id:d.id,week:cfg.weeks-1,group:d.group,subject:d.subject,teacher:d.teacher,reason:reason+' · остаток '+missing+' пар'});
+   if(d.periodAllocations?.length){
+    for(const period of d.periodAllocations){
+     const periodMissing=period.requiredPairs-(coveredByPeriod.get(d.id+'|'+period.id)||0);
+     if(periodMissing<=0)continue;
+     const periodName=period.id==='autumn'?'Осенний период':period.id==='spring'?'Весенний период':period.id;
+     const week=period.weeks.length?period.weeks[period.weeks.length-1]:cfg.weeks-1;
+     unplaced.push({id:d.id+'|'+period.id,week,group:d.group,subject:d.subject,teacher:d.teacher,
+      reason:periodName+': '+reason+' · остаток '+periodMissing+' пар'});
+    }
+   }else{
+    unplaced.push({id:d.id,week:cfg.weeks-1,group:d.group,subject:d.subject,teacher:d.teacher,reason:reason+' · остаток '+missing+' пар'});
+   }
   }
  }
  // Calendar-defined practice must have an explicit room/company reservation.
