@@ -41,6 +41,7 @@ export default function App(){
  const [collapsed,setCollapsed]=useState(false);
  const [items,setItems]=useState<Item[]>(start);
  const [selected,setSelected]=useState<Item|null>(null);
+ const [focusId,setFocusId]=useState<string|null>(null);
  const [sideMode,setSideMode]=useState<'assistant'|'edit'>('assistant');
  const [moveMode,setMoveMode]=useState(false);
  const [draggingId,setDraggingId]=useState<string|null>(null);
@@ -81,7 +82,7 @@ export default function App(){
  const collisions=selected?cellConflict(selected,current):[];
  const issueCount=current.filter(x=>cellConflict(x,current).length>0).length;
  const displayName=NAV.find(x=>x[0]===screen)?.[1]||'Расписание';
- const choose=(x:Item)=>{setContextMenu(null);setSelected(x);setSideMode('assistant');setMoveMode(false);setDraggingId(null);setPreview(null);setHoverMove(null)};
+ const choose=(x:Item)=>{setFocusId(null);setContextMenu(null);setSelected(x);setSideMode('assistant');setMoveMode(false);setDraggingId(null);setPreview(null);setHoverMove(null)};
  const beginDrag=(event:DragEvent<HTMLButtonElement>,lesson:Item)=>{
   if(lesson.status==='held'){event.preventDefault();setNotice('Проведённое занятие заблокировано для переноса');return}
   event.dataTransfer.effectAllowed='move';
@@ -184,7 +185,23 @@ export default function App(){
    window.addEventListener('keydown',handler);return ()=>window.removeEventListener('keydown',handler);
  },[lastChange,items]);
  const exportCSV=(dataset=current)=>download('college-schedule.csv',['День;Пара;Группа;Дисциплина;Преподаватель;Аудитория;Организация;Формат',...dataset.map(x=>[DAYS[x.day],x.slot,names(x.groups),x.subject,x.teacher,x.room,TYPES[x.type],MODES[x.mode]].join(';'))].join('\n'));
- const show=(to:Screen)=>{setScreen(to);closeSelected()};
+ const show=(to:Screen)=>{setFocusId(null);setScreen(to);closeSelected()};
+ const focusLesson=(lesson:Item)=>{
+  const currentLesson=items.find(x=>x.id===lesson.id);
+  if(!currentLesson){setNotice('Занятие было изменено или удалено. Обнови список.');return}
+  setScreen('schedule');setView('group');setWeek(currentLesson.week||0);
+  setGroup(currentLesson.groups[0]||group);setSelected(currentLesson);setSideMode('assistant');
+  setMoveMode(false);setDraggingId(null);setContextMenu(null);setFocusId(currentLesson.id);
+ };
+ useEffect(()=>{
+  if(!focusId||screen!=='schedule')return;
+  const timer=setTimeout(()=>{
+   const cards=Array.from(document.querySelectorAll<HTMLButtonElement>('[data-lesson-id]'));
+   const element=cards.find(b=>b.dataset.lessonId===focusId);
+   element?.scrollIntoView?.({behavior:'smooth',block:'center',inline:'center'});
+  },80);
+  return ()=>clearTimeout(timer);
+ },[focusId,screen,view,group,week]);
  const sideGroups=view==='group'?GROUPS.map(g=>g.id):view==='teacher'?TEACHERS:ROOMS.map(r=>r.id);
  const sideValue=view==='group'?group:view==='teacher'?teacher:room;
  // A chosen lesson (or an empty slot being edited) has exactly one visibly selected cell.
@@ -225,8 +242,8 @@ export default function App(){
     onDrop={e=>{e.preventDefault();const key=e.dataTransfer.getData('lessonId')||draggingId;if(key)move(key,day,row+1)}}
     onMouseEnter={()=>{if(moveMode&&target)setHoverMove(target)}}
     onMouseLeave={()=>setHoverMove(null)}>
-    {cellLessons.map(x=><button draggable={!preview&&x.status!=='held'} key={x.id}
-      className={'lesson '+x.type+(selected?.id===x.id?' picked':'')}
+    {cellLessons.map(x=><button draggable={!preview&&x.status!=='held'} key={x.id} data-lesson-id={x.id}
+      className={'lesson '+x.type+(selected?.id===x.id?' picked':'')+(focusId===x.id?' jump-focused':'')}
       onDragStart={(e:DragEvent<HTMLButtonElement>)=>beginDrag(e,x)} onDragEnd={finishDrag}
       onClick={()=>choose(x)} onContextMenu={e=>rightClick(e,x)} aria-label={'Открыть занятие: '+x.subject+', '+x.groups.join(' + ')}>{lessonLabel(x)}</button>)}
     {moveMode&&selected&&target&&cellLessons.length===0
@@ -312,7 +329,7 @@ export default function App(){
       setItems(next);setStatus('draft');setLastChange(null);setSelected(null);setWeek(0);setScreen('schedule');
       setNotice('Вариант на '+weeks+' недель применён к демочерновику: '+generated.length+' занятий');
     }}/>
-  : <AdvancedWorkflows screen={screen} items={items} setItems={setItems} week={week} setWeek={setWeek} group={group} setGroup={setGroup} teacher={teacher} setTeacher={setTeacher} room={room} setRoom={setRoom} onNavigate={show} onEdit={setSelected} notify={setNotice} markDraft={()=>setStatus('draft')} status={status} setStatus={setStatus} density={density} setDensity={setDensity} days={days} setDays={setDays}/>;
+  : <AdvancedWorkflows screen={screen} items={items} setItems={setItems} week={week} setWeek={setWeek} group={group} setGroup={setGroup} teacher={teacher} setTeacher={setTeacher} room={room} setRoom={setRoom} onNavigate={show} onEdit={setSelected} onFocusLesson={focusLesson} notify={setNotice} markDraft={()=>setStatus('draft')} status={status} setStatus={setStatus} density={density} setDensity={setDensity} days={days} setDays={setDays}/>;
  return <div className="app">
   <aside className={'nav '+(collapsed?'closed':'')}>
    <div className="brand"><div className="brand-symbol">C</div>{!collapsed&&<div><strong>College</strong><span>Schedule</span></div>}<button onClick={()=>setCollapsed(v=>!v)} className="nav-toggle"><Menu size={16}/></button></div>
