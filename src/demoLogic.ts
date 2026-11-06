@@ -1,6 +1,7 @@
 import { GROUPS, ROOMS, TEACHERS, SUBJECTS, DAYS, TIMES } from './data';
 import type { Lesson } from './data';
-export type Issue={kind:'group'|'teacher'|'room'|'capacity'|'parallel'|'calendar';message:string;hard:boolean};
+import { assessRoomFit } from './roomPolicy';
+export type Issue={kind:'group'|'teacher'|'room'|'capacity'|'equipment'|'parallel'|'calendar';message:string;hard:boolean};
 export const occupiedRooms=(l:Lesson)=> l.mode==='online'||l.mode==='async'?[]:Array.from(new Set((l.participants?.map(p=>p.room).join(' / ')||l.room).match(/\b\d{3}\b/g)||[]));
 export const participantGroups=(l:Lesson)=>Array.from(new Set(l.participants?.map(p=>p.group) || l.groups));
 export function validate(l:Lesson, others:Lesson[], options:{capacity?:boolean;parallel?:boolean}={capacity:true,parallel:true}):Issue[]{
@@ -16,26 +17,32 @@ export function validate(l:Lesson, others:Lesson[], options:{capacity?:boolean;p
  }
  if(options.capacity&&l.mode!=='online'&&l.mode!=='async'){
   const count=groups.reduce((sum,g)=>sum+(GROUPS.find(x=>x.id===g)?.count||0),0);
-  if(l.type==='stream'||l.type==='regular'){
+  if(l.type==='regular'||l.type==='stream'){
    for(const place of places){
     const room=ROOMS.find(r=>r.id===place);
-    if(room&&room.capacity<count)issues.push({kind:'capacity',hard:true,message:'Кабинет '+place+': '+room.capacity+' мест при '+count+' участниках'});
+    if(!room){issues.push({kind:'room',hard:true,message:'Аудитория '+place+' отсутствует в справочнике'});continue}
+    const fit=assessRoomFit(l,room,count);
+    if(fit.level!=='ok')issues.push({kind:fit.hard?'capacity':'equipment',hard:fit.hard,message:'Аудитория '+place+': '+fit.reason});
    }
   }
   if(l.type==='subgroup'){
-   const need=Math.ceil(count/Math.max(2,l.participants?.length||2));
-   if(places.length<2&&!l.participants?.length)issues.push({kind:'capacity',hard:true,message:'Для одновременной работы подгрупп нужно назначить отдельные помещения (например, 102 / 107)'});
+   const countPerGroup=Math.ceil(count/Math.max(2,l.participants?.length||2));
+   if(places.length<2&&!l.participants?.length)issues.push({kind:'capacity',hard:true,message:'Подгруппам нужны два разных помещения или подтверждённая схема совместного занятия'});
    for(const place of places){
     const room=ROOMS.find(r=>r.id===place);
-    if(room&&room.capacity<need)issues.push({kind:'capacity',hard:true,message:'Для подгруппы нужно '+need+' мест, в кабинете '+place+' доступно '+room.capacity});
+    if(!room){issues.push({kind:'room',hard:true,message:'Аудитория '+place+' отсутствует в справочнике'});continue}
+    const fit=assessRoomFit(l,room,countPerGroup);
+    if(fit.level!=='ok')issues.push({kind:fit.hard?'capacity':'equipment',hard:fit.hard,message:'Подгруппа, кабинет '+place+': '+fit.reason});
    }
   }
   if(l.type==='parallel'){
-   const own=l.participants?.filter(x=>x.mode!=='online'&&x.mode!=='async')||[{group:groups[0],room:places[0],mode:'offline' as const}];
-   for(const participant of own){
-    const room=ROOMS.find(r=>r.id===participant.room);
-    const attend=participant.count||GROUPS.find(x=>x.id===participant.group)?.count||0;
-    if(room&&room.capacity<attend)issues.push({kind:'capacity',hard:true,message:'Параллель: '+participant.group+' ('+attend+' чел.) не помещается в '+room.id+' ('+room.capacity+' мест)'});
+   const onsite=l.participants?.filter(p=>p.mode!=='online'&&p.mode!=='async')||[{group:groups[0],room:places[0],mode:'offline' as const}];
+   for(const part of onsite){
+    const room=ROOMS.find(r=>r.id===part.room);
+    const attending=part.count||GROUPS.find(x=>x.id===part.group)?.count||0;
+    if(!room){issues.push({kind:'room',hard:true,message:'Аудитория '+part.room+' отсутствует в справочнике'});continue}
+    const fit=assessRoomFit(l,room,attending);
+    if(fit.level!=='ok')issues.push({kind:fit.hard?'capacity':'equipment',hard:fit.hard,message:'Параллель '+part.group+': '+fit.reason});
    }
   }
  }
