@@ -1,3 +1,5 @@
+import { useRef } from 'react';
+import type { TouchEvent } from 'react';
 import { CalendarDays, Check, CircleAlert, Plus, ArrowLeftRight, X } from 'lucide-react';
 import { DAYS, TYPES } from './data';
 import type { Lesson } from './data';
@@ -15,13 +17,27 @@ export type MobileScheduleProps={
 export default function MobileSchedule({
  week,days,times,lessons,day,selectedId,moveMode,targets,onDayChange,onOpen,onAdd,onTarget,onCancelMove
 }:MobileScheduleProps){
+ const touchOrigin=useRef<{x:number;y:number}|null>(null);
  const chosenDay=Math.min(Math.max(day,0),days-1);
+ const onTouchStart=(event:TouchEvent<HTMLElement>)=>{
+  if(event.touches.length!==1){touchOrigin.current=null;return}
+  touchOrigin.current={x:event.touches[0].clientX,y:event.touches[0].clientY};
+ };
+ const onTouchEnd=(event:TouchEvent<HTMLElement>)=>{
+  const origin=touchOrigin.current;touchOrigin.current=null;
+  if(!origin||event.changedTouches.length!==1)return;
+  const dx=event.changedTouches[0].clientX-origin.x,dy=event.changedTouches[0].clientY-origin.y;
+  // Respect vertical scrolling; navigate only on a deliberate horizontal gesture.
+  if(Math.abs(dx)<70||Math.abs(dx)<Math.abs(dy)*1.6)return;
+  const next=chosenDay+(dx<0?1:-1);
+  if(next>=0&&next<days)onDayChange(next);
+ };
  const date=lessonDate(week,chosenDay);
  const official=classifyCalendarDay(date,days);
  const current=lessons.filter(l=>l.day===chosenDay&&l.status!=='cancelled');
  const slots=times.map((time,index)=>({slot:index+1,time,lessons:current.filter(l=>l.slot===index+1),
   target:targets.find(t=>t.day===chosenDay&&t.slot===index+1)}));
- return <section className="mobile-agenda" aria-label="Расписание на телефоне">
+ return <section className="mobile-agenda" aria-label="Расписание на телефоне" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
   <div className="mobile-day-strip" role="group" aria-label="Выбор дня недели">
    {DAYS.slice(0,days).map((name,i)=>{
     const iso=lessonDate(week,i);
@@ -64,6 +80,6 @@ export default function MobileSchedule({
    </div>
   </div>)}
   </div>
-  <p className="mobile-agenda-footer">Потоки и параллели изменяются вместе со всеми участниками. Для переноса выберите занятие и нажмите «Перенести».</p>
+  <p className="mobile-agenda-footer">Листайте вправо или влево, чтобы менять дни. Потоки и параллели перемещаются вместе со всеми участниками. Для переноса нажмите на занятие и выберите «Перенести».</p>
  </section>;
 }
