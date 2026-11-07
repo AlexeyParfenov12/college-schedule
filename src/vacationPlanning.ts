@@ -1,7 +1,8 @@
 import type { CalendarEvent, Lesson } from './data';
 import { lessonDate } from './plannerDomain';
-export type VacationLabel='Осенние каникулы'|'Зимние каникулы'|'Весенние каникулы'|'Летние каникулы';
-export const VACATION_LABELS:VacationLabel[]=['Осенние каникулы','Зимние каникулы','Весенние каникулы','Летние каникулы'];
+/** College UI has one seasonal quick-add. Winter break is kept as an academic-calendar period per SPO rules. */
+export type VacationLabel='Летние каникулы';
+export const VACATION_LABELS:VacationLabel[]=['Летние каникулы'];
 export const vacationEvents=(events:CalendarEvent[],group?:string)=>events.filter(e=>e.kind==='vacation'&&(!group||e.groups.length===0||e.groups.includes(group))).sort((a,b)=>a.from.localeCompare(b.from));
 export const vacationsIntersect=(events:CalendarEvent[],group:string,from:string,to:string)=>
  vacationEvents(events,group).filter(e=>e.from<=to&&from<=e.to);
