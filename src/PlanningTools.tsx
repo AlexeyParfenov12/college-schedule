@@ -3,6 +3,7 @@ import { AlertTriangle, ArrowRight, CalendarDays, Check, ChevronRight, Copy, Hel
 import { DAYS, GROUPS, TIMES } from './data';
 import type { CalendarEvent, Lesson } from './data';
 import OfficialCalendar from './OfficialCalendar';
+import { VACATION_LABELS, daysInVacation, vacationEvents, vacationsIntersect } from './vacationPlanning';
 import { WEEK_COUNT, eventAffectedLessons, lessonDate, previewTemplate, previewAutofill, needsComputers, calendarIssues } from './plannerDomain';
 import { demoAcademicDemands, demoAcademicHorizon, isTeachingDate } from './academicPlanning';
 import { readCollegeWorkweek } from './productionCalendar';
@@ -27,25 +28,58 @@ export function CalendarStudio({events,lessons,group,setGroup,week,setWeek,add,r
  const [multiGroups,setMultiGroups]=useState<string[]>([group]);
  const [groupQuery,setGroupQuery]=useState('');
  const [confirmed,setConfirmed]=useState(false);
- const candidate:CalendarEvent={id:'preview',kind,title,from,to,groups:scope==='all'?[]:scope==='custom'?multiGroups:[scope]};
+ const [periodError,setPeriodError]=useState('');
+ const [vacationNote,setVacationNote]=useState(false);
+ const scopedGroups=scope==='all'?[]:scope==='custom'?multiGroups:
+  scope.startsWith('department:')?GROUPS.filter(g=>g.department===scope.slice('department:'.length)).map(g=>g.id):[scope];
+ const candidate:CalendarEvent={id:'preview',kind,title,from,to,groups:scopedGroups};
+ const existingVacations=vacationEvents(events,group);
+ const matchingVacation=kind==='vacation'&&from&&to&&events.some(e=>e.kind==='vacation'&&e.from<=to&&from<=e.to&&
+  (e.groups.length===0||scopedGroups.length===0||scopedGroups.some(g=>e.groups.includes(g))));
  const conflicts=useMemo(()=>eventAffectedLessons(candidate,lessons),[kind,title,from,to,scope,multiGroups,lessons]);
- const isValid=Boolean(title.trim()&&from<=to&&(scope!=='custom'||multiGroups.length>0));
+ const isValid=Boolean(title.trim()&&from&&to&&from<=to&&(scope!=='custom'||multiGroups.length>0));
  const blocking=kind==='vacation'||kind==='holiday'||kind==='practice';
  const eventsSorted=[...events].sort((a,b)=>a.from.localeCompare(b.from));
- const create=()=>{if(!isValid||blocking&&conflicts.length&&!confirmed)return;add({...candidate,id:'cal-'+Date.now().toString(36)});setConfirmed(false)};
+ const create=()=>{
+  if(!isValid)return;
+  if(matchingVacation){setPeriodError('В выбранном диапазоне уже есть каникулы для одной или нескольких указанных групп. Измени даты или сначала удали прежний период.');return}
+  if(blocking&&conflicts.length&&!confirmed)return;
+  add({...candidate,id:'cal-'+Date.now().toString(36)});
+  setConfirmed(false);setPeriodError('');setVacationNote(false);
+ };
+ const prepareVacation=(name:typeof VACATION_LABELS[number])=>{
+  setKind('vacation');setTitle(name);setScope(group);setFrom('');setTo('');
+  setConfirmed(false);setPeriodError('');setVacationNote(true);
+ };
  return <div className="plan-page" data-testid="calendar-studio">
   <div className="plan-intro"><div><strong>Учебный календарь — когда колледж учится</strong><p>Определяет учебные недели, практики, сессии, каникулы и выходные. Расписание строится внутри разрешённых периодов. Календарь не заменяет расписание занятий.</p></div><CalendarDays size={25}/></div>
   <OfficialCalendar/>
   <Heading step={1}>Посмотри учебные периоды выбранной группы</Heading>
   <div className="plan-calendar-group"><Field name="Просмотр календаря группы"><select aria-label="Просмотр календаря группы" value={group} onChange={e=>setGroup(e.target.value)}>{GROUPS.map(g=><option key={g.id} value={g.id}>{g.id} · {g.department} · {g.course} курс</option>)}</select></Field><span>Общие события колледжа и периоды конкретной группы.</span></div>
   <PeriodTimeline calendar={events} lessons={lessons} group={group} activeWeek={week} onWeek={setWeek}/>
+  <section className="vacation-summary" aria-label="Каникулы выбранной группы">
+   <div className="vacation-summary-header">
+    <div><strong>Каникулы · {group}</strong><p>Отдельные периоды для каждой группы или всего колледжа. В эти дни занятия не планируются.</p></div>
+    <span>{existingVacations.length} периодов · {existingVacations.reduce((sum,e)=>sum+daysInVacation(e),0)} календарных дней</span>
+   </div>
+   <div className="vacation-summary-list">
+    {existingVacations.length?existingVacations.map(e=><div className="vacation-period-chip" key={e.id}>
+     <span>{e.title}</span><small>{e.from} — {e.to} · {e.groups.length?'Для выбранных групп':'Весь колледж'}</small>
+    </div>):<div className="vacation-empty">Для группы каникулы пока не заданы. Выбери тип ниже и укажи даты.</div>}
+   </div>
+   <div className="vacation-actions"><span>Добавить период:</span>
+    {VACATION_LABELS.map(name=><button type="button" key={name} onClick={()=>prepareVacation(name)}>{name}</button>)}
+   </div>
+   <p className="vacation-footnote">Каникулы не равны государственным праздникам. Их даты устанавливаются учебным графиком колледжа и могут различаться по группам. Здесь они вводятся для проверки в деморежиме.</p>
+  </section>
   <div className="plan-columns">
-   <section className="plan-pane"><Heading step={2}>Добавь особый период</Heading>
+   <section className="plan-pane" id="calendar-event-form"><Heading step={2}>Добавь особый период</Heading>
+    {vacationNote&&<Info>Выбран тип каникул. Укажи даты по учебному графику группы; система не подставляет вымышленные сроки.</Info>}
     <div className="plan-fields">
-     <Field name="Тип периода"><select value={kind} onChange={e=>{const v=e.target.value as CalendarEvent['kind'];setKind(v);setTitle(kinds[v]);setConfirmed(false)}}>{Object.entries(kinds).map(([k,n])=><option key={k} value={k}>{n}</option>)}</select></Field>
+     <Field name="Тип периода"><select value={kind} onChange={e=>{const v=e.target.value as CalendarEvent['kind'];setKind(v);setTitle(kinds[v]);setConfirmed(false);setPeriodError('');setVacationNote(v==='vacation')}}>{Object.entries(kinds).map(([k,n])=><option key={k} value={k}>{n}</option>)}</select></Field>
      <Field name="Название"><input value={title} onChange={e=>setTitle(e.target.value)}/></Field>
-     <div className="plan-duo"><Field name="С даты"><input type="date" value={from} onChange={e=>{setFrom(e.target.value);setConfirmed(false)}}/></Field><Field name="По дату"><input type="date" value={to} onChange={e=>{setTo(e.target.value);setConfirmed(false)}}/></Field></div>
-     <Field name="На кого действует"><select value={scope} onChange={e=>{setScope(e.target.value);setConfirmed(false)}}><option value="all">Весь колледж</option><option value="custom">Несколько групп</option>{grouped.map(g=><option key={g} value={g}>Группа {g}</option>)}</select></Field>
+     <div className="plan-duo"><Field name="С даты"><input type="date" value={from} onChange={e=>{setFrom(e.target.value);setConfirmed(false);setPeriodError('')}}/></Field><Field name="По дату"><input type="date" value={to} onChange={e=>{setTo(e.target.value);setConfirmed(false);setPeriodError('')}}/></Field></div>
+     <Field name="На кого действует"><select value={scope} onChange={e=>{setScope(e.target.value);setConfirmed(false)}}><option value="all">Весь колледж</option><option value="custom">Несколько групп</option>{[...new Set(GROUPS.map(g=>g.department))].map(dep=><option key={dep} value={'department:'+dep}>Отделение {dep}</option>)}{grouped.map(g=><option key={g} value={g}>Группа {g}</option>)}</select></Field>
     </div>
     {scope==='custom'&&<div className="plan-calendar-multiselect">
       <div><input aria-label="Поиск групп календаря" placeholder="Найти группу…" value={groupQuery} onChange={e=>setGroupQuery(e.target.value)}/>
@@ -55,8 +89,10 @@ export function CalendarStudio({events,lessons,group,setGroup,week,setWeek,add,r
       </label>)}</div>
      </div>}
      <div className="plan-impact"><strong><AlertTriangle size={15}/> В этот период уже поставлено {conflicts.length} занятий</strong><small>{blocking?'Если период ограничивает учёбу, эти занятия потребуют перепланирования. При сохранении календарь их не удаляет.':'Учебный период сам по себе не запрещает поставленные занятия.'}</small></div>
+    {periodError&&<p className="vacation-error" role="alert">{periodError}</p>}
+    {matchingVacation&&<p className="vacation-warning">На выбранные даты уже назначены каникулы для пересекающихся групп.</p>}
     {blocking&&conflicts.length>0&&<label className="plan-confirm"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/> Понимаю, что занятия останутся в расписании и потребуют решения</label>}
-    <Cmd onClick={create} disabled={!isValid||blocking&&conflicts.length>0&&!confirmed}><Check size={15}/> Сохранить учебный период</Cmd>
+    <Cmd onClick={create} disabled={!isValid||matchingVacation||blocking&&conflicts.length>0&&!confirmed}><Check size={15}/> Сохранить учебный период</Cmd>
    </section>
    <section className="plan-pane"><Heading step={3}>Проверь, что попадает в выбранную неделю</Heading>
     <MiniSchedule week={week} lessons={lessons} group={group} title={'Группа '+group+' · неделя '+(week+1)}/>
