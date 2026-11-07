@@ -1,3 +1,4 @@
+import PolishedSelect from './PolishedSelect';
 import { useMemo, useState } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import { classifyCalendarDay, holidayMonth, CONFIRMED_TRANSFERS, LEGAL_SOURCE, readCollegeWorkweek } from './productionCalendar';
@@ -30,8 +31,8 @@ export default function OfficialCalendar({workweek=readCollegeWorkweek()}:Props)
   <div className="federal-calendar-body">
    <div className="federal-calendar-main">
     <div className="federal-calendar-nav"><button aria-label="Предыдущий месяц" onClick={()=>shift(-1)}><ChevronLeft size={16}/></button>
-     <select aria-label="Месяц производственного календаря" value={chosen.month} onChange={e=>setChosen(v=>({...v,month:Number(e.target.value)}))}>
-      {MONTHS.map((name,i)=><option key={name} value={i+1}>{name}</option>)}</select>
+     <PolishedSelect aria-label="Месяц производственного календаря" value={chosen.month} onChange={e=>setChosen(v=>({...v,month:Number(e.target.value)}))}>
+      {MONTHS.map((name,i)=><option key={name} value={i+1}>{name}</option>)}</PolishedSelect>
      <input aria-label="Год производственного календаря" type="number" min={2000} max={2100} value={chosen.year}
       onChange={e=>selectYear(Number(e.target.value))}/>
      <button aria-label="Следующий месяц" onClick={()=>shift(1)}><ChevronRight size={16}/></button>
