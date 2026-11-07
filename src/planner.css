@@ -207,3 +207,23 @@
 .plan-calendar-group-list label{display:flex;align-items:center;gap:5px;font-size:10px;color:#5F806F;padding:6px;background:#FFF;border:1px solid #E2ECE5;border-radius:5px;cursor:pointer}
 .plan-calendar-group-list input{accent-color:#218B75}
 @media(max-width:630px){.plan-calendar-group-list{grid-template-columns:repeat(2,minmax(0,1fr))}.plan-calendar-group .plan-field{min-width:0}}
+
+/* Scoped college vacation periods, compact and useful instead of a decorative timetable repeat. */
+.vacation-summary{display:flex;flex-direction:column;gap:9px;padding:13px 15px;border:1px solid #d9e9df;border-radius:10px;background:linear-gradient(105deg,#f8fcf9,#fbfcf4)}
+.vacation-summary-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.vacation-summary-header strong{display:block;font-size:13px;color:#245b55}
+.vacation-summary-header p{font-size:10.5px;margin:5px 0 0;color:#789083;line-height:1.5}
+.vacation-summary-header>span{white-space:nowrap;padding:6px 9px;border-radius:6px;background:#e8f3eb;border:1px solid #d6eadc;color:#367a60;font-size:10px;font-weight:650}
+.vacation-summary-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:8px}
+.vacation-period-chip{padding:10px 11px;border:1px solid #dbece2;border-radius:7px;background:#fff;display:flex;flex-direction:column;gap:5px;min-width:0}
+.vacation-period-chip span{font-size:11px;font-weight:700;color:#286956}
+.vacation-period-chip small{font-size:10px;color:#7b9185;line-height:1.4}
+.vacation-empty{font-size:11px;color:#768c7e;padding:10px}
+.vacation-actions{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.vacation-actions span{font-size:10px;color:#7b9586;margin-right:3px}
+.vacation-actions button{font-size:10px;font-weight:650;padding:7px 9px;border:1px solid #c9e2d3;border-radius:6px;background:#fff;color:#286a58;cursor:pointer;transition:background .15s,border-color .15s}
+.vacation-actions button:hover{background:#eff8f1;border-color:#74b69a}
+.vacation-footnote{margin:0;font-size:10px;line-height:1.6;color:#799087}
+.vacation-error{padding:8px 10px;font-size:11px;border:1px solid #f0d3c6;color:#9b493e;background:#fff1ed;border-radius:6px}
+.vacation-warning{padding:8px 10px;font-size:11px;border:1px solid #f1e0bb;color:#936e36;background:#fff8e9;border-radius:6px}
+@media(max-width:620px){.vacation-summary-header{flex-wrap:wrap}.vacation-summary-header>span{white-space:normal}}
