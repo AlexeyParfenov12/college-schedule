@@ -41,6 +41,19 @@ describe('touch-first schedule agenda',()=>{
   fireEvent.click(screen.getByRole('button',{name:'Отмена'}));
   expect(onCancelMove).toHaveBeenCalledTimes(1);
  });
+ it('changes days by horizontal swipe but does not hijack vertical scrolling',()=>{
+  const onDayChange=vi.fn();
+  const {container}=render(<MobileSchedule week={0} days={6} times={times} lessons={[math]} day={2}
+   moveMode={false} targets={[]} onDayChange={onDayChange} onOpen={vi.fn()}
+   onAdd={vi.fn()} onTarget={vi.fn()} onCancelMove={vi.fn()}/>);
+  const agenda=container.querySelector('.mobile-agenda')!;
+  fireEvent.touchStart(agenda,{touches:[{clientX:260,clientY:110}]});
+  fireEvent.touchEnd(agenda,{changedTouches:[{clientX:120,clientY:125}]});
+  expect(onDayChange).toHaveBeenLastCalledWith(3);
+  fireEvent.touchStart(agenda,{touches:[{clientX:170,clientY:110}]});
+  fireEvent.touchEnd(agenda,{changedTouches:[{clientX:180,clientY:280}]});
+  expect(onDayChange).toHaveBeenCalledTimes(1);
+ });
  it('never offers create actions for a federal transferred rest day',()=>{
   const {container}=render(<MobileSchedule week={7} days={5} times={times} lessons={[]} day={3}
    moveMode={false} targets={[]} onDayChange={vi.fn()} onOpen={vi.fn()} onAdd={vi.fn()}
