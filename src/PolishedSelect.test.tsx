@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
+/// <reference types="vite/client" />
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import PolishedSelect from './PolishedSelect';
 import App from './App';
+import selectCss from './polished-select.css?raw';
 
 afterEach(()=>cleanup());
 function Controlled(){
@@ -79,4 +81,25 @@ describe('schedule entity dropdown replaces long sidebar at all breakpoints',()=
   fireEvent.click(within(document.querySelector('.toolbar')!).getByRole('button',{name:'Аудитории'}));
   expect(screen.getByRole('combobox',{name:'Выбрать аудиторию'})).toBeTruthy();
  },20000);
+});
+
+describe('schedule layout CSS regression',()=>{
+ it('keeps desktop lesson properties beside the schedule while the picker spans the top',()=>{
+  const sheet=document.createElement('style');
+  sheet.textContent=selectCss;
+  const layout=document.createElement('div');
+  layout.className='schedule-layout';
+  layout.innerHTML='<aside class="group-sidebar schedule-picker-strip"></aside><section class="schedule-body"></section><div class="right-editor"></div>';
+  document.head.appendChild(sheet);
+  document.body.appendChild(layout);
+  try{
+   expect(getComputedStyle(layout).flexDirection).toBe('row');
+   expect(getComputedStyle(layout).flexWrap).toBe('wrap');
+   expect(getComputedStyle(layout.children[0]).flexBasis).toBe('100%');
+   expect(getComputedStyle(layout.children[1]).width).toBe('auto');
+  }finally{
+   layout.remove();
+   sheet.remove();
+  }
+ });
 });
