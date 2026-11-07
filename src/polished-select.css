@@ -34,6 +34,11 @@
  .polished-select-search input{font-size:16px;height:38px}
  .polished-select-popup{border-radius:10px}
 }
+/* Keep compact utility selectors compact inside horizontal toolbars. */
+.federal-calendar-nav .polished-select{width:auto;min-width:138px;max-width:220px;flex:0 0 auto}
+.federal-calendar-nav .polished-select-native{width:100%;min-width:0}
+.federal-calendar-nav .polished-select-hitbox{width:100%}
+@media(max-width:480px){.federal-calendar-nav .polished-select{min-width:120px;max-width:calc(100vw - 130px)}}
 /* Schedule context chooser: a single drop-down on desktop, tablet, and phone. */
 .schedule-layout{flex-direction:column;align-items:stretch}
 .schedule-layout>.group-sidebar.schedule-picker-strip{display:flex;flex-direction:row;align-items:center;gap:12px;width:100%!important;max-width:none!important;min-height:64px;max-height:none!important;height:auto;flex:none;overflow:visible;padding:9px 13px;margin:0;background:#fff;border:1px solid #dce9e1;border-radius:10px;box-shadow:0 2px 8px rgba(18,70,52,.035)}
