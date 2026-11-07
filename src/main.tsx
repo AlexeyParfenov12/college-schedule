@@ -10,6 +10,7 @@ import './planner.css';
 import './year.css';
 import './room-manager.css';
 import './official-calendar.css';
+import './mobile.css';
 refreshRoomCatalog();
 migrateDemoAcademicCalendar();
 migrateDemoWinterBreakLabel();
