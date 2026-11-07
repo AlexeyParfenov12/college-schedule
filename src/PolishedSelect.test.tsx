@@ -76,7 +76,7 @@ describe('schedule entity dropdown replaces long sidebar at all breakpoints',()=
   expect(document.querySelector('.table-heading b')?.textContent).toBe('П-22');
   fireEvent.click(screen.getByRole('button',{name:'Преподаватели'}));
   expect(screen.getByRole('combobox',{name:'Выбрать преподавателя'})).toBeTruthy();
-  fireEvent.click(screen.getByRole('button',{name:'Аудитории'}));
+  fireEvent.click(within(document.querySelector('.toolbar')!).getByRole('button',{name:'Аудитории'}));
   expect(screen.getByRole('combobox',{name:'Выбрать аудиторию'})).toBeTruthy();
  },20000);
 });
