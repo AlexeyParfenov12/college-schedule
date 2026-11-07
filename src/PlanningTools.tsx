@@ -1,3 +1,4 @@
+import PolishedSelect from './PolishedSelect';
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowRight, CalendarDays, Check, ChevronRight, Copy, HelpCircle, Layers3, RotateCcw, Search, ShieldCheck, Sparkles, WandSparkles } from 'lucide-react';
 import { DAYS, GROUPS, TIMES } from './data';
@@ -55,7 +56,7 @@ export function CalendarStudio({events,lessons,group,setGroup,week,setWeek,add,r
   <div className="plan-intro"><div><strong>Учебный календарь — когда колледж учится</strong><p>Определяет учебные недели, практики, сессии, каникулы и выходные. Расписание строится внутри разрешённых периодов. Календарь не заменяет расписание занятий.</p></div><CalendarDays size={25}/></div>
   <OfficialCalendar/>
   <Heading step={1}>Посмотри учебные периоды выбранной группы</Heading>
-  <div className="plan-calendar-group"><Field name="Просмотр календаря группы"><select aria-label="Просмотр календаря группы" value={group} onChange={e=>setGroup(e.target.value)}>{GROUPS.map(g=><option key={g.id} value={g.id}>{g.id} · {g.department} · {g.course} курс</option>)}</select></Field><span>Общие события колледжа и периоды конкретной группы.</span></div>
+  <div className="plan-calendar-group"><Field name="Просмотр календаря группы"><PolishedSelect aria-label="Просмотр календаря группы" value={group} onChange={e=>setGroup(e.target.value)}>{GROUPS.map(g=><option key={g.id} value={g.id}>{g.id} · {g.department} · {g.course} курс</option>)}</PolishedSelect></Field><span>Общие события колледжа и периоды конкретной группы.</span></div>
   <PeriodTimeline calendar={events} lessons={lessons} group={group} activeWeek={week} onWeek={setWeek}/>
   <section className="vacation-summary" aria-label="Каникулы выбранной группы">
    <div className="vacation-summary-header">
@@ -76,10 +77,10 @@ export function CalendarStudio({events,lessons,group,setGroup,week,setWeek,add,r
    <section className="plan-pane" id="calendar-event-form"><Heading step={2}>Добавь особый период</Heading>
     {vacationNote&&<Info>Выбран тип каникул. Укажи даты по учебному графику группы; система не подставляет вымышленные сроки.</Info>}
     <div className="plan-fields">
-     <Field name="Тип периода"><select value={kind} onChange={e=>{const v=e.target.value as CalendarEvent['kind'];setKind(v);setTitle(kinds[v]);setConfirmed(false);setPeriodError('');setVacationNote(v==='vacation')}}>{Object.entries(kinds).map(([k,n])=><option key={k} value={k}>{n}</option>)}</select></Field>
+     <Field name="Тип периода"><PolishedSelect value={kind} onChange={e=>{const v=e.target.value as CalendarEvent['kind'];setKind(v);setTitle(kinds[v]);setConfirmed(false);setPeriodError('');setVacationNote(v==='vacation')}}>{Object.entries(kinds).map(([k,n])=><option key={k} value={k}>{n}</option>)}</PolishedSelect></Field>
      <Field name="Название"><input value={title} onChange={e=>setTitle(e.target.value)}/></Field>
      <div className="plan-duo"><Field name="С даты"><input type="date" value={from} onChange={e=>{setFrom(e.target.value);setConfirmed(false);setPeriodError('')}}/></Field><Field name="По дату"><input type="date" value={to} onChange={e=>{setTo(e.target.value);setConfirmed(false);setPeriodError('')}}/></Field></div>
-     <Field name="На кого действует"><select value={scope} onChange={e=>{setScope(e.target.value);setConfirmed(false)}}><option value="all">Весь колледж</option><option value="custom">Несколько групп</option>{[...new Set(GROUPS.map(g=>g.department))].map(dep=><option key={dep} value={'department:'+dep}>Отделение {dep}</option>)}{grouped.map(g=><option key={g} value={g}>Группа {g}</option>)}</select></Field>
+     <Field name="На кого действует"><PolishedSelect value={scope} onChange={e=>{setScope(e.target.value);setConfirmed(false)}}><option value="all">Весь колледж</option><option value="custom">Несколько групп</option>{[...new Set(GROUPS.map(g=>g.department))].map(dep=><option key={dep} value={'department:'+dep}>Отделение {dep}</option>)}{grouped.map(g=><option key={g} value={g}>Группа {g}</option>)}</PolishedSelect></Field>
     </div>
     {scope==='custom'&&<div className="plan-calendar-multiselect">
       <div><input aria-label="Поиск групп календаря" placeholder="Найти группу…" value={groupQuery} onChange={e=>setGroupQuery(e.target.value)}/>
@@ -138,12 +139,12 @@ export function TemplateStudio({lessons,calendar,group,week,blocked,saved,onAppl
    <section className="plan-pane">
     <Heading step={1}>Выбери основу расписания</Heading>
     <div className="plan-fields">
-     <Field name="Группа"><select value={startMode} onChange={e=>setStartMode(e.target.value)}>{grouped.map(g=><option key={g} value={g}>{g}</option>)}</select></Field>
-     <Field name="Откуда взять занятия"><select value={sourceWeek} onChange={e=>setSourceWeek(Number(e.target.value))}>{weekOptions.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}</select></Field>
-     <Field name="Длина повторяющегося цикла"><select value={cycle} onChange={e=>setCycle(Number(e.target.value) as 1|2|3|4)}><option value={1}>1 неделя — постоянно</option><option value={2}>2 недели — А/Б</option><option value={3}>3 недели</option><option value={4}>4 недели</option></select></Field>
+     <Field name="Группа"><PolishedSelect value={startMode} onChange={e=>setStartMode(e.target.value)}>{grouped.map(g=><option key={g} value={g}>{g}</option>)}</PolishedSelect></Field>
+     <Field name="Откуда взять занятия"><PolishedSelect value={sourceWeek} onChange={e=>setSourceWeek(Number(e.target.value))}>{weekOptions.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}</PolishedSelect></Field>
+     <Field name="Длина повторяющегося цикла"><PolishedSelect value={cycle} onChange={e=>setCycle(Number(e.target.value) as 1|2|3|4)}><option value={1}>1 неделя — постоянно</option><option value={2}>2 недели — А/Б</option><option value={3}>3 недели</option><option value={4}>4 недели</option></PolishedSelect></Field>
      <MiniSchedule lessons={lessons} week={sourceWeek} group={startMode} title={'Образец · '+source.length+' занятий в цикле'}/>
      <Heading step={2}>На какие недели применить?</Heading>
-     <div className="plan-duo"><Field name="С недели"><select value={targetStart} onChange={e=>setTargetStart(Number(e.target.value))}>{weekOptions.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}</select></Field><Field name="По неделю"><select value={targetEnd} onChange={e=>setTargetEnd(Number(e.target.value))}>{weekOptions.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}</select></Field></div>
+     <div className="plan-duo"><Field name="С недели"><PolishedSelect value={targetStart} onChange={e=>setTargetStart(Number(e.target.value))}>{weekOptions.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}</PolishedSelect></Field><Field name="По неделю"><PolishedSelect value={targetEnd} onChange={e=>setTargetEnd(Number(e.target.value))}>{weekOptions.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}</PolishedSelect></Field></div>
      <label className="plan-confirm"><input type="checkbox" checked={replace} onChange={e=>setReplace(e.target.checked)}/> Заменить обычные занятия группы в целевом периоде (не затрагивать проведённые и чужие потоки)</label>
      <Cmd disabled={!active} onClick={()=>setPreview(build())}><Search size={14}/> Рассчитать изменения</Cmd>
     </div>
@@ -195,16 +196,16 @@ export function GeneratorStudio({lessons,calendar,week,group,onGroup,blocked,onA
    <section className="plan-pane">
     <Heading step={1}>Какую нагрузку разместить?</Heading>
     <div className="plan-fields">
-     <Field name="Учебная группа"><select value={group} onChange={e=>onGroup(e.target.value)}>{grouped.map(g=><option key={g} value={g}>{g}</option>)}</select></Field>
-     <Field name="Нераспределённая учебная нагрузка"><select aria-label="Учебное назначение для генератора" value={selected?.key||''} onChange={e=>setOfferKey(e.target.value)}>{available.map(o=><option value={o.key} key={o.key}>{o.subject} · {o.remaining*2} ч осталось · {o.teacher}</option>)}</select></Field>
+     <Field name="Учебная группа"><PolishedSelect value={group} onChange={e=>onGroup(e.target.value)}>{grouped.map(g=><option key={g} value={g}>{g}</option>)}</PolishedSelect></Field>
+     <Field name="Нераспределённая учебная нагрузка"><PolishedSelect aria-label="Учебное назначение для генератора" value={selected?.key||''} onChange={e=>setOfferKey(e.target.value)}>{available.map(o=><option value={o.key} key={o.key}>{o.subject} · {o.remaining*2} ч осталось · {o.teacher}</option>)}</PolishedSelect></Field>
      {selected&&<div className="plan-current"><Check size={14}/> {selected.teacher} · {selected.subject} · <strong>план {selected.planned*2} ч, распределено {selected.scheduled*2} ч, осталось {selected.remaining*2} ч</strong> (демо)</div>}
      <div className="plan-current">Помощник попробует разместить до <strong>{count} занятий</strong> из оставшейся нагрузки на текущей неделе. Число рассчитывается автоматически.</div>
       {selected&&!selected.availableWeeks?.includes(week)&&<Info>Эта неделя не является теоретической для группы по учебному календарю. Выбери учебную неделю в расписании.</Info>}
       {selected&&selected.remaining===0&&<Info>Все часы выбранной дисциплины уже распределены по демонстрационному плану.</Info>}
      <Heading step={2}>Ограничения и пожелания</Heading>
      <div className="plan-duo">
-      <Field name="Дни"><select value={dayLimit} onChange={e=>setDayLimit(Number(e.target.value)===5?5:6)}><option value={5}>Понедельник–пятница</option><option value={6}>Понедельник–суббота</option></select></Field>
-      <Field name="До какой пары"><select value={slotLimit} onChange={e=>setSlotLimit(Number(e.target.value))}>{TIMES.map((x,i)=><option key={x} value={i+1}>До {i+1}-й пары</option>)}</select></Field>
+      <Field name="Дни"><PolishedSelect value={dayLimit} onChange={e=>setDayLimit(Number(e.target.value)===5?5:6)}><option value={5}>Понедельник–пятница</option><option value={6}>Понедельник–суббота</option></PolishedSelect></Field>
+      <Field name="До какой пары"><PolishedSelect value={slotLimit} onChange={e=>setSlotLimit(Number(e.target.value))}>{TIMES.map((x,i)=><option key={x} value={i+1}>До {i+1}-й пары</option>)}</PolishedSelect></Field>
      </div>
      {selected&&needsComputers(selected.subject)&&<div className="plan-current"><Layers3 size={14}/> Для компьютерных занятий сначала проверяется работа по 2–3 студента за ПК при достаточном числе посадочных мест. Подгруппы применяются только при обоснованной необходимости. <button type="button" className="plan-inline-link" onClick={onSubgroups}>Настройка подгрупп</button></div>}
      <Cmd disabled={!hasSelection} onClick={()=>setPreview(build())}><Sparkles size={14}/> Показать предложенный вариант</Cmd>
