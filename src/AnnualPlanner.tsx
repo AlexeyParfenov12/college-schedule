@@ -8,11 +8,13 @@ import { academicGroupStats, demoAcademicDemands, demoAcademicHorizon, DEMO_SEME
 import type { AnnualConfig, AnnualVariant, YearDemand, PracticeBlock, TeacherPreference } from './yearSolver';
 import { lessonDate } from './plannerDomain';
 import { assessRoomFit } from './roomPolicy';
+import { effectiveGroupRules } from './scheduleConstraints';
+import type { ScopeOverride } from './scheduleConstraints';
 
 type Props={lessons:Lesson[];calendar:CalendarEvent[];onApply:(variant:AnnualVariant,weeks:number,workweek:5|6)=>void;notify:(s:string)=>void};
-type Tab='load'|'teachers'|'rooms'|'groups'|'practice'|'distance'|'results';
+type Tab='load'|'teachers'|'scope'|'rooms'|'groups'|'practice'|'distance'|'results';
 const tabs:{id:Tab;name:string}[]=[
- {id:'load',name:'Нагрузка'},{id:'teachers',name:'Преподаватели'},{id:'rooms',name:'Кабинеты'},
+ {id:'load',name:'Нагрузка'},{id:'teachers',name:'Преподаватели'},{id:'scope',name:'Правила групп'},{id:'rooms',name:'Кабинеты'},
  {id:'groups',name:'Потоки и подгруппы'},{id:'practice',name:'Практика'},
  {id:'distance',name:'Дистант и дорога'},{id:'results',name:'4 варианта'}
 ];
@@ -30,6 +32,9 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
  const [tab,setTab]=useState<Tab>('load');
  const demands=useMemo(()=>demoAcademicDemands(calendar,cfg.days,cfg.weeks),[calendar,cfg.days,cfg.weeks]);
  const [teacher,setTeacher]=useState(TEACHERS[0]),[teacherSearch,setTeacherSearch]=useState('');
+ const [scopeType,setScopeType]=useState<'college'|'department'|'group'>('college');
+ const [scopeDepartment,setScopeDepartment]=useState(GROUPS[0].department);
+ const [scopeGroup,setScopeGroup]=useState(GROUPS[0].id);
  const [roomSearch,setRoomSearch]=useState(''),[group,setGroup]=useState('П-21');
  const [practiceGroup,setPracticeGroup]=useState('П-21'),[practiceKind,setPracticeKind]=useState<'college'|'company'>('college');
  const [practiceStart,setPracticeStart]=useState(5),[practiceWeeks,setPracticeWeeks]=useState(2);
@@ -50,6 +55,23 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
   if(cfg.weeks!==horizon)change(current=>({...current,weeks:horizon}));
  },[cfg.weeks,horizon]);
  const rule=teacherRule(cfg,teacher);
+ const ruleTarget:ScopeOverride=scopeType==='college'?cfg.collegeRules||{}:
+  scopeType==='department'?cfg.departmentRules?.[scopeDepartment]||{}:cfg.groupRules?.[scopeGroup]||{};
+ const inheritedGroup=effectiveGroupRules(cfg,scopeType==='group'?scopeGroup:
+  GROUPS.find(g=>g.department===scopeDepartment)?.id||scopeGroup);
+ const scopeDays=ruleTarget.daysOff||[];
+ const applyScope=(patch:Partial<ScopeOverride>)=>change(c=>{
+  if(scopeType==='college')return {...c,collegeRules:{...c.collegeRules,...patch}};
+  if(scopeType==='department')return {...c,departmentRules:{...c.departmentRules,[scopeDepartment]:{...c.departmentRules?.[scopeDepartment],...patch}}};
+  return {...c,groupRules:{...c.groupRules,[scopeGroup]:{...c.groupRules?.[scopeGroup],...patch}}};
+ });
+ const clearScope=()=>change(c=>{
+  if(scopeType==='college')return {...c,collegeRules:{}};
+  if(scopeType==='department'){
+   const next={...c.departmentRules};delete next[scopeDepartment];return {...c,departmentRules:next};
+  }
+  const next={...c.groupRules};delete next[scopeGroup];return {...c,groupRules:next};
+ });
  const teacherOptions=TEACHERS.filter(x=>x.toLowerCase().includes(teacherSearch.toLowerCase()));
  const activeRooms=ROOMS.filter(r=>r.active&&cfg.activeRooms.includes(r.id));
  const practiceStudents=GROUPS.find(g=>g.id===practiceGroup)?.count||0;
@@ -163,9 +185,62 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
      const banned=rule.forbidden.some(x=>x.day===day&&slot>=x.from&&slot<=x.to);
      return <button key={slot} className={banned?'off':''} title={banned?'Запрещено':'Допустимо'} onClick={()=>applyTeacher({forbidden:banned?rule.forbidden.filter(x=>!(x.day===day&&slot>=x.from&&slot<=x.to)):[...rule.forbidden,{day,from:slot,to:slot}]})}>{slot}</button>;
     })}</div>)}</div>
+    <F name="Максимальное количество пар в день"><select aria-label="Максимум пар преподавателя в день" value={rule.maxPairsPerDay||cfg.slotsPerDay} onChange={e=>applyTeacher({maxPairsPerDay:Number(e.target.value)})}>{Array.from({length:cfg.slotsPerDay},(_,i)=>i+1).map(n=><option key={n} value={n}>{n} {n===1?'пара':'пар'}</option>)}</select></F>
     <F name={'Максимум дистанционных пар: '+rule.maxOnlinePct+'%'}><input type="range" min={0} max={100} step={5} value={rule.maxOnlinePct} onChange={e=>applyTeacher({maxOnlinePct:Number(e.target.value)})}/></F>
     <h4>Предпочтительные дни</h4><div className="year-day-choices">{DAYS.slice(0,cfg.days).map((d,i)=><label key={d} className={rule.preferDays.includes(i)?'preferred':''}><input type="checkbox" checked={rule.preferDays.includes(i)} onChange={e=>applyTeacher({preferDays:e.target.checked?[...rule.preferDays,i]:rule.preferDays.filter(x=>x!==i)})}/>{d}</label>)}</div>
-   <button className="year-next" onClick={nextTab}>Настроить кабинеты <ArrowRight size={14}/></button></section></div>}
+   <button className="year-next" onClick={nextTab}>Настроить правила групп <ArrowRight size={14}/></button></section></div>}
+  {tab==='scope'&&<div className="year-cols">
+   <section className="year-card"><h3><SlidersHorizontal size={16}/> Общие и индивидуальные правила</h3>
+    <p>Настраивай условия для всего колледжа, отделения или одной группы. Жёсткие запреты вышестоящего уровня нельзя отменить отдельной группе: это исключает противоречивое расписание.</p>
+    <div className="year-fields">
+     <F name="Для кого правило"><select aria-label="Уровень правил" value={scopeType} onChange={e=>setScopeType(e.target.value as typeof scopeType)}>
+      <option value="college">Весь колледж</option><option value="department">Отделение</option><option value="group">Конкретная группа</option>
+     </select></F>
+     {scopeType==='department'&&<F name="Отделение"><select aria-label="Отделение ограничений" value={scopeDepartment} onChange={e=>setScopeDepartment(e.target.value)}>
+       {[...new Set(GROUPS.map(g=>g.department))].map(id=><option key={id}>{id}</option>)}</select></F>}
+     {scopeType==='group'&&<F name="Группа"><select aria-label="Группа ограничений" value={scopeGroup} onChange={e=>setScopeGroup(e.target.value)}>
+       {GROUPS.map(g=><option key={g.id} value={g.id}>{g.id} · {g.department}</option>)}</select></F>}
+    </div>
+    <div className="year-note"><strong>Откуда получено правило:</strong> {scopeType==='college'?'Общие правила колледжа':
+      scopeType==='department'?'Колледж → '+scopeDepartment:inheritedGroup.origin.join(' → ')}</div>
+    <div className="year-rule-summary">
+     <span>Рабочих дней: {cfg.days}</span><span>Пар по сетке: {cfg.slotsPerDay}</span>
+     <span>Исключено дней: {inheritedGroup.rule.daysOff.length}</span>
+     <span>Лимит группы: {inheritedGroup.rule.maxPairsPerDay} пар/день</span>
+    </div>
+    <button type="button" className="year-rule-reset" onClick={clearScope}>
+     Вернуть {scopeType==='college'?'настройки по умолчанию':'унаследованные правила'}
+    </button>
+   </section>
+   <section className="year-card"><h3>Ограничения выбранной области</h3>
+    <p>Отмеченные дни и пары исключаются из расчёта. Индивидуальные правила дополняют общие ограничения, не отменяя их.</p>
+    <h4>Не ставить занятия в дни</h4>
+    <div className="year-day-choices">{DAYS.slice(0,cfg.days).map((d,day)=>
+     <label key={d} className={scopeDays.includes(day)?'chosen':''}>
+      <input type="checkbox" checked={scopeDays.includes(day)} onChange={e=>applyScope({
+       daysOff:e.target.checked?[...scopeDays,day]:scopeDays.filter(x=>x!==day)
+      })}/>{d}
+     </label>)}</div>
+    <div className="year-fields">
+     <F name="Не раньше пары"><select aria-label="Начало диапазона правил" value={ruleTarget.fromSlot??1}
+      onChange={e=>applyScope({fromSlot:Number(e.target.value)})}>{Array.from({length:cfg.slotsPerDay},(_,i)=>i+1).map(n=><option key={n} value={n}>{n}</option>)}</select></F>
+     <F name="Не позже пары"><select aria-label="Конец диапазона правил" value={ruleTarget.toSlot??cfg.slotsPerDay}
+      onChange={e=>applyScope({toSlot:Number(e.target.value)})}>{Array.from({length:cfg.slotsPerDay},(_,i)=>i+1).map(n=><option key={n} value={n}>{n}</option>)}</select></F>
+     <F name="Максимум пар в день"><select aria-label="Максимум пар группы" value={ruleTarget.maxPairsPerDay??cfg.slotsPerDay}
+      onChange={e=>applyScope({maxPairsPerDay:Number(e.target.value)})}>{Array.from({length:cfg.slotsPerDay},(_,i)=>i+1).map(n=><option key={n} value={n}>{n} пар</option>)}</select></F>
+    </div>
+    <h4>Запретить отдельные пары</h4>
+    <div className="year-forbidden">{DAYS.slice(0,cfg.days).map((d,day)=><div key={d}><span>{d}</span>
+     {Array.from({length:cfg.slotsPerDay},(_,i)=>i+1).map(slot=>{
+      const banned=(ruleTarget.forbidden||[]).some(x=>x.day===day&&slot>=x.from&&slot<=x.to);
+      return <button type="button" key={slot} className={banned?'off':''}
+       aria-label={'Ограничения '+d+' '+slot+' пара'} title={banned?'Запрещено':'Допустимо'}
+       onClick={()=>applyScope({forbidden:banned?(ruleTarget.forbidden||[]).filter(x=>!(x.day===day&&slot>=x.from&&slot<=x.to)):
+        [...(ruleTarget.forbidden||[]),{day,from:slot,to:slot}]})}>{slot}</button>;
+     })}</div>)}</div>
+    <div className="year-note">Проверяются занятость группы, правила колледжа и отделения, индивидуальные ограничения, учебный календарь и максимальная нагрузка.</div>
+    <button className="year-next" onClick={nextTab}>Настроить кабинеты <ArrowRight size={14}/></button>
+   </section></div>}
   {tab==='rooms'&&<div className="year-cols"><section className="year-card"><h3>Работающие аудитории</h3><div className="year-search"><Search size={14}/><input aria-label="Найти аудиторию для годового плана" placeholder="Номер, корпус, тип..." value={roomSearch} onChange={e=>setRoomSearch(e.target.value)}/></div>
     <div className="year-list rooms">{ROOMS.filter(r=>(r.id+' '+r.kind+' '+r.building).toLowerCase().includes(roomSearch.toLowerCase())).map(r=><label key={r.id}><input type="checkbox" checked={cfg.activeRooms.includes(r.id)} onChange={e=>change(c=>({...c,activeRooms:e.target.checked?[...c.activeRooms,r.id]:c.activeRooms.filter(x=>x!==r.id)}))}/><b>{r.id}</b><small>{r.kind} · {r.pc?r.pc+' ПК':r.capacity+' мест'} · корпус {r.building}</small></label>)}</div>
    </section><section className="year-card"><h3>Доступный фонд</h3><div className="year-room-kpis"><div><b>{activeRooms.length}</b><small>всего</small></div><div><b>{activeRooms.filter(r=>r.pc>0).length}</b><small>компьютерных</small></div><div><b>{activeRooms.filter(r=>r.capacity>=60).length}</b><small>больших залов</small></div></div><p>Закрытая аудитория исключается из подбора. Зарезервированные под практику кабинеты будут недоступны другим группам в закреплённые пары всех недель практики.</p><button className="year-next" onClick={nextTab}>Потоки и подгруппы <ArrowRight size={14}/></button></section></div>}
