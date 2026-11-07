@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import PolishedSelect from './PolishedSelect';
 import App from './App';
 
@@ -19,16 +19,16 @@ describe('polished popup for existing select controls',()=>{
   expect(screen.getByRole('combobox',{name:'Учебная группа'})).toHaveProperty('value','П-21');
   fireEvent.click(document.querySelector('.polished-select-hitbox')!);
   expect(screen.getByRole('listbox',{name:/Варианты:/})).toBeTruthy();
-  expect(screen.getByRole('option',{name:'П-21'}).getAttribute('aria-selected')).toBe('true');
-  fireEvent.click(screen.getByRole('option',{name:'П-22'}));
+  expect(within(screen.getByRole('listbox')).getByRole('option',{name:'П-21'}).getAttribute('aria-selected')).toBe('true');
+  fireEvent.click(within(screen.getByRole('listbox')).getByRole('option',{name:'П-22'}));
   expect((screen.getByRole('combobox',{name:'Учебная группа'}) as HTMLSelectElement).value).toBe('П-22');
   expect(screen.queryByRole('listbox')).toBeNull();
  });
  it('does not allow selecting a disabled value',()=>{
   render(<Controlled/>);
   fireEvent.click(document.querySelector('.polished-select-hitbox')!);
-  expect(screen.getByRole('option',{name:/недоступно/})).toHaveProperty('disabled',true);
-  fireEvent.click(screen.getByRole('option',{name:/недоступно/}));
+  expect(within(screen.getByRole('listbox')).getByRole('option',{name:/недоступно/})).toHaveProperty('disabled',true);
+  fireEvent.click(within(screen.getByRole('listbox')).getByRole('option',{name:/недоступно/}));
   expect((screen.getByRole('combobox',{name:'Учебная группа'}) as HTMLSelectElement).value).toBe('П-21');
  });
  it('supports keyboard arrow navigation, Enter and Escape',()=>{
@@ -50,8 +50,8 @@ describe('polished popup for existing select controls',()=>{
   </PolishedSelect>);
   fireEvent.click(document.querySelector('.polished-select-hitbox')!);
   fireEvent.change(screen.getByRole('searchbox',{name:/Поиск:/}),{target:{value:'Вариант 17'}});
-  expect(screen.getByRole('option',{name:'Вариант 17'})).toBeTruthy();
-  fireEvent.click(screen.getByRole('option',{name:'Вариант 17'}));
+  expect(within(screen.getByRole('listbox')).getByRole('option',{name:'Вариант 17'})).toBeTruthy();
+  fireEvent.click(within(screen.getByRole('listbox')).getByRole('option',{name:'Вариант 17'}));
   expect(onChange).toHaveBeenCalledTimes(1);
   expect(onChange.mock.calls[0][0].target.value).toBe('Вариант 17');
  });
@@ -71,7 +71,7 @@ describe('schedule entity dropdown replaces long sidebar at all breakpoints',()=
   expect((picker as HTMLSelectElement).value).toBe('П-21');
   fireEvent.click(document.querySelector('.schedule-picker-field .polished-select-hitbox')!);
   fireEvent.change(screen.getByRole('searchbox',{name:/Поиск:/}),{target:{value:'П-22'}});
-  fireEvent.click(screen.getByRole('option',{name:'П-22'}));
+  fireEvent.click(within(screen.getByRole('listbox')).getByRole('option',{name:'П-22'}));
   expect((screen.getByRole('combobox',{name:'Выбрать группу'}) as HTMLSelectElement).value).toBe('П-22');
   expect(document.querySelector('.table-heading b')?.textContent).toBe('П-22');
   fireEvent.click(screen.getByRole('button',{name:'Преподаватели'}));
