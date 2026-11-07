@@ -1,3 +1,4 @@
+import PolishedSelect from './PolishedSelect';
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ArrowLeftRight, BookOpen, CalendarDays, Check, ChevronDown, ChevronUp, CircleAlert, Laptop, MapPin, Plus, Search, Sparkles, Trash2, Users, X } from 'lucide-react';
@@ -137,42 +138,42 @@ export default function SmartLessonEditor({item,existing,all,catalog,view,contex
     {view!=='group'&&<>
       <div className="smart-step-title"><span>1</span> Группа</div>
       <label className="smart-field"><span>Для какой группы проводится занятие?</span>
-       <select aria-label="Группа занятия" value={primaryGroup} onChange={e=>selectGroup(e.target.value)}>
+       <PolishedSelect aria-label="Группа занятия" value={primaryGroup} onChange={e=>selectGroup(e.target.value)}>
         <option value="">Выбери группу</option>{availableGroups.map(g=><option value={g} key={g}>{g}</option>)}
-       </select>
+       </PolishedSelect>
       </label>
     </>}
     {view!=='teacher'&&<>
       <div className="smart-step-title"><span>{view==='group'?1:2}</span> Преподаватель</div>
       <label className="smart-field"><span>{primaryGroup?'Преподаватели группы '+primaryGroup:'Сначала выбери группу'}</span>
-       <select aria-label="Преподаватель занятия" value={form.teacher} onChange={e=>selectTeacher(e.target.value)} disabled={!primaryGroup}>
+       <PolishedSelect aria-label="Преподаватель занятия" value={form.teacher} onChange={e=>selectTeacher(e.target.value)} disabled={!primaryGroup}>
         <option value="">Выбери свободного преподавателя</option>{availableTeachers.map(t=><option value={t} key={t}>{t}</option>)}
-       </select>
+       </PolishedSelect>
       </label>
     </>}
     {view==='teacher'&&<div className="smart-step-title"><span>2</span> Дисциплина</div>}
     {view!=='teacher'&&<div className="smart-step-title"><span>{view==='group'?2:3}</span> Дисциплина</div>}
     <label className="smart-field"><span>{form.teacher&&primaryGroup?'Что '+form.teacher+' ведёт у '+primaryGroup+'?':'Сначала '+(view==='teacher'?'выбери группу':'выбери преподавателя')}</span>
-     <select aria-label="Дисциплина занятия" value={form.subject} onChange={e=>selectSubject(e.target.value)} disabled={!form.teacher||!primaryGroup}>
+     <PolishedSelect aria-label="Дисциплина занятия" value={form.subject} onChange={e=>selectSubject(e.target.value)} disabled={!form.teacher||!primaryGroup}>
       <option value="">Выбери дисциплину</option>{subjects.map(subject=><option value={subject} key={subject}>{subject}</option>)}
-     </select>
+     </PolishedSelect>
     </label>
     {form.subject&&form.teacher&&primaryGroup&&<div className="smart-summary compact"><span><BookOpen size={13}/> {form.subject}</span><span><Users size={13}/> {form.groups.join(' + ')}</span></div>}
     {primaryGroup&&related.length===0&&<div className="smart-warning">Для группы пока нет учебных назначений в демонстрационной базе. В рабочей системе они поступят из TeachingAssignment.</div>}
     {form.teacher&&primaryGroup&&!subjectNames.length&&<div className="smart-warning">Для выбранного преподавателя нет дисциплин этой группы в демоданных. Проверь назначение в Academic Core.</div>}
     {form.subject&&form.teacher&&primaryGroup&&<>
     <div className="smart-step-title"><span>{view==='room'?4:3}</span> Где и в каком формате?</div>
-    <div className="smart-inline"><label className="smart-field"><span>Тип занятия</span><select value={form.type} onChange={e=>switchType(e.target.value as Type)}>{typeLabel.map(([type,title])=><option key={type} value={type}>{title}</option>)}</select></label><label className="smart-field"><span>Формат</span><select value={form.mode} onChange={e=>{const mode=e.target.value as Mode;const updated={...form,mode};updated.room=deriveRoom(updated,all);setForm(updated)}}>{Object.entries(MODES).map(([m,title])=><option value={m} key={m}>{title}</option>)}</select></label></div>
+    <div className="smart-inline"><label className="smart-field"><span>Тип занятия</span><PolishedSelect value={form.type} onChange={e=>switchType(e.target.value as Type)}>{typeLabel.map(([type,title])=><option key={type} value={type}>{title}</option>)}</PolishedSelect></label><label className="smart-field"><span>Формат</span><PolishedSelect value={form.mode} onChange={e=>{const mode=e.target.value as Mode;const updated={...form,mode};updated.room=deriveRoom(updated,all);setForm(updated)}}>{Object.entries(MODES).map(([m,title])=><option value={m} key={m}>{title}</option>)}</PolishedSelect></label></div>
     {(form.type==='stream'||form.type==='parallel')&&<div className="smart-group-picker"><span>Участники ({form.groups.length}) · нужно минимум две группы</span><div>{form.groups.map(g=><button type="button" key={g} onClick={()=>g===contextGroup&&view==='group'?undefined:patch({groups:form.groups.filter(x=>x!==g)})} disabled={view==='group'&&g===contextGroup}>{g}<X size={11}/></button>)}</div><button type="button" className="smart-text" onClick={()=>setSearchOpen(v=>!v)}>+ Добавить группу</button>
      {searchOpen&&<div className="smart-drop"><input aria-label="Поиск дополнительных групп" placeholder="Поиск…" value={groupSearch} onChange={e=>setGroupSearch(e.target.value)}/><div>{GROUPS.filter(g=>!form.groups.includes(g.id)&&g.id.toLowerCase().includes(groupSearch.toLowerCase())).map(g=><button type="button" key={g.id} onClick={()=>patch({groups:[...form.groups,g.id]})}>{g.id} <Plus size={11}/></button>)}</div></div>}
     </div>}
     {showRoom&&needsComputers(form.subject)&&<div className="smart-pc-policy">
      <label className="smart-field"><span>Студентов за компьютером</span>
-       <select aria-label="Студентов за компьютером" disabled={Boolean(form.requiresIndividualComputer)}
+       <PolishedSelect aria-label="Студентов за компьютером" disabled={Boolean(form.requiresIndividualComputer)}
          value={form.requiresIndividualComputer?1:form.computerShare||2}
          onChange={e=>patch({computerShare:Number(e.target.value) as 1|2|3})}>
          {[1,2,3].map(n=><option value={n} key={n}>{n} {n===1?'студент':'студента'} / ПК</option>)}
-       </select>
+       </PolishedSelect>
      </label>
      <label className="smart-pc-individual"><input type="checkbox" checked={Boolean(form.requiresIndividualComputer)}
        onChange={e=>patch({requiresIndividualComputer:e.target.checked,computerShare:e.target.checked?1:2})}/>
@@ -180,11 +181,11 @@ export default function SmartLessonEditor({item,existing,all,catalog,view,contex
     </div>}
     {showRoom&&<div className="smart-room">
       {form.type==='subgroup'?<>
-       <label className="smart-field"><span>Кабинет 1-й подгруппы</span><select aria-label="Аудитория первой подгруппы" value={currentVenue} onChange={e=>setRoom(e.target.value)}><option value="">Выбрать кабинет</option>{selectable.map(r=><option key={r.id} value={r.id}>{r.label} · {r.reason}</option>)}</select></label>
-       <label className="smart-field"><span>Кабинет 2-й подгруппы</span><select aria-label="Аудитория второй подгруппы" value={secondRoom} onChange={e=>setRoom(currentVenue,e.target.value)}><option value="">Выбрать кабинет</option>{selectable.filter(x=>x.id!==currentVenue).map(r=><option key={r.id} value={r.id}>{r.label} · {r.reason}</option>)}</select></label>
+       <label className="smart-field"><span>Кабинет 1-й подгруппы</span><PolishedSelect aria-label="Аудитория первой подгруппы" value={currentVenue} onChange={e=>setRoom(e.target.value)}><option value="">Выбрать кабинет</option>{selectable.map(r=><option key={r.id} value={r.id}>{r.label} · {r.reason}</option>)}</PolishedSelect></label>
+       <label className="smart-field"><span>Кабинет 2-й подгруппы</span><PolishedSelect aria-label="Аудитория второй подгруппы" value={secondRoom} onChange={e=>setRoom(currentVenue,e.target.value)}><option value="">Выбрать кабинет</option>{selectable.filter(x=>x.id!==currentVenue).map(r=><option key={r.id} value={r.id}>{r.label} · {r.reason}</option>)}</PolishedSelect></label>
        <span className="smart-subline">{groupSize} студентов → две подгруппы примерно по {Math.ceil(groupSize/2)} человек.</span>
       </>:<>
-       <label className="smart-field"><span>Аудитория · {selectable.length} доступных</span><select aria-label="Аудитория занятия" value={currentVenue} onChange={e=>setRoom(e.target.value)}><option value="">Подбери аудиторию</option>{selectable.map(r=><option key={r.id} value={r.id}>{r.label} · {r.reason}</option>)}</select></label>
+       <label className="smart-field"><span>Аудитория · {selectable.length} доступных</span><PolishedSelect aria-label="Аудитория занятия" value={currentVenue} onChange={e=>setRoom(e.target.value)}><option value="">Подбери аудиторию</option>{selectable.map(r=><option key={r.id} value={r.id}>{r.label} · {r.reason}</option>)}</PolishedSelect></label>
        {form.type==='parallel'&&<span className="smart-subline">Первая группа очно; остальные подключаются онлайн. При другом формате используй отдельный конструктор параллелей.</span>}
       </>}
       {minNeeded&&<div className="smart-suggest"><Laptop size={15}/><span>Для всех {groupSize} студентов недостаточно компьютерных мест. Раздели практическое занятие на подгруппы.</span><button type="button" onClick={()=>switchType('subgroup')}>Разделить</button></div>}
@@ -195,10 +196,10 @@ export default function SmartLessonEditor({item,existing,all,catalog,view,contex
    </div>
    <button className="smart-expand" type="button" onClick={()=>setExpanded(x=>!x)}>{expanded?<ChevronUp size={14}/>:<ChevronDown size={14}/>} Дополнительные параметры</button>
    {expanded&&<div className="smart-extra">
-     <div className="smart-inline"><label className="smart-field"><span>День</span><select value={form.day} onChange={e=>patch({day:Number(e.target.value)})}>{DAYS.map((d,i)=><option value={i} key={d}>{d}</option>)}</select></label><label className="smart-field"><span>Пара</span><select value={form.slot} onChange={e=>patch({slot:Number(e.target.value)})}>{TIMES.map((x,i)=><option value={i+1} key={x}>{i+1}</option>)}</select></label></div>
+     <div className="smart-inline"><label className="smart-field"><span>День</span><PolishedSelect value={form.day} onChange={e=>patch({day:Number(e.target.value)})}>{DAYS.map((d,i)=><option value={i} key={d}>{d}</option>)}</PolishedSelect></label><label className="smart-field"><span>Пара</span><PolishedSelect value={form.slot} onChange={e=>patch({slot:Number(e.target.value)})}>{TIMES.map((x,i)=><option value={i+1} key={x}>{i+1}</option>)}</PolishedSelect></label></div>
      <label className="smart-field"><span>Примечание</span><textarea rows={2} value={form.notes||''} onChange={e=>patch({notes:e.target.value})}/></label>
      <button type="button" className="smart-text" onClick={()=>setManual(x=>!x)}>{manual?'Скрыть':'Развернуть'} ручной выбор дисциплины/преподавателя</button>
-     {manual&&<><label className="smart-field"><span>Дисциплина (деморежим)</span><select value={form.subject} onChange={e=>patch({subject:e.target.value})}>{options(SUBJECTS)}</select></label><label className="smart-field"><span>Преподаватель (деморежим)</span><select value={form.teacher} onChange={e=>patch({teacher:e.target.value})}>{options(TEACHERS)}</select></label><div className="smart-warning">Ручное изменение учебного назначения требует проверки полномочий и связи TeachingAssignment в общей системе.</div></>}
+     {manual&&<><label className="smart-field"><span>Дисциплина (деморежим)</span><PolishedSelect value={form.subject} onChange={e=>patch({subject:e.target.value})}>{options(SUBJECTS)}</PolishedSelect></label><label className="smart-field"><span>Преподаватель (деморежим)</span><PolishedSelect value={form.teacher} onChange={e=>patch({teacher:e.target.value})}>{options(TEACHERS)}</PolishedSelect></label><div className="smart-warning">Ручное изменение учебного назначения требует проверки полномочий и связи TeachingAssignment в общей системе.</div></>}
    </div>}
    {softIssues.length>0&&<div className="smart-equipment-warning" role="note"><CircleAlert size={14}/>
      <span>{softIssues[0].message}. Это предупреждение, а не автоматический запрет.
