@@ -385,11 +385,11 @@ export default function App(){
   : <AdvancedWorkflows screen={screen} items={items} setItems={setItems} week={week} setWeek={setWeek} group={group} setGroup={setGroup} teacher={teacher} setTeacher={setTeacher} room={room} setRoom={setRoom} onNavigate={show} onEdit={setSelected} onFocusLesson={focusLesson} notify={setNotice} markDraft={()=>setStatus('draft')} status={status} setStatus={setStatus} density={density} setDensity={setDensity} days={days} setDays={v=>setDays(v===5?5:6)}/>;
  return <div className="app">
   <aside className={'nav '+(collapsed?'closed':'')+(mobileNavOpen?' mobile-open':'')} id="mobile-college-menu">
-   <div className="brand"><div className="brand-symbol">C</div>{!collapsed&&<div><strong>College</strong><span>Schedule</span></div>}
+   <div className="brand"><div className="brand-symbol">C</div><div><strong>College</strong><span>Schedule</span></div>
      <button onClick={()=>setCollapsed(v=>!v)} className="nav-toggle" aria-label={collapsed?'Развернуть навигацию':'Сузить навигацию'}><Menu size={16}/></button>
      <button type="button" className="mobile-menu-close" aria-label="Закрыть мобильное меню" onClick={()=>setMobileNavOpen(false)}><X size={20}/></button></div>
    <nav aria-label="Разделы College Schedule">{NAV.map(([key,label],i)=>{const I=iconSet[i];return <button key={key} title={label} className={screen===key?'active':''} onClick={()=>show(key)}><I size={17}/><span>{label}</span></button>})}</nav>
-   <div className="nav-footer"><School size={17}/>{!collapsed&&<span>Демо · Диспетчер</span>}</div>
+   <div className="nav-footer"><School size={17}/><span>Демо · Диспетчер</span></div>
   </aside>
   <button type="button" className={'mobile-nav-backdrop'+(mobileNavOpen?' is-visible':'')}
      aria-label="Закрыть список разделов" tabIndex={mobileNavOpen?0:-1} onClick={()=>setMobileNavOpen(false)}/>
