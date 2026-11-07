@@ -1,3 +1,4 @@
+import PolishedSelect from './PolishedSelect';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, ArrowRight, BookOpen, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Download, Play, Search, SlidersHorizontal, Trash2, Users, WandSparkles, X } from 'lucide-react';
 import { DAYS, GROUPS, ROOMS, TEACHERS } from './data';
@@ -166,7 +167,7 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
       <strong>{cfg.weeks} недель календарного горизонта</strong>
       <small>{lessonDate(0,0)} — {lessonDate(cfg.weeks-1,6)}</small>
      </div></F>
-    <F name="Группа"><select value={group} onChange={e=>setGroup(e.target.value)}>{GROUPS.map(g=><option key={g.id} value={g.id}>{g.id}</option>)}</select></F>
+    <F name="Группа"><PolishedSelect value={group} onChange={e=>setGroup(e.target.value)}>{GROUPS.map(g=><option key={g.id} value={g.id}>{g.id}</option>)}</PolishedSelect></F>
    </div>
    <div className="year-auto-stats">
     <span>{groupStats.assignments} учебных назначений</span>
@@ -181,22 +182,22 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
    </tr>)}</tbody></table></div>
    <div className="year-note">Часы не редактируются в расписании: изменения утверждённого учебного плана выполняются в Academic Core. Демонстрационные назначения охватывают {DEMO_SEMESTERS.length} учебных периода; периоды можно настроить в учебном календаре.</div>
    </section><section className="year-card"><h3><Clock3 size={16}/> Общие ограничения</h3><div className="year-fields">
-    <F name="Учебных дней"><select value={cfg.days} onChange={e=>change(c=>({...c,days:Number(e.target.value) as 5|6}))}><option value={5}>Пн–Пт</option><option value={6}>Пн–Сб</option></select></F>
-    <F name="Пар в день"><select value={cfg.slotsPerDay} onChange={e=>change(c=>({...c,slotsPerDay:Number(e.target.value)}))}>{[3,4,5,6].map(x=><option key={x} value={x}>{x}</option>)}</select></F></div>
+    <F name="Учебных дней"><PolishedSelect value={cfg.days} onChange={e=>change(c=>({...c,days:Number(e.target.value) as 5|6}))}><option value={5}>Пн–Пт</option><option value={6}>Пн–Сб</option></PolishedSelect></F>
+    <F name="Пар в день"><PolishedSelect value={cfg.slotsPerDay} onChange={e=>change(c=>({...c,slotsPerDay:Number(e.target.value)}))}>{[3,4,5,6].map(x=><option key={x} value={x}>{x}</option>)}</PolishedSelect></F></div>
     <div className="year-rules"><span><Check size={14}/> Группа и преподаватель не дублируются во времени</span><span><Check size={14}/> Кабинет проверяется по занятости и местам</span><span><Check size={14}/> Учебные периоды исключают запрещённые даты</span><span><Check size={14}/> Практики закрепляют аудитории на недели</span></div><button className="year-next" onClick={nextTab}>Настроить преподавателей <ArrowRight size={14}/></button></section></div>}
   {tab==='teachers'&&<div className="year-cols"><section className="year-card"><h3><Users size={16}/> Преподаватели</h3>
    <div className="year-search"><Search size={14}/><input aria-label="Поиск преподавателя для правил" placeholder="Найти…" value={teacherSearch} onChange={e=>setTeacherSearch(e.target.value)}/></div>
    <div className="year-list">{TEACHERS.filter(t=>t.toLowerCase().includes(teacherSearch.toLowerCase())).map(t=><button key={t} className={teacher===t?'chosen':''} onClick={()=>setTeacher(t)}>{t}{cfg.teacherPreferences[t]&&<Check size={13}/>}</button>)}</div>
    </section><section className="year-card"><h3><SlidersHorizontal size={16}/> {teacher}</h3><p>Жёсткие запреты не нарушаются при расчёте. Предпочтения помогают сократить окна.</p>
     <h4>Не ставить занятия в дни</h4><div className="year-day-choices">{DAYS.slice(0,cfg.days).map((d,i)=><label key={d} className={rule.daysOff.includes(i)?'chosen':''}><input type="checkbox" checked={rule.daysOff.includes(i)} onChange={e=>applyTeacher({daysOff:e.target.checked?[...rule.daysOff,i]:rule.daysOff.filter(x=>x!==i)})}/>{d}</label>)}</div>
-    <div className="year-fields"><F name="Начиная с пары"><select value={rule.fromSlot} onChange={e=>applyTeacher({fromSlot:Number(e.target.value)})}>{[1,2,3,4,5,6].map(x=><option key={x} value={x}>{x}</option>)}</select></F>
-    <F name="Не позже пары"><select value={rule.toSlot} onChange={e=>applyTeacher({toSlot:Number(e.target.value)})}>{[1,2,3,4,5,6].map(x=><option key={x} value={x}>{x}</option>)}</select></F></div>
+    <div className="year-fields"><F name="Начиная с пары"><PolishedSelect value={rule.fromSlot} onChange={e=>applyTeacher({fromSlot:Number(e.target.value)})}>{[1,2,3,4,5,6].map(x=><option key={x} value={x}>{x}</option>)}</PolishedSelect></F>
+    <F name="Не позже пары"><PolishedSelect value={rule.toSlot} onChange={e=>applyTeacher({toSlot:Number(e.target.value)})}>{[1,2,3,4,5,6].map(x=><option key={x} value={x}>{x}</option>)}</PolishedSelect></F></div>
     <h4>Запретить отдельные пары</h4>
     <div className="year-forbidden">{DAYS.slice(0,cfg.days).map((d,day)=><div key={d}><span>{d}</span>{Array.from({length:cfg.slotsPerDay},(_,i)=>i+1).map(slot=>{
      const banned=rule.forbidden.some(x=>x.day===day&&slot>=x.from&&slot<=x.to);
      return <button key={slot} className={banned?'off':''} title={banned?'Запрещено':'Допустимо'} onClick={()=>applyTeacher({forbidden:banned?rule.forbidden.filter(x=>!(x.day===day&&slot>=x.from&&slot<=x.to)):[...rule.forbidden,{day,from:slot,to:slot}]})}>{slot}</button>;
     })}</div>)}</div>
-    <F name="Максимальное количество пар в день"><select aria-label="Максимум пар преподавателя в день" value={rule.maxPairsPerDay||cfg.slotsPerDay} onChange={e=>applyTeacher({maxPairsPerDay:Number(e.target.value)})}>{Array.from({length:cfg.slotsPerDay},(_,i)=>i+1).map(n=><option key={n} value={n}>{n} {n===1?'пара':'пар'}</option>)}</select></F>
+    <F name="Максимальное количество пар в день"><PolishedSelect aria-label="Максимум пар преподавателя в день" value={rule.maxPairsPerDay||cfg.slotsPerDay} onChange={e=>applyTeacher({maxPairsPerDay:Number(e.target.value)})}>{Array.from({length:cfg.slotsPerDay},(_,i)=>i+1).map(n=><option key={n} value={n}>{n} {n===1?'пара':'пар'}</option>)}</PolishedSelect></F>
     <F name={'Максимум дистанционных пар: '+rule.maxOnlinePct+'%'}><input type="range" min={0} max={100} step={5} value={rule.maxOnlinePct} onChange={e=>applyTeacher({maxOnlinePct:Number(e.target.value)})}/></F>
     <h4>Предпочтительные дни</h4><div className="year-day-choices">{DAYS.slice(0,cfg.days).map((d,i)=><label key={d} className={rule.preferDays.includes(i)?'preferred':''}><input type="checkbox" checked={rule.preferDays.includes(i)} onChange={e=>applyTeacher({preferDays:e.target.checked?[...rule.preferDays,i]:rule.preferDays.filter(x=>x!==i)})}/>{d}</label>)}</div>
    <button className="year-next" onClick={nextTab}>Настроить правила групп <ArrowRight size={14}/></button></section></div>}
@@ -204,13 +205,13 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
    <section className="year-card"><h3><SlidersHorizontal size={16}/> Общие и индивидуальные правила</h3>
     <p>Настраивай условия для всего колледжа, отделения или одной группы. Жёсткие запреты вышестоящего уровня нельзя отменить отдельной группе: это исключает противоречивое расписание.</p>
     <div className="year-fields">
-     <F name="Для кого правило"><select aria-label="Уровень правил" value={scopeType} onChange={e=>setScopeType(e.target.value as typeof scopeType)}>
+     <F name="Для кого правило"><PolishedSelect aria-label="Уровень правил" value={scopeType} onChange={e=>setScopeType(e.target.value as typeof scopeType)}>
       <option value="college">Весь колледж</option><option value="department">Отделение</option><option value="group">Конкретная группа</option>
-     </select></F>
-     {scopeType==='department'&&<F name="Отделение"><select aria-label="Отделение ограничений" value={scopeDepartment} onChange={e=>setScopeDepartment(e.target.value)}>
-       {[...new Set(GROUPS.map(g=>g.department))].map(id=><option key={id}>{id}</option>)}</select></F>}
-     {scopeType==='group'&&<F name="Группа"><select aria-label="Группа ограничений" value={scopeGroup} onChange={e=>setScopeGroup(e.target.value)}>
-       {GROUPS.map(g=><option key={g.id} value={g.id}>{g.id} · {g.department}</option>)}</select></F>}
+     </PolishedSelect></F>
+     {scopeType==='department'&&<F name="Отделение"><PolishedSelect aria-label="Отделение ограничений" value={scopeDepartment} onChange={e=>setScopeDepartment(e.target.value)}>
+       {[...new Set(GROUPS.map(g=>g.department))].map(id=><option key={id}>{id}</option>)}</PolishedSelect></F>}
+     {scopeType==='group'&&<F name="Группа"><PolishedSelect aria-label="Группа ограничений" value={scopeGroup} onChange={e=>setScopeGroup(e.target.value)}>
+       {GROUPS.map(g=><option key={g.id} value={g.id}>{g.id} · {g.department}</option>)}</PolishedSelect></F>}
     </div>
     <div className="year-note"><strong>Откуда получено правило:</strong> {scopeType==='college'?'Общие правила колледжа':
       scopeType==='department'?'Колледж → '+scopeDepartment:inheritedGroup.origin.join(' → ')}</div>
@@ -235,12 +236,12 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
       })}/>{d}
      </label>)}</div>
     <div className="year-fields">
-     <F name="Не раньше пары"><select aria-label="Начало диапазона правил" value={inheritedGroup.rule.fromSlot}
-      onChange={e=>applyScope({fromSlot:Number(e.target.value)})}>{Array.from({length:cfg.slotsPerDay},(_,i)=>i+1).map(n=><option key={n} value={n} disabled={n<parentRule.fromSlot}>{n}</option>)}</select></F>
-     <F name="Не позже пары"><select aria-label="Конец диапазона правил" value={inheritedGroup.rule.toSlot}
-      onChange={e=>applyScope({toSlot:Number(e.target.value)})}>{Array.from({length:cfg.slotsPerDay},(_,i)=>i+1).map(n=><option key={n} value={n} disabled={n>parentRule.toSlot}>{n}</option>)}</select></F>
-     <F name="Максимум пар в день"><select aria-label="Максимум пар группы" value={inheritedGroup.rule.maxPairsPerDay}
-      onChange={e=>applyScope({maxPairsPerDay:Number(e.target.value)})}>{Array.from({length:cfg.slotsPerDay},(_,i)=>i+1).map(n=><option key={n} value={n} disabled={n>parentRule.maxPairsPerDay}>{n} пар</option>)}</select></F>
+     <F name="Не раньше пары"><PolishedSelect aria-label="Начало диапазона правил" value={inheritedGroup.rule.fromSlot}
+      onChange={e=>applyScope({fromSlot:Number(e.target.value)})}>{Array.from({length:cfg.slotsPerDay},(_,i)=>i+1).map(n=><option key={n} value={n} disabled={n<parentRule.fromSlot}>{n}</option>)}</PolishedSelect></F>
+     <F name="Не позже пары"><PolishedSelect aria-label="Конец диапазона правил" value={inheritedGroup.rule.toSlot}
+      onChange={e=>applyScope({toSlot:Number(e.target.value)})}>{Array.from({length:cfg.slotsPerDay},(_,i)=>i+1).map(n=><option key={n} value={n} disabled={n>parentRule.toSlot}>{n}</option>)}</PolishedSelect></F>
+     <F name="Максимум пар в день"><PolishedSelect aria-label="Максимум пар группы" value={inheritedGroup.rule.maxPairsPerDay}
+      onChange={e=>applyScope({maxPairsPerDay:Number(e.target.value)})}>{Array.from({length:cfg.slotsPerDay},(_,i)=>i+1).map(n=><option key={n} value={n} disabled={n>parentRule.maxPairsPerDay}>{n} пар</option>)}</PolishedSelect></F>
     </div>
     <h4>Запретить отдельные пары</h4>
     <div className="year-forbidden">{DAYS.slice(0,cfg.days).map((d,day)=><div key={d}><span>{d}</span>
@@ -266,18 +267,18 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
     <button className="year-next" onClick={nextTab}>Закрепить практики <ArrowRight size={14}/></button></section></div>}
   {tab==='practice'&&<div className="year-cols"><section className="year-card"><h3><BookOpen size={16}/> Непрерывная практика · 1–несколько недель</h3>
     <p>Группа работает в одном закреплённом кабинете весь выбранный период. В эти недели обычные занятия группы не назначаются. Другие группы не могут занять кабинет в закреплённое время. Для производственной практики на предприятии кабинет колледжа не требуется.</p><div className="year-note"><strong>Практики из учебного календаря:</strong> {calendar.filter(e=>e.kind==='practice').length?calendar.filter(e=>e.kind==='practice').map(e=>e.title+' ('+(e.groups.join(', ')||'все группы')+')').join('; '):'Пока не указаны'}. Для каждой группы и недели такой практики закрепи место и руководителя: иначе планировщик покажет незакрытый период.</div>
-    <div className="year-fields"><F name="Группа"><select value={practiceGroup} onChange={e=>setPracticeGroup(e.target.value)}>{GROUPS.map(g=><option key={g.id} value={g.id}>{g.id} · {g.count} чел.</option>)}</select></F>
-    <F name="Тип практики"><select value={practiceKind} onChange={e=>setPracticeKind(e.target.value as 'college'|'company')}><option value="college">Учебная · в колледже</option><option value="company">Производственная · на предприятии</option></select></F>
+    <div className="year-fields"><F name="Группа"><PolishedSelect value={practiceGroup} onChange={e=>setPracticeGroup(e.target.value)}>{GROUPS.map(g=><option key={g.id} value={g.id}>{g.id} · {g.count} чел.</option>)}</PolishedSelect></F>
+    <F name="Тип практики"><PolishedSelect value={practiceKind} onChange={e=>setPracticeKind(e.target.value as 'college'|'company')}><option value="college">Учебная · в колледже</option><option value="company">Производственная · на предприятии</option></PolishedSelect></F>
     <F name="Название практики"><input value={practiceTitle} onChange={e=>setPracticeTitle(e.target.value)}/></F>
-    <F name="Руководитель"><select value={practiceTeacher} onChange={e=>setPracticeTeacher(e.target.value)}>{TEACHERS.map(t=><option key={t} value={t}>{t}</option>)}</select></F>
-    <F name="Первая неделя"><select value={practiceStart} onChange={e=>setPracticeStart(Number(e.target.value))}>{periodOptions(cfg.weeks)}</select></F>
+    <F name="Руководитель"><PolishedSelect value={practiceTeacher} onChange={e=>setPracticeTeacher(e.target.value)}>{TEACHERS.map(t=><option key={t} value={t}>{t}</option>)}</PolishedSelect></F>
+    <F name="Первая неделя"><PolishedSelect value={practiceStart} onChange={e=>setPracticeStart(Number(e.target.value))}>{periodOptions(cfg.weeks)}</PolishedSelect></F>
     <F name="Продолжительность"><input type="number" min={1} max={cfg.weeks} value={practiceWeeks} onChange={e=>setPracticeWeeks(Math.max(1,Math.min(cfg.weeks,Number(e.target.value)||1)))}/></F>
-    {practiceKind==='college'&&<F name="Режим компьютеров для практики"><select aria-label="Режим компьютеров для практики" value={practiceComputerMode} onChange={e=>setPracticeComputerMode(e.target.value as typeof practiceComputerMode)}>
+    {practiceKind==='college'&&<F name="Режим компьютеров для практики"><PolishedSelect aria-label="Режим компьютеров для практики" value={practiceComputerMode} onChange={e=>setPracticeComputerMode(e.target.value as typeof practiceComputerMode)}>
  <option value="none">Компьютеры не обязательны</option><option value="pairs">По 2 студента за компьютером</option>
  <option value="triple">По 3 студента за компьютером</option><option value="individual">Индивидуальный компьютер 1:1</option>
- </select></F>}
-    {practiceKind==='college'&&<F name="Закреплённая аудитория на весь период"><select value={practiceRoom} onChange={e=>setPracticeRoom(e.target.value)}><option value="">Выбери кабинет</option>{practiceRooms.map(r=><option value={r.id} key={r.id}>{r.id} · {r.kind} · {r.capacity} мест · {r.pc} ПК</option>)}</select></F>}
-    </div><div className="year-fields"><F name="С пары"><select value={practiceFrom} onChange={e=>setPracticeFrom(Number(e.target.value))}>{[1,2,3,4,5,6].map(x=><option key={x} value={x}>{x}</option>)}</select></F><F name="По пару"><select value={practiceTo} onChange={e=>setPracticeTo(Number(e.target.value))}>{[1,2,3,4,5,6].map(x=><option key={x} value={x}>{x}</option>)}</select></F></div>
+ </PolishedSelect></F>}
+    {practiceKind==='college'&&<F name="Закреплённая аудитория на весь период"><PolishedSelect value={practiceRoom} onChange={e=>setPracticeRoom(e.target.value)}><option value="">Выбери кабинет</option>{practiceRooms.map(r=><option value={r.id} key={r.id}>{r.id} · {r.kind} · {r.capacity} мест · {r.pc} ПК</option>)}</PolishedSelect></F>}
+    </div><div className="year-fields"><F name="С пары"><PolishedSelect value={practiceFrom} onChange={e=>setPracticeFrom(Number(e.target.value))}>{[1,2,3,4,5,6].map(x=><option key={x} value={x}>{x}</option>)}</PolishedSelect></F><F name="По пару"><PolishedSelect value={practiceTo} onChange={e=>setPracticeTo(Number(e.target.value))}>{[1,2,3,4,5,6].map(x=><option key={x} value={x}>{x}</option>)}</PolishedSelect></F></div>
     <div className="year-day-choices">{DAYS.slice(0,cfg.days).map((d,i)=><label key={d} className={practiceDays.includes(i)?'chosen':''}><input type="checkbox" checked={practiceDays.includes(i)} onChange={e=>setPracticeDays(old=>e.target.checked?[...old,i]:old.filter(x=>x!==i))}/>{d}</label>)}</div>
     <button className="year-next" disabled={!practiceDays.length||practiceFrom>practiceTo||practiceStart+practiceWeeks>cfg.weeks} onClick={addPractice}>Закрепить практику <Check size={14}/></button>
    </section><section className="year-card"><h3>Календарь закреплённых практик</h3>
@@ -287,7 +288,7 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
     <p>Цветные недели означают, что выбранная группа закреплена на практике. Практика резервирует ресурсы автоматически при годовом расчёте.</p>
     <button className="year-next" onClick={nextTab}>Дистант и дорога <ArrowRight size={14}/></button></section></div>}
   {tab==='distance'&&<div className="year-cols"><section className="year-card"><h3>Дистант из дома и дорога</h3><div className="year-rule"><CheckCircle2 size={15}/> Студент и преподаватель не могут одновременно быть дома и в колледже</div><div className="year-rule"><CheckCircle2 size={15}/> Между очной и онлайн-парой — обязательный свободный промежуток для дороги</div><div className="year-rule"><CheckCircle2 size={15}/> Чередование колледж → дом → колледж в один день запрещено</div>
-   <div className="year-fields"><F name="Обязательный запас на дорогу"><select value={cfg.commuteGap} onChange={e=>change(c=>({...c,commuteGap:Number(e.target.value) as 1|2}))}><option value={1}>1 свободная пара</option><option value={2}>2 свободные пары</option></select></F>
+   <div className="year-fields"><F name="Обязательный запас на дорогу"><PolishedSelect value={cfg.commuteGap} onChange={e=>change(c=>({...c,commuteGap:Number(e.target.value) as 1|2}))}><option value={1}>1 свободная пара</option><option value={2}>2 свободные пары</option></PolishedSelect></F>
    <F name={'Дистант по умолчанию: до '+cfg.defaultOnlinePct+'%'}><input type="range" min={0} max={100} step={5} value={cfg.defaultOnlinePct} onChange={e=>change(c=>({...c,defaultOnlinePct:Number(e.target.value)}))}/></F></div>
    </section><section className="year-card"><h3>Критерии качества</h3>
     <div className="year-fields"><F name={'Штраф за окна у групп: '+cfg.groupGapWeight}><input type="range" min={0} max={100} step={5} value={cfg.groupGapWeight} onChange={e=>change(c=>({...c,groupGapWeight:Number(e.target.value)}))}/></F>
@@ -301,7 +302,7 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
     <div className="year-cols"><section className="year-card">
      <h3>Выбранный вариант: {selected?.name}</h3>
      <div className="year-result-kpis"><div><b>{selected?.coveredHours.toLocaleString('ru-RU')}</b><small>размещено часов</small></div><div><b>{selected?.requiredHours.toLocaleString('ru-RU')}</b><small>требуется</small></div><div><b>{selected?.unplaced.length}</b><small>неполных назначений</small></div><div><b>{selected?.practiceIssues.length}</b><small>конфликтов практик</small></div></div>
-     <div className="year-fields"><F name="Группа"><select value={viewGroup} onChange={e=>setViewGroup(e.target.value)}>{GROUPS.map(g=><option key={g.id} value={g.id}>{g.id}</option>)}</select></F><F name="Неделя"><select value={viewWeek} onChange={e=>setViewWeek(Number(e.target.value))}>{periodOptions(cfg.weeks)}</select></F></div>
+     <div className="year-fields"><F name="Группа"><PolishedSelect value={viewGroup} onChange={e=>setViewGroup(e.target.value)}>{GROUPS.map(g=><option key={g.id} value={g.id}>{g.id}</option>)}</PolishedSelect></F><F name="Неделя"><PolishedSelect value={viewWeek} onChange={e=>setViewWeek(Number(e.target.value))}>{periodOptions(cfg.weeks)}</PolishedSelect></F></div>
      <MiniSchedule lessons={selected?.lessons||[]} week={viewWeek} group={viewGroup} title={'Предложенное расписание · '+viewGroup}/>
      <LoadBars lessons={selected?.lessons||[]} week={viewWeek} group={viewGroup}/>
      <button className="year-next" onClick={exportVariant}><Download size={14}/> Экспорт полного варианта в JSON</button>
