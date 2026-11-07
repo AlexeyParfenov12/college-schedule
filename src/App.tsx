@@ -386,7 +386,7 @@ export default function App(){
  return <div className="app">
   <aside className={'nav '+(collapsed?'closed':'')+(mobileNavOpen?' mobile-open':'')} id="mobile-college-menu">
    <div className="brand"><div className="brand-symbol">C</div>{!collapsed&&<div><strong>College</strong><span>Schedule</span></div>}
-     <button onClick={()=>setCollapsed(v=>!v)} className="nav-toggle" aria-label={collapsed?'Развернуть боковое меню':'Свернуть боковое меню'}><Menu size={16}/></button>
+     <button onClick={()=>setCollapsed(v=>!v)} className="nav-toggle" aria-label={collapsed?'Развернуть навигацию':'Сузить навигацию'}><Menu size={16}/></button>
      <button type="button" className="mobile-menu-close" aria-label="Закрыть мобильное меню" onClick={()=>setMobileNavOpen(false)}><X size={20}/></button></div>
    <nav aria-label="Разделы College Schedule">{NAV.map(([key,label],i)=>{const I=iconSet[i];return <button key={key} title={label} className={screen===key?'active':''} onClick={()=>show(key)}><I size={17}/><span>{label}</span></button>})}</nav>
    <div className="nav-footer"><School size={17}/>{!collapsed&&<span>Демо · Диспетчер</span>}</div>
