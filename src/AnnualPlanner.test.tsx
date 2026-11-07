@@ -43,4 +43,22 @@ describe('Annual scheduler navigation and group practices',()=>{
   expect(table.textContent).toContain('Всего, ч');
  },20000);
 
+ it('applies rules to the whole college and visibly inherits them for a specific group',()=>{
+  open();
+  fireEvent.click(screen.getByRole('tab',{name:'Правила групп'}));
+  expect(screen.getByRole('combobox',{name:'Уровень правил'})).toBeTruthy();
+  fireEvent.change(screen.getByRole('combobox',{name:'Максимум пар группы'}),{target:{value:'2'}});
+  let saved=JSON.parse(localStorage.getItem('college-year-preferences-v2')!);
+  expect(saved.collegeRules.maxPairsPerDay).toBe(2);
+  const tuesday=document.querySelector<HTMLLabelElement>('.year-cols .year-day-choices label:nth-child(2)')!;
+  fireEvent.click(tuesday.querySelector('input')!);
+  saved=JSON.parse(localStorage.getItem('college-year-preferences-v2')!);
+  expect(saved.collegeRules.daysOff).toContain(1);
+  fireEvent.change(screen.getByRole('combobox',{name:'Уровень правил'}),{target:{value:'group'}});
+  const lockedTuesday=document.querySelector<HTMLInputElement>('.year-cols .year-day-choices label:nth-child(2) input')!;
+  expect(lockedTuesday.checked).toBe(true);
+  expect(lockedTuesday.disabled).toBe(true);
+  expect(screen.getByText(/Лимит группы: 2 пар\/день/)).toBeTruthy();
+ },20000);
+
 });
