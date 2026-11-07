@@ -107,7 +107,7 @@ describe('visual guided planning workflows',()=>{
   expect(screen.getByText(/уже назначены каникулы для пересекающихся групп/)).toBeTruthy();
   expect(submit.disabled).toBe(true);
   fireEvent.change(screen.getByRole('combobox',{name:'Просмотр календаря группы'}),{target:{value:'Р-21'}});
-  expect(document.querySelector('.vacation-summary')!.textContent).not.toContain('Весенние каникулы');
+  expect(document.querySelector('.vacation-summary-list')!.textContent).not.toContain('Весенние каникулы');
  },20000);
 
 });
