@@ -11,6 +11,7 @@ import './year.css';
 import './room-manager.css';
 import './official-calendar.css';
 import './mobile.css';
+import './polished-select.css';
 refreshRoomCatalog();
 migrateDemoAcademicCalendar();
 migrateDemoWinterBreakLabel();
