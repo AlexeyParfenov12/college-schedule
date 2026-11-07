@@ -9,6 +9,7 @@ import SmartLessonEditor from './SmartLessonEditor';
 import LessonWeekMove from './LessonWeekMove';
 import AnnualPlanner from './AnnualPlanner';
 import MobileSchedule from './MobileSchedule';
+import PolishedSelect from './PolishedSelect';
 import { moveOptions, explainCandidate, readBlockedRooms, swapOptions } from './scheduleAssist';
 import type { MoveOption } from './scheduleAssist';
 import { validate } from './demoLogic';
@@ -36,7 +37,7 @@ const names=(arr:string[])=>arr.join(' + ');
 function Panel({title,children,aside}: {title:string;children:ReactNode;aside?:ReactNode}){return <section className="panel"><header className="panel-top"><strong>{title}</strong>{aside}</header><div className="panel-content">{children}</div></section>}
 function Tag({children,tone='muted'}:{children:ReactNode;tone?:string}){return <span className={'tag '+tone}>{children}</span>}
 function Empty({children}:{children:ReactNode}){return <div className="empty">{children}</div>}
-function Select({value,onChange,options}:{value:string|number;onChange:(v:string)=>void;options:{value:string|number;label:string}[]}){return <select value={value} onChange={e=>onChange(e.target.value)}>{options.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}</select>}
+function Select({value,onChange,options}:{value:string|number;onChange:(v:string)=>void;options:{value:string|number;label:string}[]}){return <PolishedSelect value={value} onChange={e=>onChange(e.target.value)}>{options.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}</PolishedSelect>}
 function Action({onClick,children,primary=false,disabled=false,title}:{onClick:()=>void;children:ReactNode;primary?:boolean;disabled?:boolean;title?:string}){return <button type="button" title={title} disabled={disabled} className={primary?'btn primary':'btn'} onClick={onClick}>{children}</button>}
 function Field({label,children}:{label:string;children:ReactNode}){return <label className="field"><span>{label}</span>{children}</label>}
 
@@ -64,7 +65,6 @@ export default function App(){
  const [week,setWeek]=useState(0);
  const [density,setDensity]=useState<'compact'|'standard'>('compact');
  const [days,setDays]=useState<5|6>(readCollegeWorkweek);
- const [search,setSearch]=useState('');
  const [status,setStatus]=useState<'draft'|'published'>('draft');
  const [notice,setNotice]=useState('');
  const [replacement,setReplacement]=useState('Петров М. С.');
@@ -306,11 +306,21 @@ export default function App(){
    <span><Check size={13}/> {availableTargetCount} доступно <X size={13}/> {targets.filter(t=>t.kind==='blocked').length} запрещено</span>
    <small>{hoverMove?.reason||'Наведи на ячейку: зелёная — можно, красная — нельзя'}</small>
  </div>}
- <div className="schedule-layout"><aside className="group-sidebar">
-  <div className="sidebar-search"><Search size={14}/><input aria-label="Поиск групп, преподавателей, аудиторий" placeholder="Поиск..." value={search} onChange={e=>setSearch(e.target.value)}/></div>
-  <div className="side-caption">{view==='group'?'Группы':view==='teacher'?'Преподаватели':'Аудитории'}</div>
-  <div className="side-scroll">{sideGroups.filter(s=>s.toLowerCase().includes(search.toLowerCase())).map(s=><button key={s} className={sideValue===s?'chosen':''} onClick={()=>setSide(s)}>{view==='group'?<Users size={13}/>:view==='room'?<Building2 size={13}/>:<BookOpen size={13}/>}<span>{s}</span></button>)}</div>
-  <div className="side-bottom"><Action onClick={addRow}><Plus size={14}/> Занятие</Action></div>
+ <div className="schedule-layout"><aside className="group-sidebar schedule-picker-strip" aria-label="Выбор расписания">
+  <div className="schedule-picker-control">
+   <label className="schedule-picker-caption" htmlFor="schedule-entity-select">
+    {view==='group'?<Users size={15}/>:view==='teacher'?<BookOpen size={15}/>:<Building2 size={15}/>}
+    {view==='group'?'Группа':view==='teacher'?'Преподаватель':'Аудитория'}
+   </label>
+   <div className="schedule-picker-field">
+    <PolishedSelect id="schedule-entity-select" aria-label={view==='group'?'Выбрать группу':view==='teacher'?'Выбрать преподавателя':'Выбрать аудиторию'}
+     value={sideValue} onChange={e=>setSide(e.target.value)}>
+     {sideGroups.map(item=><option key={item} value={item}>{item}</option>)}
+    </PolishedSelect>
+   </div>
+  </div>
+  <span className="schedule-picker-counter">{view==='group'?'Групп':view==='teacher'?'Преподавателей':'Аудиторий'}: {sideGroups.length}</span>
+  <div className="schedule-picker-create"><Action onClick={addRow}><Plus size={14}/> Занятие</Action></div>
  </aside>
  <section className="schedule-body">
   <div className="table-heading"><div><b>{sideValue}</b><small>{selectedCell?'Выбрано: '+DAYS[selectedCell.day]+', '+selectedCell.slot+'-я пара':view==='group'?'Занятия группы':view==='teacher'?'Занятия преподавателя':'Занятость аудитории'}</small></div><Tag tone={status==='published'?'green':'muted'}>{status==='published'?'Опубликовано (демо)':'Черновик'}</Tag></div>
