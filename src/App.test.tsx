@@ -208,4 +208,31 @@ describe('React interface smoke checks',()=>{
   expect(meta.textContent).not.toContain('Петров М. С.');
  },20000);
 
+ it('opens the complete mobile menu and keeps the bottom quick navigation in sync',()=>{
+  render(<App/>);
+  const bottom=within(screen.getByRole('navigation',{name:'Быстрые разделы'}));
+  expect(bottom.getByRole('button',{name:'Расписание'}).getAttribute('aria-current')).toBe('page');
+  fireEvent.click(screen.getByRole('button',{name:'Открыть мобильное меню'}));
+  expect(document.querySelector('aside.nav.mobile-open')).toBeTruthy();
+  fireEvent.click(within(document.querySelector('aside.nav nav')!).getByRole('button',{name:'Учебный календарь'}));
+  expect(document.querySelector('aside.nav.mobile-open')).toBeNull();
+  expect(screen.getByRole('heading',{name:'Учебный календарь'})).toBeTruthy();
+  fireEvent.click(bottom.getByRole('button',{name:'Расписание'}));
+  expect(screen.getByRole('heading',{name:'Расписание'})).toBeTruthy();
+  expect(bottom.getByRole('button',{name:'Расписание'}).getAttribute('aria-current')).toBe('page');
+ },20000);
+ it('uses a mobile lesson sheet and releases safe slots during touch move mode',()=>{
+  render(<App/>);
+  const agenda=screen.getByRole('region',{name:'Расписание на телефоне'});
+  fireEvent.click(within(agenda).getAllByRole('button',{name:/Математика/})[0]);
+  expect(document.querySelector('.mobile-editor-backdrop')).toBeTruthy();
+  expect(document.querySelector('.right-editor.mobile-move-collapsed')).toBeNull();
+  fireEvent.click(screen.getByRole('button',{name:'Перенести'}));
+  expect(document.querySelector('.right-editor.mobile-move-collapsed')).toBeTruthy();
+  expect(document.querySelector('.mobile-editor-backdrop')).toBeNull();
+  expect(agenda.querySelector('.mobile-move-target.available')).toBeTruthy();
+  fireEvent.click(within(agenda).getByRole('button',{name:'Отмена'}));
+  expect(document.querySelector('.mobile-editor-backdrop')).toBeTruthy();
+ },20000);
+
 });
