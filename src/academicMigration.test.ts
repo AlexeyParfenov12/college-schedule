@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach,describe,expect,it } from 'vitest';
 import { CALENDAR } from './data';
-import { migrateDemoAcademicCalendar } from './academicPlanning';
+import { migrateDemoAcademicCalendar, migrateDemoWinterBreakLabel } from './academicPlanning';
 const storage='college-schedule-extras-v1';
 const marker='college-academic-fixture-v2-migrated';
 beforeEach(()=>localStorage.clear());
@@ -31,5 +31,17 @@ describe('non-destructive academic demo calendar migration',()=>{
   const calendar=(JSON.parse(localStorage.getItem(storage)!) as {calendar:typeof CALENDAR}).calendar;
   expect(calendar.some(x=>x.id==='cal-6')).toBe(false);
   expect(calendar.some(x=>x.id==='spring-custom')).toBe(true);
+ });
+ it('updates the old winter demo label without changing dates or custom periods',()=>{
+  const winter={id:'cal-4',title:'Зимние каникулы',kind:'vacation' as const,
+    from:'2027-01-26',to:'2027-02-08',groups:[] as string[]};
+  const custom={...winter,id:'my-winter',title:'Мой зимний период'};
+  localStorage.setItem(storage,JSON.stringify({calendar:[winter,custom]}));
+  migrateDemoWinterBreakLabel();
+  const data=JSON.parse(localStorage.getItem(storage)!) as {calendar:typeof winter[]};
+  expect(data.calendar[0].title).toBe('Зимний межсеместровый перерыв');
+  expect(data.calendar[0].from).toBe('2027-01-26');
+  expect(data.calendar[1].title).toBe('Мой зимний период');
+  expect(localStorage.getItem('college-demo-winter-label-v3')).toBe('done');
  });
 });
