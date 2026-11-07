@@ -1,3 +1,4 @@
+import PolishedSelect from './PolishedSelect';
 import { useMemo, useState } from 'react';
 import { CheckCircle2, ChevronLeft, ChevronRight, X, AlertTriangle, ArrowLeftRight } from 'lucide-react';
 import { DAYS, TIMES, TYPES } from './data';
@@ -28,8 +29,8 @@ export default function LessonWeekMove({lesson,lessons,blockedRooms,onCancel,onM
    <div className="week-move-details"><span>Сейчас: <b>{originWeek+1}-я неделя, {DAYS[lesson.day]}, {lesson.slot}-я пара</b></span>
     <span>Преподаватель: {lesson.teacher} · {lesson.room}</span></div>
    <div className="week-move-nav"><button aria-label="Неделя назад" disabled={targetWeek===0} onClick={()=>{setTargetWeek(v=>v-1);setChosen(null)}}><ChevronLeft size={17}/></button>
-    <label>Целевая неделя<select aria-label="Целевая неделя" value={targetWeek} onChange={e=>{setTargetWeek(Number(e.target.value));setChosen(null)}}>
-    {Array.from({length:WEEK_COUNT},(_,w)=><option key={w} value={w}>{w+1}-я · с {lessonDate(w,0)}</option>)}</select></label>
+    <label>Целевая неделя<PolishedSelect aria-label="Целевая неделя" value={targetWeek} onChange={e=>{setTargetWeek(Number(e.target.value));setChosen(null)}}>
+    {Array.from({length:WEEK_COUNT},(_,w)=><option key={w} value={w}>{w+1}-я · с {lessonDate(w,0)}</option>)}</PolishedSelect></label>
     <button aria-label="Неделя вперёд" disabled={targetWeek===WEEK_COUNT-1} onClick={()=>{setTargetWeek(v=>v+1);setChosen(null)}}><ChevronRight size={17}/></button>
     <span className="week-move-free">{eligible} доступных ячеек</span></div>
    <p className="week-move-guide">Выбери день и пару на целевой неделе. Зелёные ячейки свободны для всей группы, преподавателя и аудиторий; красные показывают причину запрета.</p>
