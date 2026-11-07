@@ -88,4 +88,26 @@ describe('visual guided planning workflows',()=>{
   expect(screen.getByText(/П-21, П-22/)).toBeTruthy();
  },20000);
 
+ it('adds college vacations with explicit dates for a selected department, without inventing official periods',()=>{
+  render(<App/>);
+  navigation('Учебный календарь');
+  expect(screen.getByRole('region',{name:'Каникулы выбранной группы'}).textContent).toContain('Зимние каникулы');
+  fireEvent.click(screen.getByRole('button',{name:'Весенние каникулы'}));
+  expect(screen.getByText(/система не подставляет вымышленные сроки/)).toBeTruthy();
+  const submit=screen.getByRole('button',{name:'Сохранить учебный период'}) as HTMLButtonElement;
+  expect(submit.disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText('С даты'),{target:{value:'2027-03-22'}});
+  fireEvent.change(screen.getByLabelText('По дату'),{target:{value:'2027-03-28'}});
+  fireEvent.change(screen.getByRole('combobox',{name:'На кого действует'}),{target:{value:'department:ИТ'}});
+  expect(submit.disabled).toBe(false);
+  fireEvent.click(submit);
+  expect(document.querySelector('.plan-period-list')!.textContent).toContain('Весенние каникулы');
+  expect(document.querySelector('.plan-period-list')!.textContent).toContain('П-11');
+  expect(document.querySelector('.vacation-summary')!.textContent).toContain('Весенние каникулы');
+  expect(screen.getByText(/уже назначены каникулы для пересекающихся групп/)).toBeTruthy();
+  expect(submit.disabled).toBe(true);
+  fireEvent.change(screen.getByRole('combobox',{name:'Просмотр календаря группы'}),{target:{value:'Р-21'}});
+  expect(document.querySelector('.vacation-summary')!.textContent).not.toContain('Весенние каникулы');
+ },20000);
+
 });
