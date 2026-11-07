@@ -4,11 +4,13 @@ import { deriveOffers, needsComputers, calendarIssues, lessonDate } from './plan
 import { assessRoomFit } from './roomPolicy';
 import { readCollegeWorkweek } from './productionCalendar';
 import { isTeachingDate } from './academicPlanning';
+import { checkGroupSlot, checkTeacherSlot, effectiveTeacherRule } from './scheduleConstraints';
+import type { ScopeOverride } from './scheduleConstraints';
 
 export type TeacherPreference={
  daysOff:number[]; fromSlot:number; toSlot:number;
  forbidden:{day:number;from:number;to:number}[];
- preferDays:number[]; maxOnlinePct:number;
+ preferDays:number[]; maxOnlinePct:number; maxPairsPerDay?:number;
 };
 export type PracticeBlock={
  id:string;group:string;kind:'college'|'company';title:string;teacher:string;
@@ -21,6 +23,9 @@ export type AnnualConfig={
  defaultOnlinePct:number; groupGapWeight:number; teacherGapWeight:number;
  activeRooms:string[]; allowStreams:string[]; allowSubgroups:string[]; assistedSubgroups:string[];
  teacherPreferences:Record<string,TeacherPreference>;
+ collegeRules?:ScopeOverride;
+ departmentRules?:Record<string,ScopeOverride>;
+ groupRules?:Record<string,ScopeOverride>;
  practiceBlocks:PracticeBlock[];
 };
 export type YearDemand={id:string;group:string;teacher:string;subject:string;pairsPerWeek:number;requiredPairs:number;
@@ -38,12 +43,10 @@ export function defaultAnnualConfig():AnnualConfig{
   weeks:40,days:readCollegeWorkweek(),slotsPerDay:6,commuteGap:1,
   defaultOnlinePct:20,groupGapWeight:90,teacherGapWeight:65,
   activeRooms:ROOMS.filter(r=>r.active).map(r=>r.id),allowStreams:[],
-  allowSubgroups:[],assistedSubgroups:[],teacherPreferences:{},practiceBlocks:[]
+  allowSubgroups:[],assistedSubgroups:[],teacherPreferences:{},collegeRules:{},departmentRules:{},groupRules:{},practiceBlocks:[]
  };
 }
-export const teacherRule=(cfg:AnnualConfig,name:string):TeacherPreference=>cfg.teacherPreferences[name]||{
- daysOff:[],fromSlot:1,toSlot:6,forbidden:[],preferDays:[],maxOnlinePct:cfg.defaultOnlinePct
-};
+export const teacherRule=(cfg:AnnualConfig,name:string):TeacherPreference=>effectiveTeacherRule(cfg,name);
 export const streamKey=(teacher:string,subject:string)=>teacher+'|'+subject;
 /** Infers deliberately limited synthetic demand, NOT curricula from the Academic Core. */
 export function deriveAnnualDemands(seed:Lesson[],weeks:number,maxSubjects=6):YearDemand[]{
@@ -133,12 +136,12 @@ export function practiceReservations(cfg:AnnualConfig,events:CalendarEvent[],wee
      mode:'offline',type:'regular',hours:2,practiceBlockId:block.id,requiresComputers:block.requiresComputers,requiresIndividualComputer:block.requiresIndividualComputer,computerShare:block.computerShare,notes:'Непрерывный блок практики · '+(block.kind==='college'?'Закреплённый кабинет':'Внешняя организация')};
     const conflicts=hasSlotConflict(state,lesson);
     const availability=teacherRule(cfg,block.teacher);
-    const unavailable=availability.daysOff.includes(day)||slot<availability.fromSlot||slot>availability.toSlot||
-      availability.forbidden.some(b=>b.day===day&&slot>=b.from&&slot<=b.to);
+    const unavailable=!checkTeacherSlot(cfg,block.teacher,day,slot,get(state.teacherByDay,k(block.teacher,day)).length).allowed;
+    const groupRestriction=checkGroupSlot(cfg,block.group,day,slot,get(state.groupByDay,k(block.group,day)).length);
     // A matching practice period is not a prohibition; vacations and holidays are.
     const vacation=calendarIssues(lesson,events,cfg.days).length>0;
-    if(vacation||conflicts||unavailable){
-     issues.push({blockId:block.id,group:block.group,week,reason:vacation?'Практика пересекается с каникулами или выходным':unavailable?'Руководитель практики недоступен в заданный день или пару':'Группа, руководитель или кабинет заняты другой практикой/фиксированным занятием'});
+    if(vacation||conflicts||unavailable||!groupRestriction.allowed){
+     issues.push({blockId:block.id,group:block.group,week,reason:vacation?'Практика пересекается с каникулами или выходным':!groupRestriction.allowed?'Группа: '+groupRestriction.reason+' ('+groupRestriction.origin.join(' → ')+')':unavailable?'Руководитель практики недоступен в заданный день или пару':'Группа, руководитель или кабинет заняты другой практикой/фиксированным занятием'});
      continue;
     }
     append(state,lesson);created.push(lesson);
@@ -276,6 +279,8 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
     for(let slot=1;slot<=cfg.slotsPerDay;slot++){
      if(slot<preference.fromSlot||slot>preference.toSlot)continue;
      if(preference.forbidden.some(x=>x.day===day&&slot>=x.from&&slot<=x.to))continue;
+     if(!checkTeacherSlot(cfg,task.teacher,day,slot,get(state.teacherByDay,k(task.teacher,day)).length).allowed)continue;
+     if(taskGroups.some(g=>!checkGroupSlot(cfg,g,day,slot,get(state.groupByDay,k(g,day)).length).allowed))continue;
      if(taskGroups.some(g=>state.groupBusy.has(busyKey(g,day,slot)))||state.teacherBusy.has(busyKey(task.teacher,day,slot)))continue;
      const roomChoices=suitableRooms(task,cfg,state,day,slot);
      const modes:{mode:'offline'|'online';room:string;type:'regular'|'subgroup'}[]=
