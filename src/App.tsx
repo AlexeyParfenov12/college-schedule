@@ -322,7 +322,8 @@ export default function App(){
   {legend}
   <div className="bottom-line"><span>Потоки и параллели переносятся целиком с участниками</span><span className="push-right">{hoverMove&&moveMode?hoverMove.reason:'Нажми на занятие — увидишь доступные варианты'}</span></div>
  </section>
- {selected&&<div className="right-editor">
+ {selected&&!moveMode&&<button type="button" className="mobile-editor-backdrop" aria-label="Закрыть карточку занятия" onClick={closeSelected}/>}
+ {selected&&<div className={'right-editor'+(moveMode?' mobile-move-collapsed':'')}>
    {sideMode==='assistant'&&items.some(x=>x.id===selected.id)
     ?<LessonQuickActions lesson={selected} current={current} blocked={blockedRooms} isMoveMode={moveMode}
       onMoveMode={()=>{setMoveMode(v=>!v);setPreview(null)}}
