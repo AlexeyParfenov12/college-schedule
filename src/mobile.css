@@ -3,6 +3,8 @@
    Breakpoints: 820px tablet/phone, 600px phone, 390px compact phone. */
 .mobile-menu-trigger,.mobile-menu-close,.mobile-bottom-nav,.mobile-nav-backdrop,.mobile-agenda,.mobile-editor-backdrop{display:none}
 
+.nav.closed nav button span,.nav.closed .brand>div:nth-child(2),.nav.closed .nav-footer span{display:none}
+.mobile-menu-close{display:none}
 /* Agenda: larger touch targets and an explicit reason for unavailable moves. */
 .mobile-agenda{min-width:0;color:#254b49}
 .mobile-day-strip{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:5px;padding:5px 0 12px}
