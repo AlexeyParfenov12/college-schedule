@@ -135,7 +135,6 @@ export function practiceReservations(cfg:AnnualConfig,events:CalendarEvent[],wee
      teacher:block.teacher||'Руководитель практики',room:block.kind==='college'?block.room:'Предприятие',
      mode:'offline',type:'regular',hours:2,practiceBlockId:block.id,requiresComputers:block.requiresComputers,requiresIndividualComputer:block.requiresIndividualComputer,computerShare:block.computerShare,notes:'Непрерывный блок практики · '+(block.kind==='college'?'Закреплённый кабинет':'Внешняя организация')};
     const conflicts=hasSlotConflict(state,lesson);
-    const availability=teacherRule(cfg,block.teacher);
     const unavailable=!checkTeacherSlot(cfg,block.teacher,day,slot,get(state.teacherByDay,k(block.teacher,day)).length).allowed;
     const groupRestriction=checkGroupSlot(cfg,block.group,day,slot,get(state.groupByDay,k(block.group,day)).length);
     // A matching practice period is not a prohibition; vacations and holidays are.
