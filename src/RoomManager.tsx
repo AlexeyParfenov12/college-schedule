@@ -1,3 +1,4 @@
+import PolishedSelect from './PolishedSelect';
 import { useEffect, useState } from 'react';
 import { Building2, Check, Plus, Pencil, X, Archive, AlertTriangle } from 'lucide-react';
 import { ROOMS } from './data';
@@ -50,15 +51,15 @@ export default function RoomManager({selected,lessons,onSelect,onChange,notify}:
      <label>Номер аудитории<input value={form.id} maxLength={3} disabled={Boolean(original)} onChange={e=>patch({id:e.target.value})} placeholder="Например, 405" required/></label>
      <label>Корпус<input value={form.building} onChange={e=>patch({building:e.target.value})} required/></label>
      <label className="full">Название (необязательно)<input value={form.title||''} onChange={e=>patch({title:e.target.value})} placeholder="Лаборатория робототехники"/></label>
-     <label className="full">Назначение<select value={form.kind} onChange={e=>patch({kind:e.target.value})}>
+     <label className="full">Назначение<PolishedSelect value={form.kind} onChange={e=>patch({kind:e.target.value})}>
       {['Учебная аудитория','Компьютерный класс','Лекционный зал','Лаборатория','Мастерская','Спортивный зал','Другое'].map(x=><option key={x}>{x}</option>)}
-     </select></label>
+     </PolishedSelect></label>
      <label>Посадочных мест<input aria-label="Посадочных мест" type="number" min={1} max={500} value={form.capacity} onChange={e=>patch({capacity:Number(e.target.value)})} required/></label>
      <label>Рабочих компьютеров<input aria-label="Рабочих компьютеров" type="number" min={0} max={500} value={form.pc} onChange={e=>patch({pc:Number(e.target.value)})} required/></label>
-     <label>Обычно студентов за ПК<select aria-label="Обычно студентов за ПК" value={form.recommendedStudentsPerComputer||2} onChange={e=>patch({recommendedStudentsPerComputer:Number(e.target.value) as 1|2|3})}>
-      {[1,2,3].map(x=><option key={x} value={x}>{x}</option>)}</select></label>
-     <label>Допустимо максимум за ПК<select aria-label="Допустимо максимум за ПК" value={form.maxStudentsPerComputer||3} onChange={e=>patch({maxStudentsPerComputer:Number(e.target.value) as 1|2|3})}>
-      {[1,2,3].map(x=><option key={x} value={x}>{x}</option>)}</select></label>
+     <label>Обычно студентов за ПК<PolishedSelect aria-label="Обычно студентов за ПК" value={form.recommendedStudentsPerComputer||2} onChange={e=>patch({recommendedStudentsPerComputer:Number(e.target.value) as 1|2|3})}>
+      {[1,2,3].map(x=><option key={x} value={x}>{x}</option>)}</PolishedSelect></label>
+     <label>Допустимо максимум за ПК<PolishedSelect aria-label="Допустимо максимум за ПК" value={form.maxStudentsPerComputer||3} onChange={e=>patch({maxStudentsPerComputer:Number(e.target.value) as 1|2|3})}>
+      {[1,2,3].map(x=><option key={x} value={x}>{x}</option>)}</PolishedSelect></label>
      <label className="full">Оборудование (через запятую)<input value={equipment} onChange={e=>setEquipment(e.target.value)} placeholder="Проектор, Интернет, интерактивная доска"/></label>
      <label className="full room-editor-switch"><input type="checkbox" checked={form.active} onChange={e=>patch({active:e.target.checked})}/> Кабинет работает и доступен для подбора</label>
     </div>
