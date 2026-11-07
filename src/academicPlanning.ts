@@ -127,3 +127,29 @@ export function migrateDemoAcademicCalendar(){
   localStorage.setItem(marker,'done');
  }catch{/** Keep existing browser state if storage is blocked or malformed. */}
 }
+
+/**
+ * Rename only the old untouched winter demo fixture in browsers that saved it.
+ * No dates or group assignments are changed; custom entries are preserved.
+ */
+export function migrateDemoWinterBreakLabel(){
+ if(typeof localStorage==='undefined')return;
+ const marker='college-demo-winter-label-v3';
+ const storage='college-schedule-extras-v1';
+ try{
+  if(localStorage.getItem(marker)==='done')return;
+  const raw=localStorage.getItem(storage);
+  if(raw){
+   const parsed:unknown=JSON.parse(raw);
+   if(parsed&&typeof parsed==='object'&&'calendar' in parsed){
+    const record=parsed as {calendar?:CalendarEvent[]};
+    if(Array.isArray(record.calendar)){
+     const next=record.calendar.map(item=>item.id==='cal-4'&&item.kind==='vacation'&&item.title==='Зимние каникулы'
+      ?{...item,title:'Зимний межсеместровый перерыв'}:item);
+     if(next.some((item,index)=>item!==record.calendar![index]))localStorage.setItem(storage,JSON.stringify({...parsed,calendar:next}));
+    }
+   }
+  }
+  localStorage.setItem(marker,'done');
+ }catch{/* Do not overwrite saved data on storage failures. */}
+}
