@@ -1,3 +1,4 @@
+import PolishedSelect from './PolishedSelect';
 import { useMemo, useState } from 'react';
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import { AlertTriangle, ArrowLeftRight, BarChart3, Bell, BookOpen, CalendarDays, Check, CheckCircle2, ChevronRight, Clock, Copy, Download, FileSpreadsheet, Filter, GitFork, GraduationCap, History, Laptop, Network, Plus, Printer, RotateCcw, Search, Send, Settings2, ShieldCheck, SlidersHorizontal, Trash2, Users, WandSparkles, X } from 'lucide-react';
@@ -39,7 +40,7 @@ type Props={
 };
 function Panel({title,children,aside}:{title:string;children:ReactNode;aside?:ReactNode}){return <section className="studio-panel"><header><strong>{title}</strong>{aside}</header><div className="studio-inner">{children}</div></section>}
 function Button({children,onClick,primary=false,disabled=false,danger=false}:{children:ReactNode;onClick:()=>void;primary?:boolean;disabled?:boolean;danger?:boolean}){return <button type="button" className={'studio-btn '+(primary?'strong ':'')+(danger?'danger':'')} disabled={disabled} onClick={onClick}>{children}</button>}
-function Select({value,onChange,items}:{value:string|number;onChange:(value:string)=>void;items:{id:string|number;label:string}[]}){return <select value={value} onChange={e=>onChange(e.target.value)}>{items.map((v,i)=><option key={i} value={v.id}>{v.label}</option>)}</select>}
+function Select({value,onChange,items}:{value:string|number;onChange:(value:string)=>void;items:{id:string|number;label:string}[]}){return <PolishedSelect value={value} onChange={e=>onChange(e.target.value)}>{items.map((v,i)=><option key={i} value={v.id}>{v.label}</option>)}</PolishedSelect>}
 function Field({title,children}:{title:string;children:ReactNode}){return <label className="studio-field"><span>{title}</span>{children}</label>}
 const opts=(xs:string[])=>xs.map(x=>({id:x,label:x}));
 const weekOpts=Array.from({length:WEEK_COUNT},(_,i)=>({id:i,label:'Учебная неделя '+(i+1)}));
@@ -57,7 +58,7 @@ function Rows({heads,rows}:{heads:string[];rows:ReactNode[][]}){
    {searchable&&<div className="studio-table-tools">
     <div className="assist-search"><Search size={13}/><input aria-label="Фильтр строк таблицы" placeholder="Найти в таблице…" value={query} onChange={e=>{setQuery(e.target.value);setPage(0)}}/></div>
     <span className="studio-table-count">{filtered.length} записей</span>
-    <select aria-label="Строк на странице" value={pageSize} onChange={e=>{setPageSize(Number(e.target.value));setPage(0)}}><option value={12}>12 строк</option><option value={24}>24 строки</option><option value={48}>48 строк</option></select>
+    <PolishedSelect aria-label="Строк на странице" value={pageSize} onChange={e=>{setPageSize(Number(e.target.value));setPage(0)}}><option value={12}>12 строк</option><option value={24}>24 строки</option><option value={48}>48 строк</option></PolishedSelect>
    </div>}
    <div className="studio-table-scroll"><table className="studio-table"><thead><tr>{heads.map((x,i)=><th key={i}>{x}</th>)}</tr></thead>
     <tbody>{shown.map((row,i)=><tr key={actualPage*pageSize+i}>{row.map((cell,j)=><td key={j}>{cell}</td>)}</tr>)}</tbody>
