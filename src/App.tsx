@@ -8,6 +8,7 @@ import LessonQuickActions from './LessonQuickActions';
 import SmartLessonEditor from './SmartLessonEditor';
 import LessonWeekMove from './LessonWeekMove';
 import AnnualPlanner from './AnnualPlanner';
+import MobileSchedule from './MobileSchedule';
 import { moveOptions, explainCandidate, readBlockedRooms, swapOptions } from './scheduleAssist';
 import type { MoveOption } from './scheduleAssist';
 import { validate } from './demoLogic';
@@ -42,6 +43,8 @@ function Field({label,children}:{label:string;children:ReactNode}){return <label
 export default function App(){
  const [screen,setScreen]=useState<Screen>('schedule');
  const [collapsed,setCollapsed]=useState(false);
+ const [mobileNavOpen,setMobileNavOpen]=useState(false);
+ const [mobileDay,setMobileDay]=useState(0);
  const [items,setItems]=useState<Item[]>(start);
  const [selected,setSelected]=useState<Item|null>(null);
  const [focusId,setFocusId]=useState<string|null>(null);
@@ -86,7 +89,7 @@ export default function App(){
  const collisions=selected?cellConflict(selected,current):[];
  const issueCount=current.filter(x=>x.status!=='cancelled'&&(cellConflict(x,current).length>0||calendarIssues(x,currentDemoCalendar(),days).length>0)).length;
  const displayName=NAV.find(x=>x[0]===screen)?.[1]||'Расписание';
- const choose=(x:Item)=>{setFocusId(null);setContextMenu(null);setSelected(x);setSideMode('assistant');setMoveMode(false);setDraggingId(null);setPreview(null);setHoverMove(null)};
+ const choose=(x:Item)=>{setMobileDay(x.day);setFocusId(null);setContextMenu(null);setSelected(x);setSideMode('assistant');setMoveMode(false);setDraggingId(null);setPreview(null);setHoverMove(null)};
  const beginDrag=(event:DragEvent<HTMLButtonElement>,lesson:Item)=>{
   if(lesson.status==='held'){event.preventDefault();setNotice('Проведённое занятие заблокировано для переноса');return}
   event.dataTransfer.effectAllowed='move';
@@ -95,7 +98,7 @@ export default function App(){
   setMoveMode(true);setDraggingId(lesson.id);setPreview(null);setHoverMove(null);
  };
  const finishDrag=()=>{setDraggingId(null);setMoveMode(false);setHoverMove(null)};
- const make=(day=0,slot=1)=>{const created:Item={id:id(),day,slot,week,subject:'',teacher:view==='teacher'?teacher:'',groups:view==='group'?[group]:[],room:view==='room'?room:'',type:'regular',mode:'offline'};setSelected(created);setSideMode('edit');setMoveMode(false);setPreview(null)};
+ const make=(day=0,slot=1)=>{setMobileDay(day);const created:Item={id:id(),day,slot,week,subject:'',teacher:view==='teacher'?teacher:'',groups:view==='group'?[group]:[],room:view==='room'?room:'',type:'regular',mode:'offline'};setSelected(created);setSideMode('edit');setMoveMode(false);setPreview(null)};
 
  const save=(x:Item)=>{
   if(items.find(y=>y.id===x.id)?.status==='held'){setNotice('Проведённое занятие нельзя изменить без процедуры исправления');return false}
@@ -189,11 +192,19 @@ export default function App(){
    window.addEventListener('keydown',handler);return ()=>window.removeEventListener('keydown',handler);
  },[lastChange,items]);
  const exportCSV=(dataset=current)=>download('college-schedule.csv',['День;Пара;Группа;Дисциплина;Преподаватель;Аудитория;Организация;Формат',...dataset.map(x=>[DAYS[x.day],x.slot,names(x.groups),x.subject,x.teacher,x.room,TYPES[x.type],MODES[x.mode]].join(';'))].join('\n'));
- const show=(to:Screen)=>{setFocusId(null);setScreen(to);closeSelected()};
+ const show=(to:Screen)=>{setMobileNavOpen(false);setFocusId(null);setScreen(to);closeSelected()};
+ useEffect(()=>{
+  if(!mobileNavOpen)return;
+  const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape')setMobileNavOpen(false)};
+  const onResize=()=>{if(window.innerWidth>820)setMobileNavOpen(false)};
+  window.addEventListener('keydown',onKey);
+  window.addEventListener('resize',onResize);
+  return ()=>{window.removeEventListener('keydown',onKey);window.removeEventListener('resize',onResize)};
+ },[mobileNavOpen]);
  const focusLesson=(lesson:Item)=>{
   const currentLesson=items.find(x=>x.id===lesson.id);
   if(!currentLesson){setNotice('Занятие было изменено или удалено. Обнови список.');return}
-  setScreen('schedule');setView('group');setWeek(currentLesson.week||0);
+  setScreen('schedule');setView('group');setWeek(currentLesson.week||0);setMobileDay(currentLesson.day);
   setGroup(currentLesson.groups[0]||group);setSelected(currentLesson);setSideMode('assistant');
   setMoveMode(false);setDraggingId(null);setContextMenu(null);setFocusId(currentLesson.id);
  };
@@ -303,7 +314,12 @@ export default function App(){
  </aside>
  <section className="schedule-body">
   <div className="table-heading"><div><b>{sideValue}</b><small>{selectedCell?'Выбрано: '+DAYS[selectedCell.day]+', '+selectedCell.slot+'-я пара':view==='group'?'Занятия группы':view==='teacher'?'Занятия преподавателя':'Занятость аудитории'}</small></div><Tag tone={status==='published'?'green':'muted'}>{status==='published'?'Опубликовано (демо)':'Черновик'}</Tag></div>
-  {grid}{legend}
+  {grid}
+  <MobileSchedule week={week} days={days} times={bellTimes} lessons={visible} day={mobileDay}
+    selectedId={selected?.id} moveMode={moveMode&&Boolean(selected)} targets={targets}
+    onDayChange={setMobileDay} onOpen={choose} onAdd={make} onTarget={inspectTarget}
+    onCancelMove={()=>{setMoveMode(false);setPreview(null);setDraggingId(null)}}/>
+  {legend}
   <div className="bottom-line"><span>Потоки и параллели переносятся целиком с участниками</span><span className="push-right">{hoverMove&&moveMode?hoverMove.reason:'Нажми на занятие — увидишь доступные варианты'}</span></div>
  </section>
  {selected&&<div className="right-editor">
@@ -367,14 +383,23 @@ export default function App(){
     }}/>
   : <AdvancedWorkflows screen={screen} items={items} setItems={setItems} week={week} setWeek={setWeek} group={group} setGroup={setGroup} teacher={teacher} setTeacher={setTeacher} room={room} setRoom={setRoom} onNavigate={show} onEdit={setSelected} onFocusLesson={focusLesson} notify={setNotice} markDraft={()=>setStatus('draft')} status={status} setStatus={setStatus} density={density} setDensity={setDensity} days={days} setDays={v=>setDays(v===5?5:6)}/>;
  return <div className="app">
-  <aside className={'nav '+(collapsed?'closed':'')}>
-   <div className="brand"><div className="brand-symbol">C</div>{!collapsed&&<div><strong>College</strong><span>Schedule</span></div>}<button onClick={()=>setCollapsed(v=>!v)} className="nav-toggle"><Menu size={16}/></button></div>
-   <nav>{NAV.map(([key,label],i)=>{const I=iconSet[i];return <button key={key} title={label} className={screen===key?'active':''} onClick={()=>show(key)}><I size={17}/>{!collapsed&&<span>{label}</span>}</button>})}</nav>
+  <aside className={'nav '+(collapsed?'closed':'')+(mobileNavOpen?' mobile-open':'')} id="mobile-college-menu">
+   <div className="brand"><div className="brand-symbol">C</div>{!collapsed&&<div><strong>College</strong><span>Schedule</span></div>}
+     <button onClick={()=>setCollapsed(v=>!v)} className="nav-toggle" aria-label={collapsed?'Развернуть боковое меню':'Свернуть боковое меню'}><Menu size={16}/></button>
+     <button type="button" className="mobile-menu-close" aria-label="Закрыть мобильное меню" onClick={()=>setMobileNavOpen(false)}><X size={20}/></button></div>
+   <nav aria-label="Разделы College Schedule">{NAV.map(([key,label],i)=>{const I=iconSet[i];return <button key={key} title={label} className={screen===key?'active':''} onClick={()=>show(key)}><I size={17}/><span>{label}</span></button>})}</nav>
    <div className="nav-footer"><School size={17}/>{!collapsed&&<span>Демо · Диспетчер</span>}</div>
   </aside>
+  <button type="button" className={'mobile-nav-backdrop'+(mobileNavOpen?' is-visible':'')}
+     aria-label="Закрыть список разделов" tabIndex={mobileNavOpen?0:-1} onClick={()=>setMobileNavOpen(false)}/>
   <div className="main">
-   <header className="main-head"><div className="page-title"><CalendarDays size={22}/><div><h1>{displayName}</h1><p>Демонстрационный учебный год 2026/2027</p></div></div><div className="head-actions"><Tag tone="muted">Колледж · Демостенд</Tag><button className="icon-btn" onClick={()=>setNotice('Все изменения сохраняются только в браузере')} title="Уведомления"><Bell size={17}/></button><Action onClick={()=>{setScreen('publication');setSelected(null)}} primary><Check size={15}/> Публикация</Action></div></header>
+   <header className="main-head"><button type="button" className="mobile-menu-trigger" aria-label="Открыть мобильное меню" aria-controls="mobile-college-menu" aria-expanded={mobileNavOpen} onClick={()=>setMobileNavOpen(true)}><Menu size={21}/></button><div className="page-title"><CalendarDays size={22}/><div><h1>{displayName}</h1><p>Демонстрационный учебный год 2026/2027</p></div></div><div className="head-actions"><Tag tone="muted">Колледж · Демостенд</Tag><button className="icon-btn" onClick={()=>setNotice('Все изменения сохраняются только в браузере')} title="Уведомления"><Bell size={17}/></button><Action onClick={()=>{setScreen('publication');setSelected(null)}} primary><Check size={15}/> Публикация</Action></div></header>
    <main className="workspace">{render()}</main>
+   <nav className="mobile-bottom-nav" aria-label="Быстрые разделы">
+     {([['schedule','Расписание',CalendarDays],['calendar','Календарь',CalendarDays],['year','Годовой',School],['overview','Обзор',LayoutDashboard]] as const).map(([key,label,Icon])=>
+       <button type="button" key={key} className={screen===key?'active':''} aria-current={screen===key?'page':undefined} onClick={()=>show(key)}><Icon size={18}/><span>{label}</span></button>)}
+     <button type="button" className={mobileNavOpen?'active':''} aria-label="Все разделы" onClick={()=>setMobileNavOpen(true)}><Menu size={19}/><span>Ещё</span></button>
+   </nav>
    <footer className="app-foot"><span>College Schedule · тестовый стенд · {GROUPS.length} групп, {TEACHERS.length} преподавателя, {ROOMS.length} аудиторий · {items.length.toLocaleString('ru-RU')} занятий</span><button type="button" className="reset-button" onClick={resetSeed}>Сбросить демоданные</button></footer>
   </div>
   {notice&&<div role="status" className="toast"><AlertTriangle size={16}/>{notice}<button onClick={()=>setNotice('')}><X size={15}/></button></div>}
