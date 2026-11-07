@@ -57,8 +57,14 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
  const rule=teacherRule(cfg,teacher);
  const ruleTarget:ScopeOverride=scopeType==='college'?cfg.collegeRules||{}:
   scopeType==='department'?cfg.departmentRules?.[scopeDepartment]||{}:cfg.groupRules?.[scopeGroup]||{};
- const inheritedGroup=effectiveGroupRules(cfg,scopeType==='group'?scopeGroup:
-  GROUPS.find(g=>g.department===scopeDepartment)?.id||scopeGroup);
+ const targetGroup=scopeType==='group'?scopeGroup:
+  GROUPS.find(g=>g.department===scopeDepartment)?.id||scopeGroup;
+ const previewConfig:AnnualConfig=scopeType==='college'?{...cfg,departmentRules:{},groupRules:{}}:
+  scopeType==='department'?{...cfg,groupRules:{}}:cfg;
+ const parentConfig:AnnualConfig=scopeType==='college'?{...cfg,collegeRules:{},departmentRules:{},groupRules:{}}:
+  scopeType==='department'?{...cfg,departmentRules:{},groupRules:{}}:{...cfg,groupRules:{}};
+ const inheritedGroup=effectiveGroupRules(previewConfig,targetGroup);
+ const parentRule=effectiveGroupRules(parentConfig,targetGroup).rule;
  const scopeDays=ruleTarget.daysOff||[];
  const applyScope=(patch:Partial<ScopeOverride>)=>change(c=>{
   if(scopeType==='college')return {...c,collegeRules:{...c.collegeRules,...patch}};
@@ -97,7 +103,12 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
  const selected=variants[active];
  const issues=(selected?.unplaced||[]).filter(x=>(x.group+x.subject+x.teacher+x.reason).toLowerCase().includes(issueSearch.toLowerCase()));
  const totalHours=demands.reduce((s,d)=>s+d.requiredPairs*2,0);
- const applyTeacher=(changes:Partial<TeacherPreference>)=>change(c=>({...c,teacherPreferences:{...c.teacherPreferences,[teacher]:{...teacherRule(c,teacher),...changes}}}));
+ const applyTeacher=(changes:Partial<TeacherPreference>)=>change(c=>({
+  ...c,teacherPreferences:{...c.teacherPreferences,[teacher]:{
+   ...(c.teacherPreferences[teacher]||{daysOff:[],fromSlot:1,toSlot:6,forbidden:[],preferDays:[],maxOnlinePct:c.defaultOnlinePct}),
+   ...changes
+  }}
+ }));
  const run=()=>{
   worker.current?.terminate();setWorking(true);setProgress('Вычисление вариантов...');setVariants([]);setTab('results');
   const w=new Worker(new URL('./yearPlanner.worker.ts',import.meta.url),{type:'module'});worker.current=w;
@@ -216,25 +227,29 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
     <p>Отмеченные дни и пары исключаются из расчёта. Индивидуальные правила дополняют общие ограничения, не отменяя их.</p>
     <h4>Не ставить занятия в дни</h4>
     <div className="year-day-choices">{DAYS.slice(0,cfg.days).map((d,day)=>
-     <label key={d} className={scopeDays.includes(day)?'chosen':''}>
-      <input type="checkbox" checked={scopeDays.includes(day)} onChange={e=>applyScope({
+     <label key={d} className={scopeDays.includes(day)||parentRule.daysOff.includes(day)?'chosen':''}
+      title={parentRule.daysOff.includes(day)?'Запрещено вышестоящими правилами':'Индивидуальное ограничение'}>
+      <input type="checkbox" checked={scopeDays.includes(day)||parentRule.daysOff.includes(day)}
+       disabled={parentRule.daysOff.includes(day)} onChange={e=>applyScope({
        daysOff:e.target.checked?[...scopeDays,day]:scopeDays.filter(x=>x!==day)
       })}/>{d}
      </label>)}</div>
     <div className="year-fields">
-     <F name="Не раньше пары"><select aria-label="Начало диапазона правил" value={ruleTarget.fromSlot??1}
-      onChange={e=>applyScope({fromSlot:Number(e.target.value)})}>{Array.from({length:cfg.slotsPerDay},(_,i)=>i+1).map(n=><option key={n} value={n}>{n}</option>)}</select></F>
-     <F name="Не позже пары"><select aria-label="Конец диапазона правил" value={ruleTarget.toSlot??cfg.slotsPerDay}
-      onChange={e=>applyScope({toSlot:Number(e.target.value)})}>{Array.from({length:cfg.slotsPerDay},(_,i)=>i+1).map(n=><option key={n} value={n}>{n}</option>)}</select></F>
-     <F name="Максимум пар в день"><select aria-label="Максимум пар группы" value={ruleTarget.maxPairsPerDay??cfg.slotsPerDay}
-      onChange={e=>applyScope({maxPairsPerDay:Number(e.target.value)})}>{Array.from({length:cfg.slotsPerDay},(_,i)=>i+1).map(n=><option key={n} value={n}>{n} пар</option>)}</select></F>
+     <F name="Не раньше пары"><select aria-label="Начало диапазона правил" value={inheritedGroup.rule.fromSlot}
+      onChange={e=>applyScope({fromSlot:Number(e.target.value)})}>{Array.from({length:cfg.slotsPerDay},(_,i)=>i+1).map(n=><option key={n} value={n} disabled={n<parentRule.fromSlot}>{n}</option>)}</select></F>
+     <F name="Не позже пары"><select aria-label="Конец диапазона правил" value={inheritedGroup.rule.toSlot}
+      onChange={e=>applyScope({toSlot:Number(e.target.value)})}>{Array.from({length:cfg.slotsPerDay},(_,i)=>i+1).map(n=><option key={n} value={n} disabled={n>parentRule.toSlot}>{n}</option>)}</select></F>
+     <F name="Максимум пар в день"><select aria-label="Максимум пар группы" value={inheritedGroup.rule.maxPairsPerDay}
+      onChange={e=>applyScope({maxPairsPerDay:Number(e.target.value)})}>{Array.from({length:cfg.slotsPerDay},(_,i)=>i+1).map(n=><option key={n} value={n} disabled={n>parentRule.maxPairsPerDay}>{n} пар</option>)}</select></F>
     </div>
     <h4>Запретить отдельные пары</h4>
     <div className="year-forbidden">{DAYS.slice(0,cfg.days).map((d,day)=><div key={d}><span>{d}</span>
      {Array.from({length:cfg.slotsPerDay},(_,i)=>i+1).map(slot=>{
+      const inheritedBan=parentRule.forbidden.some(x=>x.day===day&&slot>=x.from&&slot<=x.to);
       const banned=(ruleTarget.forbidden||[]).some(x=>x.day===day&&slot>=x.from&&slot<=x.to);
-      return <button type="button" key={slot} className={banned?'off':''}
-       aria-label={'Ограничения '+d+' '+slot+' пара'} title={banned?'Запрещено':'Допустимо'}
+      return <button type="button" key={slot} className={banned||inheritedBan?'off':''}
+       disabled={inheritedBan}
+       aria-label={'Ограничения '+d+' '+slot+' пара'} title={inheritedBan?'Наследуется от вышестоящего уровня':banned?'Запрещено':'Допустимо'}
        onClick={()=>applyScope({forbidden:banned?(ruleTarget.forbidden||[]).filter(x=>!(x.day===day&&slot>=x.from&&slot<=x.to)):
         [...(ruleTarget.forbidden||[]),{day,from:slot,to:slot}]})}>{slot}</button>;
      })}</div>)}</div>
