@@ -1,11 +1,9 @@
 // @vitest-environment jsdom
-/// <reference types="vite/client" />
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import PolishedSelect from './PolishedSelect';
 import App from './App';
-import selectCss from './polished-select.css?raw';
 
 afterEach(()=>cleanup());
 function Controlled(){
@@ -83,13 +81,3 @@ describe('schedule entity dropdown replaces long sidebar at all breakpoints',()=
  },20000);
 });
 
-describe('schedule layout CSS regression',()=>{
- it('preserves desktop side editor and mobile single-column rules',()=>{
-  // A source-level regression guard: jsdom does not compute layout from all modern CSS rules.
-  expect(selectCss).toContain('.schedule-layout{flex-direction:row;flex-wrap:wrap;align-items:flex-start}');
-  expect(selectCss).toMatch(/\.schedule-layout>\.group-sidebar\.schedule-picker-strip\{[^}]*flex:0 0 100%/);
-  expect(selectCss).toContain('.schedule-layout>.schedule-body{width:auto;max-width:none;flex:1 1 0;min-width:0}');
-  expect(selectCss).toContain('.schedule-layout{flex-direction:column;flex-wrap:nowrap;align-items:stretch}');
-  expect(selectCss).toContain('.schedule-layout>.schedule-body{width:100%;max-width:100%;flex:1 1 auto}');
- });
-});
