@@ -4,7 +4,7 @@ import { deriveOffers, needsComputers, calendarIssues, lessonDate } from './plan
 import { assessRoomFit } from './roomPolicy';
 import { readCollegeWorkweek } from './productionCalendar';
 import { isTeachingDate } from './academicPlanning';
-import { checkGroupSlot, checkTeacherSlot, effectiveTeacherRule } from './scheduleConstraints';
+import { checkGroupSlot, checkTeacherSlot, effectiveGroupRules, effectiveTeacherRule } from './scheduleConstraints';
 import type { ScopeOverride } from './scheduleConstraints';
 
 export type TeacherPreference={
@@ -157,9 +157,19 @@ function hardReason(task:Task,state:WeekState,cfg:AnnualConfig,calendar:Calendar
  if(rule.fromSlot>rule.toSlot)return 'Недопустимый диапазон пар преподавателя';
  const group=GROUPS.find(g=>g.id===task.group);
  if(!group)return 'Группа отсутствует в Academic Core';
+ const groupAllowed=Array.from({length:cfg.days},(_,i)=>i).some(day=>
+  Array.from({length:cfg.slotsPerDay},(_,i)=>i+1).some(slot=>checkGroupSlot(cfg,group.id,day,slot).allowed));
+ if(!groupAllowed){
+  const scoped=effectiveGroupRules(cfg,group.id);
+  return 'Для группы '+group.id+' не осталось допустимых пар. Проверь ограничения: '+scoped.origin.join(' → ');
+ }
+ const teacherAllowed=Array.from({length:cfg.days},(_,i)=>i).some(day=>
+  Array.from({length:cfg.slotsPerDay},(_,i)=>i+1).some(slot=>checkTeacherSlot(cfg,task.teacher,day,slot).allowed));
+ if(!teacherAllowed)return 'Для преподавателя '+task.teacher+' не осталось разрешённых пар';
  if(needsComputers(task.subject)&&!roomCandidates.some(r=>suited(task.subject,r,group.count))
-   &&(!cfg.allowSubgroups.includes(group.id)||!cfg.assistedSubgroups.includes(group.id)))return 'Не хватает компьютеров: нужны разрешение на подгруппы и сопровождающий';
- return 'Нет свободного слота с учётом пожеланий, кабинетов, окон и времени на дорогу';
+   &&(!cfg.allowSubgroups.includes(group.id)||!cfg.assistedSubgroups.includes(group.id)))
+  return 'Не найден совместимый кабинет: проверь вместимость и возможность работы по 2–3 студента за ПК; подгруппы не обязательны';
+ return 'Нет свободного слота с учётом правил колледжа, преподавателя, кабинетов, окон и времени на дорогу';
 }
 function suitableRooms(task:Task,cfg:AnnualConfig,state:WeekState,day:number,slot:number){
  const group=GROUPS.find(g=>g.id===task.group)!;
