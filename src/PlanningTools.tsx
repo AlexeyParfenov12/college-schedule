@@ -59,7 +59,7 @@ export function CalendarStudio({events,lessons,group,setGroup,week,setWeek,add,r
   <PeriodTimeline calendar={events} lessons={lessons} group={group} activeWeek={week} onWeek={setWeek}/>
   <section className="vacation-summary" aria-label="Каникулы выбранной группы">
    <div className="vacation-summary-header">
-    <div><strong>Каникулы · {group}</strong><p>Отдельные периоды для каждой группы или всего колледжа. В эти дни занятия не планируются.</p></div>
+    <div><strong>Каникулы и межсеместровые перерывы · {group}</strong><p>Летний отдых и зимний межсеместровый перерыв по учебному графику группы. В эти дни обычные занятия не планируются.</p></div>
     <span>{existingVacations.length} периодов · {existingVacations.reduce((sum,e)=>sum+daysInVacation(e),0)} календарных дней</span>
    </div>
    <div className="vacation-summary-list">
@@ -70,7 +70,7 @@ export function CalendarStudio({events,lessons,group,setGroup,week,setWeek,add,r
    <div className="vacation-actions"><span>Добавить период:</span>
     {VACATION_LABELS.map(name=><button type="button" key={name} onClick={()=>prepareVacation(name)}>{name}</button>)}
    </div>
-   <p className="vacation-footnote">Каникулы не равны государственным праздникам. Их даты устанавливаются учебным графиком колледжа и могут различаться по группам. Здесь они вводятся для проверки в деморежиме.</p>
+   <p className="vacation-footnote">В отличие от школы, в колледже нет стандартных осенних и весенних каникул. Летние каникулы и зимний межсеместровый перерыв учитываются по утверждённому календарному учебному графику. Для СПО зимой предусмотрено не менее двух недель каникул (п. 26 приказа Минпросвещения № 762).</p>
   </section>
   <div className="plan-columns">
    <section className="plan-pane" id="calendar-event-form"><Heading step={2}>Добавь особый период</Heading>
