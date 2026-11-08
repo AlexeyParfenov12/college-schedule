@@ -3,6 +3,34 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import App from './App';
 import { NAV, buildSeed } from './data';
+import { NAV_SECTIONS, PREVIEW_SCREENS, menuContainsScreen } from './navigationModel';
+
+type ScreenKey=typeof NAV[number][0];
+function openScreen(key:ScreenKey){
+ const nav=within(document.querySelector('aside.nav nav')!);
+ if(key==='publication'){
+  fireEvent.click(within(document.querySelector('.head-actions')!).getByRole('button',{name:'Публикация'}));
+  return;
+ }
+ const group=NAV_SECTIONS.find(item=>item.key===key||item.children.some(([child])=>child===key));
+ if(group){
+  if(group.key===key)fireEvent.click(nav.getByRole('button',{name:group.label,exact:true}));
+  else{
+   const toggle=nav.queryByRole('button',{name:'Развернуть '+group.label});
+   if(toggle)fireEvent.click(toggle);
+   const child=group.children.find(([child])=>child===key)!;
+   fireEvent.click(nav.getByRole('button',{name:child[1],exact:true}));
+  }
+  return;
+ }
+ const preview=PREVIEW_SCREENS.find(([id])=>id===key);
+ if(preview){
+  const summary=nav.getByText('Предпросмотр ролей');
+  const detail=summary.closest('details');
+  if(detail&&!detail.open)fireEvent.click(summary);
+  fireEvent.click(nav.getByRole('button',{name:preview[1],exact:true}));
+ }
+}
 
 beforeEach(()=>{localStorage.clear()});
 afterEach(()=>cleanup());
@@ -22,20 +50,22 @@ describe('non-destructive academic-week migration',()=>{
  },20000);
 });
 describe('React interface smoke checks',()=>{
- it('renders the compact timetable and exposes all 18 main sections',()=>{
+ it('shows eight task sections while retaining links to every legacy screen',()=>{
   render(<App/>);
   expect(screen.getByRole('heading',{name:'Расписание'})).toBeTruthy();
   const nav=within(document.querySelector('aside.nav nav')!);
-  for(const [,label] of NAV){
-   expect(nav.getByRole('button',{name:label})).toBeTruthy();
-  }
+  expect(NAV_SECTIONS).toHaveLength(8);
+  for(const section of NAV_SECTIONS)expect(nav.getByRole('button',{name:section.label,exact:true})).toBeTruthy();
+  for(const [key] of NAV)expect(menuContainsScreen(key)).toBe(true);
+  expect(nav.getByRole('button',{name:'Шаблоны расписания'})).toBeTruthy();
+  expect(nav.getByRole('button',{name:'Развернуть Планирование'})).toBeTruthy();
+  expect(nav.queryByRole('button',{name:'Автосоставление на неделю'})).toBeNull();
   expect(document.querySelector('.timetable')).toBeTruthy();
  },15000);
  it('navigates all functional screens without rendering errors',()=>{
   render(<App/>);
-  const nav=within(document.querySelector('aside.nav nav')!);
   for(const [key,label] of NAV){
-   fireEvent.click(nav.getByRole('button',{name:label}));
+   openScreen(key);
    expect(document.querySelector('.workspace')?.textContent?.length).toBeGreaterThan(30);
    expect(screen.getByRole('heading',{name:label})).toBeTruthy();
    if(key==='streams') expect(screen.getByText('Конструктор потока')).toBeTruthy();
@@ -74,8 +104,7 @@ describe('React interface smoke checks',()=>{
  },20000);
  it('paginates long academic lists rather than growing an endless page',()=>{
   render(<App/>);
-  const nav=within(document.querySelector('aside.nav nav')!);
-  fireEvent.click(nav.getByRole('button',{name:'Академические данные'}));
+  openScreen('academic');
   expect(screen.getAllByLabelText('Строк на странице').length).toBeGreaterThan(0);
   const next=screen.getByRole('button',{name:'Следующая страница таблицы'});
   fireEvent.click(next);
@@ -88,6 +117,32 @@ describe('React interface smoke checks',()=>{
   fireEvent.click(lesson!);
   expect(screen.getByTestId('lesson-assistant')).toBeTruthy();
   expect(screen.getByRole('button',{name:'Удалить пару'})).toBeTruthy();
+ },20000);
+ it('right click offers explicit properties without entering edit mode',()=>{
+  render(<App/>);
+  const lesson=document.querySelector<HTMLButtonElement>('.lesson')!;
+  fireEvent.contextMenu(lesson,{clientX:148,clientY:194});
+  const menu=screen.getByRole('menu',{name:'Действия с занятием'});
+  expect(within(menu).getByRole('menuitem',{name:'Открыть свойства'})).toBeTruthy();
+  fireEvent.click(within(menu).getByRole('menuitem',{name:'Открыть свойства'}));
+  expect(screen.queryByRole('menu',{name:'Действия с занятием'})).toBeNull();
+  expect(screen.getByTestId('lesson-assistant')).toBeTruthy();
+  expect(screen.queryByTestId('smart-lesson-editor')).toBeNull();
+  fireEvent.contextMenu(lesson,{clientX:130,clientY:160});
+  fireEvent.click(screen.getByRole('menuitem',{name:'Изменить занятие'}));
+  expect(screen.getByTestId('smart-lesson-editor')).toBeTruthy();
+ },20000);
+ it('expands grouped menus, keeps real routes and hides previews by default',()=>{
+  render(<App/>);
+  const nav=within(document.querySelector('aside.nav nav')!);
+  expect(nav.queryByRole('button',{name:'Предпросмотр преподавателя'})).toBeNull();
+  fireEvent.click(nav.getByRole('button',{name:'Развернуть Справочники'}));
+  fireEvent.click(nav.getByRole('button',{name:'Группы и подгруппы'}));
+  expect(screen.getByRole('heading',{name:'Группы и подгруппы'})).toBeTruthy();
+  expect(nav.getByRole('button',{name:'Свернуть Справочники'})).toBeTruthy();
+  fireEvent.click(nav.getByText('Предпросмотр ролей'));
+  fireEvent.click(nav.getByRole('button',{name:'Предпросмотр преподавателя'}));
+  expect(screen.getByRole('heading',{name:'Преподаватель'})).toBeTruthy();
  },20000);
  it('right click opens edit, delete and inter-week move actions',()=>{
   render(<App/>);
@@ -190,7 +245,7 @@ describe('React interface smoke checks',()=>{
 
  it('navigates from a workflow to the exact shared lesson and highlights it by stable ID',()=>{
   render(<App/>);
-  fireEvent.click(within(document.querySelector('aside.nav nav')!).getByRole('button',{name:'Потоки'}));
+  openScreen('streams');
   const link=screen.getAllByRole('button',{name:'Изменить'})[0];
   expect(link).toBeTruthy();
   fireEvent.click(link);
