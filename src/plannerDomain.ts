@@ -65,7 +65,7 @@ export function calendarIssues(lesson:Lesson,calendar:CalendarEvent[],workweek:W
  const custom=calendar.filter(e=>e.from<=date&&date<=e.to&&(e.groups.length===0||lesson.groups.some(g=>e.groups.includes(g))))
   .filter(e=>e.kind==='holiday'||e.kind==='vacation'||(e.kind==='practice'&&!lesson.practiceBlockId))
   .map(e=>'Учебный календарь: '+e.title+' ('+date+')');
- const activity=calendar.length?lesson.groups.flatMap(group=>{
+ const activity=calendar.some(e=>e.kind==='study'||Boolean(e.periodCode))?lesson.groups.flatMap(group=>{
   const phase=phaseAt(calendar,group,date);
   if(phase==='unassigned')return ['График '+group+': учебный период не назначен ('+date+')'];
   if(['exam','state'].includes(phase)&&!/экзамен|зач[её]т|аттестац|консультац/i.test(lesson.subject))
