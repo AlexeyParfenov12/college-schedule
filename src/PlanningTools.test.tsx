@@ -8,14 +8,19 @@ afterEach(()=>cleanup());
 const navigation=(name:string)=>{fireEvent.click(within(document.querySelector('aside.nav nav')!).getByRole('button',{name}))};
 
 describe('visual guided planning workflows',()=>{
- it('shows the semester timeline and a preview of calendar impact',()=>{
+ it('shows one KUG editor with official holidays embedded instead of the old production-calendar block',()=>{
   render(<App/>);
   navigation('Учебный календарь');
-  fireEvent.click(screen.getByText('Расширенный редактор и производственный календарь'));
   expect(screen.getByTestId('calendar-studio')).toBeTruthy();
-  expect(screen.getByTestId('academic-timeline')).toBeTruthy();
-  expect(screen.getByText(/Учебный календарь — когда колледж учится/)).toBeTruthy();
-  expect(screen.getByText(/В этот период уже поставлено/)).toBeTruthy();
+  expect(screen.getByTestId('calendar-matrix')).toBeTruthy();
+  expect(screen.queryByText('Расширенный редактор и производственный календарь')).toBeNull();
+  expect(screen.getByText('Перенос выходного')).toBeTruthy();
+  const week=document.querySelector<HTMLButtonElement>('[aria-label^="П-21, неделя 10:"]');
+  expect(week).toBeTruthy();
+  fireEvent.click(week!);
+  const detail=screen.getByRole('region',{name:'Дни выбранной недели'});
+  expect(within(detail).getByText('День народного единства')).toBeTruthy();
+  expect(within(detail).getByText('Государственный праздник')).toBeTruthy();
  },20000);
  it('shows a saved template cycle and a before/after grid',()=>{
   render(<App/>);
@@ -74,46 +79,35 @@ describe('visual guided planning workflows',()=>{
   expect(screen.getByRole('combobox',{name:'Группа занятия'})).toBeTruthy();
   expect(screen.getByRole('combobox',{name:'Дисциплина занятия'})).toBeTruthy();
  },20000);
- it('can assign one academic period to several selected groups without creating duplicate calendars',()=>{
+ it('assigns a period to two groups directly from the weekly matrix',()=>{
   render(<App/>);
   navigation('Учебный календарь');
-  fireEvent.click(screen.getByText('Расширенный редактор и производственный календарь'));
-  expect(screen.getByRole('combobox',{name:'Просмотр календаря группы'})).toBeTruthy();
-  fireEvent.change(screen.getByRole('combobox',{name:'Тип периода'}),{target:{value:'study'}});
-  fireEvent.change(screen.getByRole('combobox',{name:'На кого действует'}),{target:{value:'custom'}});
-  const groupLabels=[...document.querySelectorAll<HTMLLabelElement>('.plan-calendar-group-list label')];
-  const second=groupLabels.find(x=>x.textContent?.includes('П-22'));
-  expect(second).toBeTruthy();
-  fireEvent.click(second!.querySelector('input')!);
-  expect(screen.getByText('Выбрано групп: 2')).toBeTruthy();
-  fireEvent.click(screen.getByRole('button',{name:'Сохранить учебный период'}));
-  expect(screen.getByText(/П-21, П-22/)).toBeTruthy();
+  const week=document.querySelector<HTMLButtonElement>('[aria-label^="П-21, неделя 1:"]');
+  expect(week).toBeTruthy();
+  fireEvent.click(week!);
+  fireEvent.click(screen.getByRole('checkbox',{name:'Выбрать группу П-22'}));
+  const end=document.querySelector<HTMLButtonElement>('[aria-label^="П-21, неделя 3:"]');
+  fireEvent.click(end!,{shiftKey:true});
+  expect(screen.getByText(/Выбрано групп: 2/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button',{name:'Рассчитать изменения'}));
+  expect(screen.getByText(/для 2 групп/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button',{name:'Подтвердить и сохранить'}));
+  expect(screen.getByText(/Сохранено: 2 групп/)).toBeTruthy();
  },20000);
-
- it('adds college vacations with explicit dates for a selected department, without inventing official periods',()=>{
+ it('can assign vacation to all visible department groups with exact dates',()=>{
   render(<App/>);
   navigation('Учебный календарь');
-  fireEvent.click(screen.getByText('Расширенный редактор и производственный календарь'));
-  expect(screen.getByRole('region',{name:'Каникулы выбранной группы'}).textContent).toContain('Зимний межсеместровый перерыв');
-  expect(screen.queryByRole('button',{name:'Осенние каникулы'})).toBeNull();
-  expect(screen.queryByRole('button',{name:'Весенние каникулы'})).toBeNull();
-  expect(screen.queryByRole('button',{name:'Зимние каникулы'})).toBeNull();
-  fireEvent.click(screen.getByRole('button',{name:'Летние каникулы'}));
-  expect(screen.getByText(/система не подставляет вымышленные сроки/)).toBeTruthy();
-  const submit=screen.getByRole('button',{name:'Сохранить учебный период'}) as HTMLButtonElement;
-  expect(submit.disabled).toBe(true);
-  fireEvent.change(screen.getByLabelText('С даты'),{target:{value:'2027-07-05'}});
-  fireEvent.change(screen.getByLabelText('По дату'),{target:{value:'2027-07-18'}});
-  fireEvent.change(screen.getByRole('combobox',{name:'На кого действует'}),{target:{value:'department:ИТ'}});
-  expect(submit.disabled).toBe(false);
-  fireEvent.click(submit);
-  expect(document.querySelector('.plan-period-list')!.textContent).toContain('Летние каникулы');
-  expect(document.querySelector('.plan-period-list')!.textContent).toContain('П-11');
-  expect(document.querySelector('.vacation-summary')!.textContent).toContain('Летние каникулы');
-  expect(screen.getByText(/уже назначены каникулы для пересекающихся групп/)).toBeTruthy();
-  expect(submit.disabled).toBe(true);
-  fireEvent.change(screen.getByRole('combobox',{name:'Просмотр календаря группы'}),{target:{value:'Р-21'}});
-  expect(document.querySelector('.vacation-summary-list')!.textContent).not.toContain('Летние каникулы');
+  fireEvent.change(screen.getByRole('combobox',{name:'Отделение КУГ'}),{target:{value:'ИТ'}});
+  fireEvent.click(screen.getByRole('button',{name:/Выбрать все видимые/}));
+  const first=document.querySelector<HTMLButtonElement>('[aria-label^="П-21, неделя 1:"]');
+  fireEvent.click(first!);
+  fireEvent.change(screen.getByLabelText('Вид периода КУГ'),{target:{value:'vacation'}});
+  fireEvent.change(screen.getByLabelText('Точная дата начала периода'),{target:{value:'2027-07-05'}});
+  fireEvent.change(screen.getByLabelText('Точная дата окончания периода'),{target:{value:'2027-07-18'}});
+  fireEvent.click(screen.getByRole('button',{name:'Рассчитать изменения'}));
+  expect(screen.getByText(/2027-07-05 — 2027-07-18/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button',{name:'Подтвердить и сохранить'}));
+  expect(screen.getByText(/Сохранено: 12 групп/)).toBeTruthy();
  },20000);
 
 });

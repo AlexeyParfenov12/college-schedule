@@ -59,3 +59,16 @@ describe('KUG exact dates and bulk selection',()=>{
   expect(screen.getByText('Выбрано групп: 0')).toBeTruthy();
  });
 });
+
+describe('integrated KUG production calendar display',()=>{
+ it('shows seven day markers in a selected week with explicit holiday details',()=>{
+  const {container}=render(<CalendarMatrix events={CALENDAR} lessons={[]} group="П-21" setGroup={()=>{}} replace={()=>{}}/>);
+  const button=container.querySelector<HTMLButtonElement>('[aria-label^="П-21, неделя 10:"]');
+  expect(button).not.toBeNull();
+  expect(button!.querySelectorAll('.kug-day-dot')).toHaveLength(7);
+  fireEvent.click(button!);
+  const detail=screen.getByRole('region',{name:'Дни выбранной недели'});
+  expect(detail.textContent).toContain('День народного единства');
+  expect(detail.querySelectorAll('.kug-detail-day')).toHaveLength(7);
+ });
+});

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CALENDAR } from './data';
 import type { CalendarEvent } from './data';
-import { assignPeriod, calendarChangeImpact, calendarWeeks, checkCalendar, copyGroupCalendar, importMatrixCSV, matrixCSV, parseCalendarBackup, phaseAt, weekCell } from './calendarMatrixDomain';
+import { assignPeriod, calendarChangeImpact, calendarWeeks, checkCalendar, copyGroupCalendar, importMatrixCSV, kugWeekDays, matrixCSV, parseCalendarBackup, phaseAt, weekCell } from './calendarMatrixDomain';
 
 describe('college academic calendar matrix domain',()=>{
  it('covers the full academic year including partial boundary weeks',()=>{
@@ -130,5 +130,36 @@ describe('backup restoration safety',()=>{
   const a={...CALENDAR[0],groups:['НЕСУЩЕСТВУЮЩАЯ']};
   expect(()=>parseCalendarBackup(JSON.stringify({academicYear:2026,periods:[a]}),2026,allowed)).toThrow(/Неизвестная группа/);
   expect(()=>parseCalendarBackup(JSON.stringify({academicYear:2026,periods:[CALENDAR[0],CALENDAR[0]]}),2026,allowed)).toThrow(/идентификатор/);
+ });
+});
+
+describe('day-level federal calendar embedded in the academic KUG',()=>{
+ it('marks the federal holiday without changing the academic period',()=>{
+  const week=calendarWeeks(2026).find(w=>w.start<='2026-11-04'&&w.end>='2026-11-04')!;
+  const days=kugWeekDays(CALENDAR,'П-21',week,undefined,6);
+  const day=days.find(d=>d.date==='2026-11-04')!;
+  expect(day.kind).toBe('holiday');
+  expect(day.label).toContain('День народного единства');
+  expect(day.nonWorking).toBe(true);
+  expect(day.phase).toBe('study');
+  expect(day.canScheduleTheory).toBe(false);
+ });
+ it('respects a six-day workweek, five-day Saturday off and approved transfers',()=>{
+  const week=calendarWeeks(2026).find(w=>w.start<='2026-11-14'&&w.end>='2026-11-14')!;
+  const six=kugWeekDays(CALENDAR,'П-21',week,undefined,6);
+  const five=kugWeekDays(CALENDAR,'П-21',week,undefined,5);
+  expect(six.find(d=>d.date==='2026-11-14')?.nonWorking).toBe(false);
+  expect(five.find(d=>d.date==='2026-11-14')?.kind).toBe('weekend');
+  const feb=calendarWeeks(2026).find(w=>w.start<='2027-02-22'&&w.end>='2027-02-22')!;
+  expect(kugWeekDays(CALENDAR,'П-21',feb,undefined,5).find(d=>d.date==='2027-02-22')?.kind).toBe('transfer');
+ });
+ it('includes additional college closures but does not change period data',()=>{
+  const week=calendarWeeks(2026).find(w=>w.start<='2026-11-10'&&w.end>='2026-11-10')!;
+  const extra={id:'college-day',title:'День колледжа',kind:'holiday' as const,from:'2026-11-10',to:'2026-11-10',groups:['П-21']};
+  const day=kugWeekDays([...CALENDAR,extra],'П-21',week,undefined,6).find(d=>d.date==='2026-11-10')!;
+  expect(day.kind).toBe('college');
+  expect(day.nonWorking).toBe(true);
+  expect(day.phase).toBe('study');
+  expect(kugWeekDays([...CALENDAR,extra],'П-22',week,undefined,6).find(d=>d.date==='2026-11-10')?.nonWorking).toBe(false);
  });
 });
