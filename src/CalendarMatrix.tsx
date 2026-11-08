@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Check, ChevronDown, ChevronRight, ClipboardCopy, Download, RotateCcw, Search, Table2, Users } from 'lucide-react';
 import { GROUPS } from './data';
 import type { CalendarEvent, Lesson } from './data';
-import { assignPeriod, calendarChangeImpact, CALENDAR_PHASES, calendarWeeks, checkCalendar, copyGroupCalendar, importMatrixCSV, kugWeekDays, matrixCSV, parseCalendarBackup, phaseInfo, weekCell } from './calendarMatrixDomain';
+import { assignPeriod, calendarChangeImpact, CALENDAR_PHASES, calendarWeeks, checkCalendar, copyGroupCalendar, importMatrixCSV, kugWeekDays, matrixCSV, matrixTemplateCSV, parseCalendarBackup, phaseInfo, weekCell } from './calendarMatrixDomain';
 import type { MatrixImport } from './calendarMatrixDomain';
 import type { CalendarPhase, Week } from './calendarMatrixDomain';
 import { classifyCalendarDay, readCollegeWorkweek, productionDiffersFromBaseline } from './productionCalendar';
@@ -157,6 +157,8 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
   setPrevious(events);replace(projected);setPreview(false);setShowCheck(false);
   setMessage('Сохранено: '+selectedGroups.length+' групп · '+from+' — '+to+'. Можно отменить.');
  };
+ const handleTemplate=()=>csvDownload('KUG-шаблон-'+year+'-'+(year+1)+'.csv',
+  matrixTemplateCSV(GROUPS.map(g=>g.id),weeks),'text/csv;charset=utf-8');
  const handleExport=()=>csvDownload('KUG-'+year+'-'+(year+1)+'.csv',
   matrixCSV(events,groups.map(g=>g.id),weeks),'text/csv;charset=utf-8');
  const handleJSON=()=>csvDownload('KUG-'+year+'-'+(year+1)+'.json',
@@ -280,10 +282,27 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
     <h2>Календарный учебный график</h2>
     <p>Сначала периоды групп — затем расписание занятий. Выдели недели и назначь вид учебной деятельности.</p>
    </div>
-   <details className="kug-tools"><summary>Импорт, экспорт и печать</summary><div className="kug-actions">
-    <button onClick={handleExport}><Download size={15}/> CSV для Excel</button>
+   <details className="kug-tools"><summary>Шаблон таблицы, импорт и экспорт</summary>
+    <div className="kug-template-guide">
+     <strong>Заполнение учебного календаря через Excel</strong>
+     <ol>
+      <li>Скачай пустой шаблон CSV с группами и датами всех недель выбранного учебного года.</li>
+      <li>Открой его в Excel. В нужных неделях впиши код периода, сохрани файл в формате <b>CSV UTF-8 с разделителем «;»</b>.</li>
+      <li>Загрузи файл обратно. Проверь число изменяемых ячеек и подтверди импорт.</li>
+     </ol>
+     <p><b>Пустая ячейка</b> — оставить существующий график без изменения.
+      Код <b>—</b> — намеренно очистить выбранную неделю.
+      Для дней с разными периодами используй семь кодов, разделённых знаком <b>|</b> (с понедельника по воскресенье).</p>
+     <div className="kug-template-codes" aria-label="Допустимые коды периодов">
+      {CALENDAR_PHASES.map(p=><span key={p.id}><b>{p.short}</b> — {p.name}</span>)}
+     </div>
+     <p>Не меняй заголовки с датами и названия групп. В шаблоне можно удалить строки групп, которые не требуется импортировать. Праздники и выходные учитываются системой отдельно.</p>
+    </div>
+    <div className="kug-actions">
+    <button type="button" className="kug-primary" onClick={handleTemplate}><Download size={15}/> Скачать пустой шаблон CSV</button>
+    <button onClick={handleExport}><Download size={15}/> Скачать текущий график CSV</button>
     <button onClick={handleJSON}><Download size={15}/> Резервная копия JSON</button>
-    <label className="kug-import-label"><span>Импорт CSV</span><input type="file" accept=".csv,text/csv" aria-label="Загрузить график из CSV" onChange={e=>{void readCSV(e.target.files?.[0]);e.target.value=''}}/></label>
+    <label className="kug-import-label"><span>Загрузить заполненный CSV</span><input type="file" accept=".csv,text/csv" aria-label="Загрузить график из CSV" onChange={e=>{void readCSV(e.target.files?.[0]);e.target.value=''}}/></label>
     <label className="kug-import-label"><span>Восстановить JSON</span><input type="file" accept=".json,application/json" aria-label="Восстановить календарь из JSON" onChange={e=>{void readBackup(e.target.files?.[0]);e.target.value=''}}/></label>
     <button onClick={()=>window.print()}>Печать</button>
    </div></details>
@@ -299,8 +318,8 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
   </div>}
   {importPending&&<div className="kug-preview" role="status">
    <strong>Предпросмотр импорта</strong>
-   <p>{importPending.groups} групп, {importPending.cells} недельных ячеек, {importPending.ranges} периодов. Существующие периоды указанных групп на этот учебный год будут заменены; данные остальных групп и других учебных лет сохранятся.</p>
-   <p>Данные из файла не утверждаются автоматически. После импорта требуется проверить затронутые занятия.</p>
+   <p>Будут изменены <b>{importPending.cells} недельных ячеек</b> в <b>{importPending.groups} группах</b> ({importPending.ranges} непрерывных периодов).</p>
+   <p><b>Пустые ячейки не изменяют существующий график.</b> Другие группы, неуказанные недели и учебные годы сохраняются. Проверь связанные занятия перед подтверждением.</p>
    <button className="kug-primary" onClick={confirmImport}><Check size={15}/> Применить импорт</button>
    <button onClick={()=>setImportPending(null)}>Отмена</button>
   </div>}
