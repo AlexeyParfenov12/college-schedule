@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Check, ClipboardCopy, Download, RotateCcw, Search, Table2, Users } from 'lucide-react';
 import { GROUPS } from './data';
 import type { CalendarEvent, Lesson } from './data';
-import { affectedLessons, assignPeriod, CALENDAR_PHASES, calendarWeeks, checkCalendar, matrixCSV, phaseInfo, weekCell } from './calendarMatrixDomain';
+import { affectedLessons, assignPeriod, CALENDAR_PHASES, calendarWeeks, checkCalendar, copyGroupCalendar, importMatrixCSV, matrixCSV, phaseInfo, weekCell } from './calendarMatrixDomain';
+import type { MatrixImport } from './calendarMatrixDomain';
 import type { CalendarPhase, Week } from './calendarMatrixDomain';
 import './calendar-matrix.css';
 
@@ -39,6 +40,11 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
  const [showCheck,setShowCheck]=useState(false);
  const [previous,setPrevious]=useState<CalendarEvent[]|null>(null);
  const [message,setMessage]=useState('');
+ const [importPending,setImportPending]=useState<MatrixImport|null>(null);
+ const [importError,setImportError]=useState('');
+ const [copyTarget,setCopyTarget]=useState('П-22');
+ const [copyOverwrite,setCopyOverwrite]=useState(false);
+ const [copyPending,setCopyPending]=useState<CalendarEvent[]|null>(null);
  const dragging=useRef(false);
  const weeks=useMemo(()=>calendarWeeks(year),[year]);
  const groups=useMemo(()=>GROUPS.filter(g=>
@@ -83,6 +89,33 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
   matrixCSV(events,groups.map(g=>g.id),weeks),'text/csv;charset=utf-8');
  const handleJSON=()=>csvDownload('KUG-'+year+'-'+(year+1)+'.json',
   JSON.stringify({academicYear:year,periods:events},null,2),'application/json;charset=utf-8');
+ const readCSV=async(file?:File)=>{
+  if(!file)return;
+  setImportError('');setImportPending(null);
+  if(file.size>2_000_000){setImportError('CSV превышает 2 МБ. Проверь размер файла.');return}
+  try{
+   const parsed=importMatrixCSV(await file.text(),events,year,GROUPS.map(g=>g.id));
+   setImportPending(parsed);
+  }catch(error){setImportError(error instanceof Error?error.message:'Не удалось проверить CSV')}
+ };
+ const confirmImport=()=>{
+  if(!importPending)return;
+  setPrevious(events);replace(importPending.next);
+  setMessage('Импортировано '+importPending.groups+' групп и '+importPending.ranges+' интервалов. Расписание требует повторной проверки.');
+  setImportPending(null);setPreview(false);setShowCheck(false);
+ };
+ const prepareCopy=()=>{
+  try{
+   const result=copyGroupCalendar(events,group,copyTarget,year,copyOverwrite);
+   if(result===events||JSON.stringify(result)===JSON.stringify(events)){setMessage('Нет доступных пустых периодов для копирования. При необходимости разреши замену текущего графика.');return}
+   setCopyPending(result);setMessage('');
+  }catch(error){setMessage(error instanceof Error?error.message:'Не удалось сформировать копию')}
+ };
+ const confirmCopy=()=>{
+  if(!copyPending)return;
+  setPrevious(events);replace(copyPending);setCopyPending(null);
+  setMessage('График группы '+group+' скопирован в '+copyTarget+'. Проверь связанные занятия.');
+ };
  const groupWeeks=weeks.map(w=>({week:w,cell:weekCell(events,group,w)}));
  return <section className="kug" data-testid="calendar-matrix">
   <header className="kug-top">
@@ -93,6 +126,7 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    <div className="kug-actions">
     <button onClick={handleExport}><Download size={15}/> CSV для Excel</button>
     <button onClick={handleJSON}><Download size={15}/> Резервная копия JSON</button>
+    <label className="kug-import-label"><span>Импорт CSV</span><input type="file" accept=".csv,text/csv" aria-label="Загрузить график из CSV" onChange={e=>{void readCSV(e.target.files?.[0]);e.target.value=''}}/></label>
     <button onClick={()=>window.print()}>Печать</button>
    </div>
   </header>
@@ -109,6 +143,14 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
     <button className={mode==='single'?'active':''} aria-pressed={mode==='single'} onClick={()=>setMode('single')}><Users size={15}/> Одна группа</button>
    </div>
   </div>
+  {importError&&<p className="kug-alert" role="alert">{importError}</p>}
+  {importPending&&<div className="kug-preview" role="status">
+   <strong>Предпросмотр импорта</strong>
+   <p>{importPending.groups} групп, {importPending.cells} недельных ячеек, {importPending.ranges} периодов. Существующие периоды указанных групп на этот учебный год будут заменены; данные остальных групп и других учебных лет сохранятся.</p>
+   <p>Данные из файла не утверждаются автоматически. После импорта требуется проверить затронутые занятия.</p>
+   <button className="kug-primary" onClick={confirmImport}><Check size={15}/> Применить импорт</button>
+   <button onClick={()=>setImportPending(null)}>Отмена</button>
+  </div>}
   {year!==2026&&<p className="kug-note">Выбран другой учебный год для просмотра и разметки. Расписание демонстрационного стенда пока привязано к датам с 9 ноября 2026 года; перенос дат его занятий на новый год не выполняется.</p>}
   <div className="kug-legend" aria-label="Обозначения периодов">
    {CALENDAR_PHASES.filter(x=>x.id!=='unassigned').map(p=><span key={p.id}><i className={'kug-fill kug-'+p.color}/><b>{p.short}</b> {p.name}</span>)}
@@ -185,6 +227,22 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
     <button onClick={()=>setPreview(false)}>Отмена</button>
    </div>}
    {message&&<p className="kug-note" role="status">{message}</p>}
+  </div>
+  <div className="kug-copy-panel">
+   <strong>Копирование графика группы</strong>
+   <div className="kug-copy-controls">
+    <label>Из группы <b>{group}</b></label>
+    <label>В группу <select aria-label="Получатель копии КУГ" value={copyTarget} onChange={e=>{setCopyTarget(e.target.value);setCopyPending(null)}}>
+     {GROUPS.filter(g=>g.id!==group).map(g=><option key={g.id} value={g.id}>{g.id}</option>)}</select></label>
+    <label className="kug-copy-overwrite"><input type="checkbox" checked={copyOverwrite}
+     onChange={e=>{setCopyOverwrite(e.target.checked);setCopyPending(null)}}/> Заменить заполненные периоды получателя</label>
+    <button type="button" onClick={prepareCopy}><ClipboardCopy size={15}/> Предпросмотр копирования</button>
+   </div>
+   {copyPending&&<div className="kug-preview" role="status">
+    <p>Скопировать график {group} в {copyTarget}. {copyOverwrite?'Заполненные периоды получателя будут перезаписаны.':'Уже заполненные периоды получателя сохранятся.'}</p>
+    <button className="kug-primary" onClick={confirmCopy}><Check size={15}/> Подтвердить копирование</button>
+    <button onClick={()=>setCopyPending(null)}>Отмена</button>
+   </div>}
   </div>
   {showCheck&&<div className="kug-check" role="region" aria-label="Проверка календарного графика">
    <h3>Проверка заполнения · {findings.filter(f=>f.level==='error').length} незаполненных, {findings.filter(f=>f.level==='warning').length} смешанных недель</h3>
