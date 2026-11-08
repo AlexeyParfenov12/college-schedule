@@ -38,6 +38,8 @@ describe('KUG exact dates and bulk selection',()=>{
  it('can edit a partial week without changing neighbouring dates',()=>{
   const replace=vi.fn<(events:CalendarEvent[])=>void>();
   const {container}=render(<CalendarMatrix events={CALENDAR} lessons={[]} group="П-21" setGroup={()=>{}} replace={replace}/>);
+  // Filter to the target row before editing, just as a dispatcher would for a single-group correction.
+  fireEvent.change(screen.getByLabelText('Поиск группы КУГ'),{target:{value:'П-21'}});
   fireEvent.click(container.querySelector<HTMLButtonElement>('[aria-label^="П-21, неделя 1:"]')!);
   fireEvent.change(screen.getByLabelText('Точная дата начала периода'),{target:{value:'2026-09-02'}});
   fireEvent.change(screen.getByLabelText('Точная дата окончания периода'),{target:{value:'2026-09-03'}});
