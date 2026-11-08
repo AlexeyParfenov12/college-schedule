@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import { refreshRoomCatalog } from './roomRegistry';
+import { refreshProductionCalendar } from './productionCalendarSync';
 import { migrateDemoAcademicCalendar, migrateDemoWinterBreakLabel } from './academicPlanning';
 import './styles.css';
 import './studio.css';
@@ -16,3 +17,5 @@ refreshRoomCatalog();
 migrateDemoAcademicCalendar();
 migrateDemoWinterBreakLabel();
 createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);
+// Check the latest published snapshot without blocking initial rendering.
+void refreshProductionCalendar();
