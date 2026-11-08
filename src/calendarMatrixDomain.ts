@@ -71,20 +71,29 @@ export type WeekCell={phase:CalendarPhase;mixed:boolean;holidays:number;parts:Ca
 /** Never paint an unassigned week as theoretical training. */
 export function weekCell(events:CalendarEvent[],group:string,week:Week,closedDays?:ReadonlyMap<string,boolean>):WeekCell{
  const phases:CalendarPhase[]=[],seen=new Set<CalendarPhase>();
+ const closedPhases:CalendarPhase[]=[],closedSeen=new Set<CalendarPhase>();
  let holidays=0,unassignedDays=0;
  const workweek=readCollegeWorkweek();
  for(let date=week.start;date<=week.end;date=plusDays(date,1)){
-  if((closedDays?.get(date)??classifyCalendarDay(date,workweek).nonWorking)){
-   holidays++;continue;
-  }
-  if(events.some(e=>e.kind==='holiday'&&e.from<=date&&e.to>=date&&
-   (e.groups.length===0||e.groups.includes(group)))){holidays++;continue}
   const phase=phaseAt(events,group,date);
+  const nonWorking=(closedDays?.get(date)??classifyCalendarDay(date,workweek).nonWorking)||
+   events.some(e=>e.kind==='holiday'&&e.from<=date&&e.to>=date&&
+    (e.groups.length===0||e.groups.includes(group)));
+  if(nonWorking){
+   holidays++;
+   // Keep the academic period visible if every date of this week is closed.
+   // Federal holidays still remain an overlay, not a separate academic phase.
+   if(phase!=='unassigned'&&!closedSeen.has(phase)){
+    closedSeen.add(phase);closedPhases.push(phase);
+   }
+   continue;
+  }
   if(phase==='unassigned')unassignedDays++;
   if(!seen.has(phase)){seen.add(phase);phases.push(phase)}
  }
- return {phase:phases.length===1?phases[0]:phases.length===0?'unassigned':phases[0],
-  mixed:phases.length>1,holidays,parts:phases,unassignedDays};
+ const effective=phases.length?phases:closedPhases;
+ return {phase:effective.length?effective[0]:'unassigned',
+  mixed:effective.length>1,holidays,parts:effective,unassignedDays};
 }
 const relevant=(e:CalendarEvent,groups:string[],from:string,to:string)=>
  e.from<=to&&e.to>=from&&e.groups.some(g=>groups.includes(g));

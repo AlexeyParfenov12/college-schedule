@@ -12,6 +12,16 @@ describe('college academic calendar matrix domain',()=>{
   expect(w[0].from).toBe('2026-08-31');
   expect(w[0].end).toBe('2026-09-06');
  });
+ it('keeps winter vacation visible when an entire January week is a public holiday',()=>{
+  const w=calendarWeeks(2026).find(x=>x.start==='2027-01-04')!;
+  const forcedClosed=new Map<string,boolean>();
+  for(let d=4;d<=10;d++)forcedClosed.set('2027-01-'+String(d).padStart(2,'0'),true);
+  const cell=weekCell(CALENDAR,'П-11',w,forcedClosed);
+  expect(cell.phase).toBe('vacation');
+  expect(cell.mixed).toBe(false);
+  expect(cell.holidays).toBe(7);
+  expect(cell.unassignedDays).toBe(0);
+ });
  it('does not mistake an unassigned week for theory',()=>{
   const w=calendarWeeks(2026).find(x=>x.start<='2027-07-05'&&x.end>='2027-07-05')!;
   expect(weekCell(CALENDAR,'П-21',w).phase).toBe('unassigned');
