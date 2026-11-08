@@ -37,10 +37,10 @@ export type AnnualVariant={id:string;name:string;lessons:Lesson[];unplaced:Unpla
  totalPairs:number;placedPairs:number;coveredHours:number;requiredHours:number;
  groupWindows:number;teacherWindows:number;onlinePercent:number;score:number;streamCount:number;subgroupCount:number;
  practicePairs:number;practiceIssues:PracticeAudit[];practiceBlocks:PracticeBlock[]};
-export const ANNUAL_WEEK_LIMIT=40;
+export const ANNUAL_WEEK_LIMIT=53;
 export function defaultAnnualConfig():AnnualConfig{
  return {
-  weeks:40,days:readCollegeWorkweek(),slotsPerDay:6,commuteGap:1,
+  weeks:ANNUAL_WEEK_LIMIT,days:readCollegeWorkweek(),slotsPerDay:6,commuteGap:1,
   defaultOnlinePct:20,groupGapWeight:90,teacherGapWeight:65,
   activeRooms:ROOMS.filter(r=>r.active).map(r=>r.id),allowStreams:[],
   allowSubgroups:[],assistedSubgroups:[],teacherPreferences:{},collegeRules:{},departmentRules:{},groupRules:{},practiceBlocks:[]
