@@ -130,3 +130,74 @@ export function matrixCSV(events:CalendarEvent[],groups:string[],weeks:Week[]):s
   const s=weekCell(events,g,w);return s.mixed?s.parts.map(p=>phaseInfo(p).short).join('/'):phaseInfo(s.phase).short;
  })])].map(row=>row.map(quote).join(';')).join('\r\n');
 }
+
+/** CSV produced by matrixCSV: strict year/header/group checks, no guessed mixed-day allocation. */
+function parseSemicolonCSV(source:string):string[][]{
+ const rows:string[][]=[],line:string[]=[];
+ let item='',inside=false;
+ const s=source.replace(/^\uFEFF/,'');
+ for(let i=0;i<s.length;i++){
+  const c=s[i];
+  if(c==='"'){
+   if(inside&&s[i+1]==='"'){item+='"';i++}else inside=!inside;
+  }else if(c===';'&&!inside){line.push(item);item=''}
+  else if((c==='\r'||c==='\n')&&!inside){
+   if(c==='\r'&&s[i+1]==='\n')i++;
+   line.push(item);item='';
+   if(line.some(x=>x.trim()))rows.push([...line]);
+   line.length=0;
+  }else item+=c;
+ }
+ if(inside)throw new Error('Незакрытая кавычка в файле CSV');
+ line.push(item);
+ if(line.some(x=>x.trim()))rows.push(line);
+ return rows;
+}
+export type MatrixImport={next:CalendarEvent[];groups:number;ranges:number;cells:number};
+export function importMatrixCSV(source:string,events:CalendarEvent[],year:number,allowedGroups:string[]):MatrixImport{
+ const weeks=calendarWeeks(year);
+ const lines=parseSemicolonCSV(source);
+ if(!lines.length)throw new Error('Файл CSV пуст');
+ const expected=['Группа',...weeks.map(w=>'Неделя '+(w.index+1)+' ('+w.start+'—'+w.end+')')];
+ if(lines[0].length!==expected.length||lines[0].some((value,i)=>value!==expected[i])){
+  throw new Error('Заголовок недель или учебный год не соответствует выбранному графику. Нужен CSV, экспортированный из этого раздела.');
+ }
+ const byCode=new Map(CALENDAR_PHASES.map(x=>[x.short,x.id]));
+ const groups=new Set<string>(),edits:{group:string;phase:CalendarPhase;start:string;end:string}[]=[];
+ for(const row of lines.slice(1)){
+  const group=row[0]?.trim();
+  if(!allowedGroups.includes(group))throw new Error('Неизвестная группа в файле: '+group);
+  if(groups.has(group))throw new Error('Повторяется группа: '+group);
+  if(row.length!==expected.length)throw new Error('Неверное число недель у группы '+group);
+  groups.add(group);
+  let current:typeof edits[number]|undefined;
+  for(let i=0;i<weeks.length;i++){
+   const value=row[i+1].trim();
+   const phase=byCode.get(value);
+   if(!phase)throw new Error('Неизвестный или смешанный код «'+value+'» у '+group+', неделя '+(i+1)+'. Такие недели нужно уточнить вручную по датам.');
+   if(current&&current.phase===phase&&plusDays(current.end,1)===weeks[i].start)current.end=weeks[i].end;
+   else {current={group,phase,start:weeks[i].start,end:weeks[i].end};edits.push(current)}
+  }
+ }
+ if(!groups.size)throw new Error('В CSV нет ни одной группы');
+ let next=events;
+ for(const edit of edits)next=assignPeriod(next,[edit.group],edit.start,edit.end,edit.phase);
+ return {next,groups:groups.size,ranges:edits.length,cells:groups.size*weeks.length};
+}
+/** Copies exact daily activity, not a rough week label; optionally preserve target's existing periods. */
+export function copyGroupCalendar(events:CalendarEvent[],source:string,target:string,year:number,overwrite:boolean):CalendarEvent[]{
+ if(source===target)throw new Error('Выбери другую группу');
+ const from=String(year)+'-09-01',to=String(year+1)+'-08-31';
+ const edits:{phase:CalendarPhase;start:string;end:string}[]=[];
+ let current:typeof edits[number]|undefined;
+ for(let date=from;date<=to;date=plusDays(date,1)){
+  const phase=phaseAt(events,source,date);
+  const targetPhase=phaseAt(events,target,date);
+  if(!overwrite&&targetPhase!=='unassigned'){current=undefined;continue}
+  if(current&&current.phase===phase&&plusDays(current.end,1)===date)current.end=date;
+  else{current={phase,start:date,end:date};edits.push(current)}
+ }
+ let next=events;
+ for(const item of edits)next=assignPeriod(next,[target],item.start,item.end,item.phase);
+ return next;
+}
