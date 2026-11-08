@@ -127,7 +127,13 @@ export function matrixCSV(events:CalendarEvent[],groups:string[],weeks:Week[]):s
  const quote=(v:string)=>'"'+v.replace(/"/g,'""')+'"';
  const first=['Группа',...weeks.map(w=>'Неделя '+(w.index+1)+' ('+w.start+'—'+w.end+')')];
  return '\uFEFF'+[first,...groups.map(g=>[g,...weeks.map(w=>{
-  const s=weekCell(events,g,w);return s.mixed?s.parts.map(p=>phaseInfo(p).short).join('/'):phaseInfo(s.phase).short;
+  const cell=weekCell(events,g,w);
+  if(!cell.mixed)return phaseInfo(cell.phase).short;
+  // Seven unambiguous weekday codes permit an exact round-trip even for mixed weeks.
+  return Array.from({length:7},(_,i)=>{
+   const date=plusDays(w.from,i);
+   return date<w.start||date>w.end?'~':phaseInfo(phaseAt(events,g,date)).short;
+  }).join('|');
  })])].map(row=>row.map(quote).join(';')).join('\r\n');
 }
 
@@ -173,10 +179,19 @@ export function importMatrixCSV(source:string,events:CalendarEvent[],year:number
   let current:typeof edits[number]|undefined;
   for(let i=0;i<weeks.length;i++){
    const value=row[i+1].trim();
-   const phase=byCode.get(value);
-   if(!phase)throw new Error('Неизвестный или смешанный код «'+value+'» у '+group+', неделя '+(i+1)+'. Такие недели нужно уточнить вручную по датам.');
-   if(current&&current.phase===phase&&plusDays(current.end,1)===weeks[i].start)current.end=weeks[i].end;
-   else {current={group,phase,start:weeks[i].start,end:weeks[i].end};edits.push(current)}
+   const codes=value.includes('|')?value.split('|'):null;
+   if(codes&&codes.length!==7)throw new Error('Неверный формат смешанной недели '+(i+1)+' у '+group);
+   const parts:{from:string;to:string;code:string}[]=codes?codes.map((code,j)=>{
+    const date=plusDays(weeks[i].from,j);
+    return {from:date,to:date,code};
+   }).filter(x=>x.from>=weeks[i].start&&x.from<=weeks[i].end):
+   [{from:weeks[i].start,to:weeks[i].end,code:value}];
+   for(const part of parts){
+    const phase=byCode.get(part.code);
+    if(!phase)throw new Error('Неизвестный код «'+part.code+'» у '+group+', неделя '+(i+1));
+    if(current&&current.phase===phase&&plusDays(current.end,1)===part.from)current.end=part.to;
+    else {current={group,phase,start:part.from,end:part.to};edits.push(current)}
+   }
   }
  }
  if(!groups.size)throw new Error('В CSV нет ни одной группы');
