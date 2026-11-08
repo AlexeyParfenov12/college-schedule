@@ -56,7 +56,12 @@ def code(flags: str, year: int, month: int, day: int) -> str:
     return flags[index]
 
 
-def verified_anchors(records: dict) -> None:
+def reconcile_legal_anchors(records: dict) -> list[str]:
+    """Prefer the text of known government decrees on discrepancies with reference APIs.
+
+    Only a *single expected state* is corrected; ambiguous 0/2 combinations are accepted
+    as working or shortened. This deliberately does not certify unpublished future years.
+    """
     checks = [
         (2026, 12, 31, "1", "1"),
         (2026, 11, 4, "1", "1"),
@@ -65,15 +70,24 @@ def verified_anchors(records: dict) -> None:
         (2027, 11, 5, "1", "02"),
         (2027, 12, 31, "1", "1"),
     ]
+    warnings = []
     for year, month, day, five, six in checks:
         item = records.get(str(year))
         if not item:
             raise ValueError("Missing confirmed calendar year " + str(year))
         for attr, expected in [("five", five), ("six", six)]:
-            actual = code(item[attr], year, month, day)
+            flags = item[attr]
+            date = f"{year}-{month:02}-{day:02}"
+            index = (dt.date(year, month, day) - dt.date(year, 1, 1)).days
+            actual = flags[index]
             if actual not in expected:
-                raise ValueError(f"API disagrees with confirmed transfer on {year}-{month:02}-{day:02}, "
-                                 f"{attr}: {actual} not in {expected}")
+                if len(expected) != 1:
+                    raise ValueError(f"Reference API disagrees with known working status: {date} {attr}={actual}")
+                item[attr] = flags[:index] + expected + flags[index+1:]
+                warning = f"{date}: {attr}, справочный API={actual}, постановление={expected}"
+                warnings.append(warning)
+                print("Normative override: " + warning, flush=True)
+    return warnings
 
 
 def main() -> int:
@@ -100,7 +114,7 @@ def main() -> int:
             else:
                 print(f"{year}: not published or unavailable ({error}), using local legal baseline", flush=True)
     try:
-        verified_anchors(records)
+        warnings = reconcile_legal_anchors(records)
     except ValueError as error:
         print(f"ERROR: {error}. Existing snapshot will remain untouched.", file=sys.stderr)
         return 1
@@ -110,6 +124,7 @@ def main() -> int:
         "provider": "isdayoff.ru",
         "checkedAt": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "years": records,
+        "warnings": warnings,
     }
     # Avoid rewrite on rapid successive runs while recording a new check every day.
     if DEST.exists():
