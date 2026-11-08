@@ -36,6 +36,7 @@ const read=():AnnualConfig=>{try{
  }
 }catch{}return defaultAnnualConfig()};
 const key=(name:string,subject:string)=>streamKey(name,subject);
+const periodOptions=(weeks:number)=>Array.from({length:weeks},(_,w)=><option key={w} value={w}>{w+1}-я · {w===0?ACADEMIC_START:lessonDate(w,0)}</option>);
 export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
  const production=useProductionCalendarState();
  const collegeRevision=useCollegeOverrideRevision();
@@ -287,7 +288,7 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
     <div className="year-variants">{variants.map((v,i)=><button key={v.id} className={active===i?'chosen':''} onClick={()=>setActive(i)}><b>{v.name}</b><span>{Math.round(v.coveredHours/Math.max(1,v.requiredHours)*100)}% часов закрыто</span><small>{v.groupWindows} окон у групп · {v.teacherWindows} у преподавателей · {v.onlinePercent}% онлайн</small><small>{kugPractice.length} периодов практики из КУГ · {v.practiceIssues.length} требуют назначения</small><em>{v.unplaced.length||v.practiceIssues.length?'Требует доработки':'Нет неразмещённых назначений'}</em></button>)}</div>
     <div className="year-cols"><section className="year-card">
      <h3>Выбранный вариант: {selected?.name}</h3>
-     <div className="year-result-kpis"><div><b>{selected?.coveredHours.toLocaleString('ru-RU')}</b><small>размещено часов</small></div><div><b>{selected?.requiredHours.toLocaleString('ru-RU')}</b><small>требуется</small></div><div><b>{selected?.unplaced.length}</b><small>неполных назначений</small></div><div><b>{selected?.practiceIssues.length}</b><small>конфликтов практик</small></div></div>
+     <div className="year-result-kpis"><div><b>{selected?.coveredHours.toLocaleString('ru-RU')}</b><small>размещено часов</small></div><div><b>{selected?.requiredHours.toLocaleString('ru-RU')}</b><small>требуется</small></div><div><b>{selected?.unplaced.length}</b><small>неполных назначений</small></div><div><b>{selected?.practiceIssues.length}</b><small>назначений практик для проверки</small></div></div>
      <div className="year-fields"><F name="Группа"><PolishedSelect value={viewGroup} onChange={e=>setViewGroup(e.target.value)}>{GROUPS.map(g=><option key={g.id} value={g.id}>{g.id}</option>)}</PolishedSelect></F><F name="Неделя"><PolishedSelect value={viewWeek} onChange={e=>setViewWeek(Number(e.target.value))}>{periodOptions(cfg.weeks)}</PolishedSelect></F></div>
      <MiniSchedule lessons={selected?.lessons||[]} week={viewWeek} group={viewGroup} title={'Предложенное расписание · '+viewGroup}/>
      <LoadBars lessons={selected?.lessons||[]} week={viewWeek} group={viewGroup}/>
