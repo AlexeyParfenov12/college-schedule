@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "source": "publication.pravo.gov.ru",
+  "checkedAt": "2026-11-08T15:58:18Z",
+  "status": "unavailable",
+  "daysChecked": 0,
+  "daysFailed": 14,
+  "lastSuccessfulDate": null,
+  "officialDocuments": [
+    {
+      "id": "0001202509240023",
+      "name": "Постановление Правительства РФ от 24.09.2025 № 1466",
+      "year": 2026,
+      "url": "https://publication.pravo.gov.ru/document/0001202509240023"
+    },
+    {
+      "id": "0001202609180037",
+      "name": "Постановление Правительства РФ от 17.09.2026 № 1187",
+      "year": 2027,
+      "url": "https://publication.pravo.gov.ru/document/0001202609180037"
+    }
+  ],
+  "candidates": [],
+  "failures": [
+    "2026-10-26: <urlopen error timed out>",
+    "2026-10-27: <urlopen error timed out>",
+    "2026-10-28: <urlopen error timed out>",
+    "2026-10-29: <urlopen error timed out>"
+  ]
+}
