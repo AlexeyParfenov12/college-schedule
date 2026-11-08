@@ -168,10 +168,17 @@ export function checkCalendar(events:CalendarEvent[],groups:string[],weeks:Week[
  }
  return findings;
 }
+const matrixColumns=(weeks:Week[])=>['Группа',...weeks.map(w=>'Неделя '+(w.index+1)+' ('+w.start+'—'+w.end+')')];
+const csvQuoted=(v:string)=>'"'+v.replace(/"/g,'""')+'"';
+const encodeMatrix=(rows:string[][])=>'\uFEFF'+rows.map(row=>row.map(csvQuoted).join(';')).join('\r\n');
+
+/** Downloadable blank spreadsheet template. Empty week means "leave unchanged". */
+export function matrixTemplateCSV(groups:string[],weeks:Week[]):string{
+ return encodeMatrix([matrixColumns(weeks),...groups.map(group=>[group,...weeks.map(()=>'')])]);
+}
 export function matrixCSV(events:CalendarEvent[],groups:string[],weeks:Week[]):string{
- const quote=(v:string)=>'"'+v.replace(/"/g,'""')+'"';
- const first=['Группа',...weeks.map(w=>'Неделя '+(w.index+1)+' ('+w.start+'—'+w.end+')')];
- return '\uFEFF'+[first,...groups.map(g=>[g,...weeks.map(w=>{
+ const first=matrixColumns(weeks);
+ return encodeMatrix([first,...groups.map(g=>[g,...weeks.map(w=>{
   // Export exact dates even when a holiday masks a transition on the weekly view.
   const days=Array.from({length:7},(_,i)=>{
    const date=plusDays(w.from,i);
@@ -179,7 +186,7 @@ export function matrixCSV(events:CalendarEvent[],groups:string[],weeks:Week[]):s
   });
   const present=days.filter(x=>x!=='~');
   return present.every(x=>x===present[0])?present[0]:days.join('|');
- })])].map(row=>row.map(quote).join(';')).join('\r\n');
+ })])]);
 }
 
 /** CSV produced by matrixCSV: strict year/header/group checks, no guessed mixed-day allocation. */
@@ -209,21 +216,26 @@ export function importMatrixCSV(source:string,events:CalendarEvent[],year:number
  const weeks=calendarWeeks(year);
  const lines=parseSemicolonCSV(source);
  if(!lines.length)throw new Error('Файл CSV пуст');
- const expected=['Группа',...weeks.map(w=>'Неделя '+(w.index+1)+' ('+w.start+'—'+w.end+')')];
+ const expected=matrixColumns(weeks);
  if(lines[0].length!==expected.length||lines[0].some((value,i)=>value!==expected[i])){
   throw new Error('Заголовок недель или учебный год не соответствует выбранному графику. Нужен CSV, экспортированный из этого раздела.');
  }
  const byCode=new Map(CALENDAR_PHASES.map(x=>[x.short,x.id]));
- const groups=new Set<string>(),edits:{group:string;phase:CalendarPhase;start:string;end:string}[]=[];
+ const groups=new Set<string>(),seenGroups=new Set<string>();
+ const edits:{group:string;phase:CalendarPhase;start:string;end:string}[]=[];
+ let editedCells=0;
  for(const row of lines.slice(1)){
   const group=row[0]?.trim();
   if(!allowedGroups.includes(group))throw new Error('Неизвестная группа в файле: '+group);
-  if(groups.has(group))throw new Error('Повторяется группа: '+group);
+  if(seenGroups.has(group))throw new Error('Повторяется группа: '+group);
   if(row.length!==expected.length)throw new Error('Неверное число недель у группы '+group);
-  groups.add(group);
+  seenGroups.add(group);
   let current:typeof edits[number]|undefined;
+  let editedGroup=false;
   for(let i=0;i<weeks.length;i++){
    const value=row[i+1].trim();
+   // Empty template cells are deliberately ignored. Use "—" to explicitly clear a week.
+   if(!value){current=undefined;continue}
    const codes=value.includes('|')?value.split('|'):null;
    if(codes&&codes.length!==7)throw new Error('Неверный формат смешанной недели '+(i+1)+' у '+group);
    const parts:{from:string;to:string;code:string}[]=codes?codes.map((code,j)=>{
@@ -231,18 +243,24 @@ export function importMatrixCSV(source:string,events:CalendarEvent[],year:number
     return {from:date,to:date,code};
    }).filter(x=>x.from>=weeks[i].start&&x.from<=weeks[i].end):
    [{from:weeks[i].start,to:weeks[i].end,code:value}];
+   let editedWeek=false;
    for(const part of parts){
-    const phase=byCode.get(part.code);
-    if(!phase)throw new Error('Неизвестный код «'+part.code+'» у '+group+', неделя '+(i+1));
+    const code=part.code.trim();
+    if(!code){current=undefined;continue}
+    const phase=byCode.get(code);
+    if(!phase)throw new Error('Неизвестный код «'+code+'» у '+group+', неделя '+(i+1));
     if(current&&current.phase===phase&&plusDays(current.end,1)===part.from)current.end=part.to;
     else {current={group,phase,start:part.from,end:part.to};edits.push(current)}
+    editedWeek=true;
    }
+   if(editedWeek){editedGroup=true;editedCells++}
   }
+  if(editedGroup)groups.add(group);
  }
- if(!groups.size)throw new Error('В CSV нет ни одной группы');
+ if(!editedCells)throw new Error('В шаблоне нет заполненных недель. Впиши коды периодов в нужные ячейки; пустые ячейки не изменяют календарь.');
  let next=events;
  for(const edit of edits)next=assignPeriod(next,[edit.group],edit.start,edit.end,edit.phase);
- return {next,groups:groups.size,ranges:edits.length,cells:groups.size*weeks.length};
+ return {next,groups:groups.size,ranges:edits.length,cells:editedCells};
 }
 /** Copies exact daily activity, not a rough week label; optionally preserve target's existing periods. */
 export function copyGroupCalendar(events:CalendarEvent[],source:string,target:string,year:number,overwrite:boolean):CalendarEvent[]{
