@@ -1,0 +1,46 @@
+.calendar-admin{display:flex;flex-direction:column;gap:12px;border:1px solid #d6e5df;border-radius:11px;padding:14px;background:#fff;color:#1c5148;font-size:12px}
+.calendar-admin-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.calendar-admin-head strong{font-size:16px}
+.calendar-admin p{margin:5px 0;line-height:1.5;color:#56776e}
+.calendar-admin-head>span{background:#fff4e9;border-radius:7px;padding:7px 10px;font-size:11px;color:#95602a;font-weight:700}
+.calendar-admin-status{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.calendar-admin-status>div{background:#f0f7f4;border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:5px}
+.calendar-admin-status b{font-size:12px}
+.calendar-admin-status span{font-size:11px;line-height:1.35;color:#57766d}
+.calendar-admin-alerts{background:#fff8ec;border:1px solid #f0dfbe;border-radius:9px;overflow:hidden}
+.calendar-admin-expand{width:100%;border:0;background:transparent;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px;text-align:left;color:#895922;font-size:12px;cursor:pointer}
+.calendar-admin-expand span{font-size:11px;text-decoration:underline}
+.calendar-admin-alert-items{padding:0 10px 10px;display:grid;gap:7px}
+.calendar-admin-alert{padding:9px;background:#fff;border:1px solid #e6d5b6;border-radius:7px;overflow-wrap:anywhere}
+.calendar-admin-alert b{font-size:12px;color:#6c4b21}
+.calendar-admin-alert span{display:block;font-size:11px;color:#65756e;margin:5px 0}
+.calendar-admin-alert a{display:inline-block;font-size:12px;color:#13736a;text-decoration:underline;overflow-wrap:anywhere}
+.calendar-admin .calendar-admin-unverified{color:#885d25;background:#fff2e0;border-radius:6px;padding:8px}
+.calendar-admin-manual{border-top:1px solid #deebe5;padding-top:12px;display:flex;flex-direction:column;gap:8px}
+.calendar-admin-manual strong{font-size:14px}
+.calendar-admin-form{display:grid;grid-template-columns:160px minmax(170px,1fr) minmax(190px,2fr);gap:9px}
+.calendar-admin-form label{display:flex;flex-direction:column;gap:5px;font-size:11px;font-weight:700;color:#50766b;min-width:0}
+.calendar-admin-form input,.calendar-admin-form select{height:36px;min-width:0;width:100%;border:1px solid #c9ddd4;border-radius:7px;background:#fff;color:#1a5246;padding:7px;font:inherit}
+.calendar-admin-day-preview{font-size:11px!important}
+.calendar-admin-deny{color:#9e423c!important;background:#fff1ee;border-radius:7px;padding:8px}
+.calendar-admin-actions{display:flex;flex-wrap:wrap;gap:8px}
+.calendar-admin-actions button,.calendar-admin-confirm button,.calendar-admin-overrides button{border:1px solid #b9d2c6;border-radius:7px;background:#ecf7f0;color:#225e4c;padding:8px 11px;font-weight:700;font-size:11px;cursor:pointer}
+.calendar-admin button:disabled{opacity:.45;cursor:not-allowed}
+.calendar-admin-confirm{background:#edf9f1;border:1px solid #b3d9c2;padding:11px;border-radius:8px}
+.calendar-admin-confirm p{color:#305d4c}
+.calendar-admin-confirm button{margin:6px 7px 0 0}
+.calendar-admin-confirm button:first-of-type{background:#1c6d5e;color:#fff}
+.calendar-admin-feedback{background:#eff7f3;padding:8px;border-radius:6px;color:#346d56!important}
+.calendar-admin-overrides{display:flex;flex-direction:column;gap:5px}
+.calendar-admin-overrides>b{margin-bottom:3px}
+.calendar-admin-overrides>div{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid #e0eee7;border-radius:7px;padding:7px}
+.calendar-admin-overrides>div span{font-size:11px;line-height:1.4}
+.calendar-admin-overrides button{background:#fff4f0;color:#a15342;border-color:#f0d6d0}
+.calendar-admin .calendar-admin-disclaimer{font-size:11px;color:#6e847c}
+.calendar-admin-summary{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;background:#fff9ec;border:1px solid #eee2bd;border-radius:9px;padding:9px 11px;color:#5c5c3b;font-size:11px}
+.calendar-admin-summary>div{display:flex;flex-direction:column;gap:3px}
+.calendar-admin-summary strong{font-size:12px}
+.calendar-admin-summary button{border:1px solid #d8ceaa;border-radius:7px;color:#416452;background:#fff;padding:7px 9px;font-size:11px;cursor:pointer}
+@media(max-width:800px){.calendar-admin-form{grid-template-columns:repeat(2,minmax(0,1fr))}.calendar-admin-form .calendar-admin-reason{grid-column:1/-1}}
+@media(max-width:480px){.calendar-admin-status,.calendar-admin-form{grid-template-columns:1fr}.calendar-admin-form .calendar-admin-reason{grid-column:auto}}
+@media print{.calendar-admin{display:none!important}}
