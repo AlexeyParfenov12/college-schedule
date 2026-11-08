@@ -8,6 +8,7 @@ import { defaultAnnualConfig, streamKey, teacherRule, practiceWeekActive } from 
 import { academicGroupStats, demoAcademicDemands, demoAcademicHorizon, DEMO_SEMESTERS } from './academicPlanning';
 import type { AnnualConfig, AnnualVariant, YearDemand, PracticeBlock, TeacherPreference } from './yearSolver';
 import { lessonDate } from './plannerDomain';
+import { useProductionCalendarState } from './productionCalendarSync';
 import { ACADEMIC_START, ACADEMIC_END, LEGACY_WEEK_OFFSET } from './weekTimeline';
 import { assessRoomFit } from './roomPolicy';
 import { effectiveGroupRules } from './scheduleConstraints';
@@ -35,6 +36,7 @@ const read=():AnnualConfig=>{try{
 const key=(name:string,subject:string)=>streamKey(name,subject);
 const periodOptions=(weeks:number)=>Array.from({length:weeks},(_,w)=><option key={w} value={w}>{w+1}-я · {w===0?ACADEMIC_START:lessonDate(w,0)}</option>);
 export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
+ const production=useProductionCalendarState();
  const horizon=useMemo(()=>demoAcademicHorizon(calendar),[calendar]);
  const [cfg,setCfg]=useState<AnnualConfig>(()=>({...read(),weeks:demoAcademicHorizon(calendar)}));
  const backlog=useMemo(()=>{
@@ -52,7 +54,7 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
   }catch{return null}
  },[]);
  const [tab,setTab]=useState<Tab>('load');
- const demands=useMemo(()=>demoAcademicDemands(calendar,cfg.days,cfg.weeks),[calendar,cfg.days,cfg.weeks]);
+ const demands=useMemo(()=>demoAcademicDemands(calendar,cfg.days,cfg.weeks),[calendar,cfg.days,cfg.weeks,production.revision]);
  const [teacher,setTeacher]=useState(TEACHERS[0]),[teacherSearch,setTeacherSearch]=useState('');
  const [scopeType,setScopeType]=useState<'college'|'department'|'group'>('college');
  const [scopeDepartment,setScopeDepartment]=useState(GROUPS[0].department);
