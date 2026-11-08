@@ -2,11 +2,14 @@
 import { solveAnnualVariant } from './yearSolver';
 import type { AnnualConfig, YearDemand, AnnualVariant } from './yearSolver';
 import type { Lesson, CalendarEvent } from './data';
+import { acceptProductionSnapshot } from './productionCalendarSync';
+import type { ProductionSnapshot } from './productionCalendarSync';
 
-type Request={demands:YearDemand[];config:AnnualConfig;calendar:CalendarEvent[];locked:Lesson[]};
+type Request={demands:YearDemand[];config:AnnualConfig;calendar:CalendarEvent[];locked:Lesson[];production?:ProductionSnapshot|null};
 self.onmessage=(event:MessageEvent<Request>)=>{
  try{
-  const {demands,config,calendar,locked}=event.data;
+  const {demands,config,calendar,locked,production}=event.data;
+  if(production&&!acceptProductionSnapshot(production))throw Error('Некорректные данные производственного календаря');
   const variants:AnnualVariant[]=[];
   for(let n=0;n<4;n++){
    const variant=solveAnnualVariant(demands,config,calendar,n,locked);
