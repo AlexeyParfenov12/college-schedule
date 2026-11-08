@@ -63,16 +63,16 @@ describe('Russia annual production calendar: Labour Code art.112 and confirmed d
  });
 });
 describe('federal rest days are constraints for every scheduling workflow',()=>{
- it('rejects a Friday scheduled on a government transferred 2027 rest day',()=>{
-  // 2026-11-09 + 51 calendar weeks => 2027-11-01; 5 November is Friday of week 51.
-  const candidate=lesson(51,4);
+ it('rejects a February 2027 transferred rest day without blocking the six-day college',()=>{
+  // February 22, 2027 is a Monday with a confirmed five-day-calendar transfer.
+  const candidate=lesson(25,0);
   expect(calendarIssues(candidate,[],5).some(x=>x.includes('Выходной'))).toBe(true);
   expect(calendarIssues(candidate,[],6)).toHaveLength(0);
  });
  it('prevents a template from copying a lesson to a 2026 transferred holiday',()=>{
-  // On 2026-12-31 (Thursday) => teaching week 7, weekday 3.
-  const original=lesson(0,3);
-  const preview=previewTemplate([original],{sourceWeek:0,targetStart:7,targetEnd:7,cycle:1,group:'П-21',replace:false,calendar:[],blockedRooms:[]});
+  // On 2026-12-31 (Thursday) => canonical academic week 17, weekday 3.
+  const original=lesson(10,3);
+  const preview=previewTemplate([original],{sourceWeek:10,targetStart:17,targetEnd:17,cycle:1,group:'П-21',replace:false,calendar:[],blockedRooms:[]});
   expect(preview.accepted).toHaveLength(0);
   expect(preview.skipped.some(x=>x.reason.includes('Производственный календарь'))).toBe(true);
  });
@@ -83,11 +83,11 @@ describe('federal rest days are constraints for every scheduling workflow',()=>{
   for(const l of result.lessons)expect(calendarIssues(l,[],5)).toHaveLength(0);
  });
  it('does not reserve classrooms for continuous practice on government closed days',()=>{
-  const cfg=defaultAnnualConfig();cfg.weeks=9;cfg.days=5;cfg.slotsPerDay=2;
+  const cfg=defaultAnnualConfig();cfg.weeks=18;cfg.days=5;cfg.slotsPerDay=2;
   cfg.practiceBlocks=[{id:'practice',group:'П-21',kind:'college',title:'Учебная практика',
-    teacher:TEACHERS[0],startWeek:7,durationWeeks:1,days:[3,4],fromSlot:1,toSlot:1,room:'109'}];
+    teacher:TEACHERS[0],startWeek:17,durationWeeks:1,days:[3,4],fromSlot:1,toSlot:1,room:'109'}];
   const result=solveAnnualVariant([],cfg,[],0);
-  expect(result.lessons.filter(l=>l.practiceBlockId==='practice').some(l=>l.week===7&&l.day===3)).toBe(false);
+  expect(result.lessons.filter(l=>l.practiceBlockId==='practice').some(l=>l.week===17&&l.day===3)).toBe(false);
   expect(result.practiceIssues.some(i=>i.reason.includes('Практика пересекается'))).toBe(true);
  });
 });
