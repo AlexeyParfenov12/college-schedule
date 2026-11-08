@@ -57,29 +57,29 @@ describe('Practice blocks with fixed rooms',()=>{
   expect(result.practiceIssues.some(x=>x.reason.includes('1:1')&&x.reason.includes('ПК'))).toBe(true);
  });
  it('honours teacher day-off preferences for continuous practice',()=>{
-  const cfg=defaultAnnualConfig();cfg.weeks=1;
-  cfg.practiceBlocks=[block({startWeek:0,durationWeeks:1,days:[0],fromSlot:1,toSlot:2})];
+  const cfg=defaultAnnualConfig();cfg.weeks=2;
+  cfg.practiceBlocks=[block({startWeek:1,durationWeeks:1,days:[0],fromSlot:1,toSlot:2})];
   cfg.teacherPreferences[TEACHERS[0]]={daysOff:[0],fromSlot:1,toSlot:6,forbidden:[],preferDays:[],maxOnlinePct:0};
   const result=solveAnnualVariant([],cfg,[],0);
   expect(result.practicePairs).toBe(0);
   expect(result.practiceIssues.some(x=>x.reason.includes('недоступен'))).toBe(true);
  });
  it('allows practice at a company without booking a college room',()=>{
-  const cfg=defaultAnnualConfig();cfg.weeks=2;cfg.practiceBlocks=[block({startWeek:0,durationWeeks:2,kind:'company',room:'',days:[0],fromSlot:1,toSlot:2})];
+  const cfg=defaultAnnualConfig();cfg.weeks=3;cfg.practiceBlocks=[block({startWeek:1,durationWeeks:2,kind:'company',room:'',days:[0],fromSlot:1,toSlot:2})];
   cfg.activeRooms=[];
   const result=solveAnnualVariant([],cfg,[],0);
   expect(result.practicePairs).toBe(4);
   expect(result.lessons.every(x=>x.room==='Предприятие')).toBe(true);
  });
  it('rejects overlap with a public holiday and reports the problem',()=>{
-  const cfg=defaultAnnualConfig();cfg.weeks=1;cfg.practiceBlocks=[block({startWeek:0,durationWeeks:1,days:[0],fromSlot:1,toSlot:2})];
+  const cfg=defaultAnnualConfig();cfg.weeks=11;cfg.practiceBlocks=[block({startWeek:10,durationWeeks:1,days:[0],fromSlot:1,toSlot:2})];
   const holiday:CalendarEvent={id:'off',kind:'holiday',title:'Выходной',from:'2026-11-09',to:'2026-11-09',groups:[]};
   const result=solveAnnualVariant([],cfg,[holiday],0);
   expect(result.practiceIssues.length).toBeGreaterThan(0);
   expect(result.practicePairs).toBe(0);
  });
  it('flags academic-calendar practice without a corresponding fixed reservation',()=>{
-  const cfg=defaultAnnualConfig();cfg.weeks=3;
+  const cfg=defaultAnnualConfig();cfg.weeks=12;
   const event:CalendarEvent={id:'practice-calendar',kind:'practice',title:'Учебная практика',
    from:'2026-11-16',to:'2026-11-20',groups:['П-21']};
   const variant=solveAnnualVariant([],cfg,[event],0);
