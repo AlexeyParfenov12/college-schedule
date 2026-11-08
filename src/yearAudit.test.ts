@@ -2,7 +2,7 @@ import { describe,expect,it } from 'vitest';
 import type { CalendarEvent, Lesson } from './data';
 import { TEACHERS } from './data';
 import { auditAnnualDraft } from './yearAudit';
-const lesson=(id:string,changes:Partial<Lesson>={}):Lesson=>({id,week:0,day:0,slot:1,
+const lesson=(id:string,changes:Partial<Lesson>={}):Lesson=>({id,week:10,day:0,slot:1,
  subject:'Математика',teacher:TEACHERS[0],groups:['П-21'],room:'109',type:'regular',mode:'offline',hours:2,...changes});
 describe('safe application of annual timetable variants',()=>{
  it('keeps held lessons and rejects collisions with them',()=>{
@@ -13,7 +13,7 @@ describe('safe application of annual timetable variants',()=>{
   expect(audit.next).toHaveLength(2);
  });
  it('does not wrongly reject linked practice for its own practice-calendar period',()=>{
-  const practice=lesson('practice',{week:1,day:0,subject:'Учебная практика',
+  const practice=lesson('practice',{week:11,day:0,subject:'Учебная практика',
    teacher:TEACHERS[1],practiceBlockId:'block-1',room:'109'});
   const calendar:CalendarEvent[]=[{id:'period',title:'Учебная практика',kind:'practice',
    from:'2026-11-16',to:'2026-11-20',groups:['П-21']}];
@@ -21,7 +21,7 @@ describe('safe application of annual timetable variants',()=>{
   expect(audit.hardIssues).toHaveLength(0);
  });
  it('protects periods assigned to practice against unlinked normal teaching',()=>{
-  const x=lesson('ordinary',{week:1,day:0});
+  const x=lesson('ordinary',{week:11,day:0});
   const calendar:CalendarEvent[]=[{id:'period',title:'Практика',kind:'practice',
    from:'2026-11-16',to:'2026-11-20',groups:['П-21']}];
   expect(auditAnnualDraft([],[x],40,calendar,[]).hardIssues.length).toBeGreaterThan(0);
