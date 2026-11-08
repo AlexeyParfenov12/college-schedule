@@ -272,3 +272,30 @@
  .kug-workspace{display:block!important}.kug-scroll{overflow:visible!important;max-height:none!important}
  .kug .kug-table .kug-sticky-label{position:static!important}
  .kug{--kug-week-width:17px;--kug-row-height:19px}}
+
+
+/* Three distinct KUG table modes, retaining the original detailed weekly grid. */
+.kug.kug-view-large{--kug-week-width:67px;--kug-row-height:48px}
+.kug-view-large .kug-table .kug-cell{
+ width:var(--kug-week-width);height:var(--kug-row-height);min-height:var(--kug-row-height);
+ flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:4px 3px}
+.kug-view-large .kug-table .kug-cell-label{font-size:10px;font-weight:750}
+.kug-view-large .kug-table .kug-weekheads th small{display:block;font-size:9px}
+.kug-view-large .kug-large-weekdays{width:100%;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px;padding:0 2px}
+.kug-view-large .kug-large-weekdays .kug-day-dot{display:block;height:7px;border-radius:1.5px}
+.kug-view-large .kug-cell-unassigned{width:5px;height:5px;top:3px;right:3px}
+.kug-view-large .kug-cell-exception{width:6px;height:4px;bottom:3px;left:3px}
+/* Academic-office tools are intentionally collapsed until requested. */
+.kug-admin-accordion{border:1px solid #d6e5df;background:#f8fbf9;border-radius:9px;overflow:hidden}
+.kug-admin-toggle{width:100%;min-height:41px;display:flex;align-items:center;justify-content:space-between;
+ gap:12px;border:0;background:transparent;color:#28665b;padding:9px 12px;text-align:left;cursor:pointer}
+.kug-admin-toggle:hover{background:#eef6f1}
+.kug-admin-toggle:focus-visible{outline:2px solid #1a806c;outline-offset:-2px}
+.kug-admin-toggle-main{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;min-width:0}
+.kug-admin-chevron{display:inline-flex;align-items:center;justify-content:center}
+.kug-admin-count{font-size:10px;color:#945e28;background:#fff1df;border-radius:6px;padding:4px 7px}
+.kug-admin-toggle-action{font-size:11px;font-weight:700;flex-shrink:0;color:#4a796d}
+.kug-admin-content{padding:9px;border-top:1px solid #daeae1;background:#fff}
+.kug-admin-content .calendar-admin{margin:0}
+@media(max-width:780px){.kug-admin-toggle-main{gap:5px}.kug-admin-toggle{padding:9px 8px}}
+@media print{.kug-admin-accordion{display:none!important}}

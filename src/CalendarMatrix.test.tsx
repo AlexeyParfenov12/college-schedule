@@ -94,13 +94,13 @@ describe('compact KUG navigation, progressive disclosure and density',()=>{
  },20000);
  it('shows four months, switches the term, and scopes selection to visible weeks',()=>{
   const {container}=render(<CalendarMatrix events={CALENDAR} lessons={[]} group="П-21" setGroup={()=>{}} replace={()=>{}}/>);
-  fireEvent.click(screen.getByRole('button',{name:'4 месяца'}));
-  expect(screen.getByTestId('calendar-matrix').classList.contains('kug-view-quarter')).toBe(true);
+  fireEvent.change(screen.getByRole('combobox',{name:'Масштаб компактного календаря'}),{target:{value:'quarter'}});
+  expect(screen.getByRole('combobox',{name:'Масштаб компактного календаря'})).toHaveProperty('value','quarter');
   expect(container.querySelectorAll('[aria-label^="П-21, неделя "]').length).toBeLessThan(25);
   fireEvent.click(screen.getByRole('button',{name:'Январь — апрель'}));
   expect(container.querySelector('[aria-label^="П-21, неделя 1:"]')).toBeNull();
   expect(container.querySelector('[aria-label^="П-21, неделя 20:"]')).not.toBeNull();
-  fireEvent.click(screen.getByRole('button',{name:'Весь год'}));
+  fireEvent.change(screen.getByRole('combobox',{name:'Масштаб компактного календаря'}),{target:{value:'all'}});
   expect(container.querySelectorAll('[aria-label^="П-21, неделя "]')).toHaveLength(53);
  },20000);
  it('collapses department/course sections without losing their group records',()=>{
@@ -119,5 +119,34 @@ describe('compact KUG navigation, progressive disclosure and density',()=>{
   fireEvent.click(strip.querySelectorAll('button')[9]);
   expect(screen.getByRole('region',{name:'Дни выбранной недели'})).toBeTruthy();
   expect(container.querySelector('.kug-workspace-side')).not.toBeNull();
+ },20000);
+});
+
+
+describe('three KUG view modes and the hidden academic-office center',()=>{
+ it('retains the original large-table grid with seven daily marks in each group/week',()=>{
+  const {container}=render(<CalendarMatrix events={CALENDAR} lessons={[]} group="П-21" setGroup={()=>{}} replace={()=>{}}/>);
+  const first=container.querySelector<HTMLButtonElement>('[aria-label^="П-21, неделя 10:"]')!;
+  expect(first.querySelectorAll('.kug-day-dot')).toHaveLength(0);
+  expect(screen.getByRole('group',{name:'Режим календаря'}).querySelectorAll('button')).toHaveLength(3);
+  fireEvent.click(screen.getByRole('button',{name:'Большая таблица'}));
+  expect(screen.getByTestId('calendar-matrix').classList.contains('kug-view-large')).toBe(true);
+  const expanded=container.querySelector<HTMLButtonElement>('[aria-label^="П-21, неделя 10:"]')!;
+  expect(expanded.querySelectorAll('.kug-day-dot')).toHaveLength(7);
+  expect(container.querySelectorAll('.kug-calendar-row .kug-day-dot')).toHaveLength(371);
+  fireEvent.click(screen.getByRole('button',{name:'Компактная таблица'}));
+  expect(container.querySelector<HTMLButtonElement>('[aria-label^="П-21, неделя 10:"]')!.querySelectorAll('.kug-day-dot')).toHaveLength(0);
+ },20000);
+ it('keeps academic-office tools hidden until explicit click, then allows closing',()=>{
+  render(<CalendarMatrix events={CALENDAR} lessons={[]} group="П-21" setGroup={()=>{}} replace={()=>{}}/>);
+  const trigger=screen.getByRole('button',{name:/Центр календаря учебной части/});
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  expect(screen.queryByLabelText('Дата исключения колледжа')).toBeNull();
+  fireEvent.click(trigger);
+  expect(trigger.getAttribute('aria-expanded')).toBe('true');
+  expect(screen.getByLabelText('Дата исключения колледжа')).toBeTruthy();
+  fireEvent.click(trigger);
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  expect(screen.queryByLabelText('Дата исключения колледжа')).toBeNull();
  },20000);
 });
