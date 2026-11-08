@@ -21,22 +21,22 @@ describe('Academic vacations and college calendar integration',()=>{
   expect(isTeachingDate('2027-03-23','П-21',calendar,5)).toBe(false);
   expect(isTeachingDate('2027-03-23','П-22',calendar,5)).toBe(true);
   const eligible=teachingWeeks('П-21',calendar,5,40,DEMO_SEMESTERS[1]);
-  expect(eligible).not.toContain(19);
+  expect(eligible).not.toContain(29);
  });
  it('rejects scheduled ordinary lessons during group vacations',()=>{
-  const l:Lesson={id:'x',week:19,day:1,slot:1,groups:['П-21'],teacher:TEACHERS[0],
+  const l:Lesson={id:'x',week:29,day:1,slot:1,groups:['П-21'],teacher:TEACHERS[0],
    subject:'Математика',room:'109',type:'regular',mode:'offline'};
   expect(calendarIssues(l,[v(['П-21'])],5).some(x=>x.includes('Весенние каникулы'))).toBe(true);
   expect(calendarIssues({...l,groups:['П-22']},[v(['П-21'])],5)).toHaveLength(0);
   expect(vacationImpact(v(['П-21']),[l,{...l,id:'other',groups:['П-22']}])).toBe(1);
  });
  it('annual solver leaves a group on vacation unassigned and schedules another group normally',()=>{
-  const cfg=defaultAnnualConfig();cfg.weeks=20;cfg.days=5;cfg.slotsPerDay=3;
+  const cfg=defaultAnnualConfig();cfg.weeks=30;cfg.days=5;cfg.slotsPerDay=3;
   const d=[
    {id:'P21',group:'П-21',teacher:TEACHERS[0],subject:'Математика',requiredPairs:1,pairsPerWeek:1,
-    availableWeeks:[19],periodAllocations:[{id:'spring',weeks:[19],requiredPairs:1}]},
+    availableWeeks:[29],periodAllocations:[{id:'spring',weeks:[29],requiredPairs:1}]},
    {id:'P22',group:'П-22',teacher:TEACHERS[1],subject:'Математика',requiredPairs:1,pairsPerWeek:1,
-    availableWeeks:[19],periodAllocations:[{id:'spring',weeks:[19],requiredPairs:1}]}
+    availableWeeks:[29],periodAllocations:[{id:'spring',weeks:[29],requiredPairs:1}]}
   ];
   const result=solveAnnualVariant(d,cfg,[...CALENDAR,v(['П-21'])],0);
   expect(result.lessons.filter(x=>x.groups.includes('П-21'))).toHaveLength(0);
@@ -44,9 +44,9 @@ describe('Academic vacations and college calendar integration',()=>{
   expect(result.unplaced.some(x=>x.group==='П-21')).toBe(true);
  });
  it('leaves multi-week practice unplaced on group vacation days rather than scheduling it anyway',()=>{
-  const cfg=defaultAnnualConfig();cfg.weeks=20;cfg.days=5;cfg.slotsPerDay=2;
+  const cfg=defaultAnnualConfig();cfg.weeks=30;cfg.days=5;cfg.slotsPerDay=2;
   cfg.practiceBlocks=[{id:'practice-spring',group:'П-21',kind:'college',title:'Учебная практика',
-   teacher:TEACHERS[0],startWeek:19,durationWeeks:1,days:[0,1,2,3,4],fromSlot:1,toSlot:1,room:'109'}];
+   teacher:TEACHERS[0],startWeek:29,durationWeeks:1,days:[0,1,2,3,4],fromSlot:1,toSlot:1,room:'109'}];
   const result=solveAnnualVariant([],cfg,[v(['П-21'])],0);
   expect(result.practicePairs).toBe(0);
   expect(result.practiceIssues.some(x=>x.reason.includes('каникулами'))).toBe(true);
