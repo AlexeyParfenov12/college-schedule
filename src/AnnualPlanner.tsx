@@ -38,8 +38,18 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
  const horizon=useMemo(()=>demoAcademicHorizon(calendar),[calendar]);
  const [cfg,setCfg]=useState<AnnualConfig>(()=>({...read(),weeks:demoAcademicHorizon(calendar)}));
  const backlog=useMemo(()=>{
-  try{return JSON.parse(localStorage.getItem('college-year-unplaced-v2')||'null') as {at:string;weeks:number;unplaced:{group:string;subject:string;reason:string}[];practiceIssues:{group:string;week:number;reason:string}[]}|null}
-  catch{return null}
+  try{
+   const current=localStorage.getItem('college-year-unplaced-v2');
+   const legacy=current?null:localStorage.getItem('college-year-unplaced-v1');
+   const source=current||legacy;
+   if(!source)return null;
+   const record=JSON.parse(source) as {at:string;weeks:number;unplaced:{group:string;subject:string;reason:string;week?:number}[];practiceIssues:{group:string;week:number;reason:string}[]};
+   if(!legacy)return record;
+   // Historical reports remain readable. Old week indexes are translated only in memory.
+   return {...record,weeks:53,
+    unplaced:record.unplaced.map(x=>({...x,...(x.week===undefined?{}:{week:x.week+LEGACY_WEEK_OFFSET})})),
+    practiceIssues:record.practiceIssues.map(x=>({...x,week:x.week+LEGACY_WEEK_OFFSET}))};
+  }catch{return null}
  },[]);
  const [tab,setTab]=useState<Tab>('load');
  const demands=useMemo(()=>demoAcademicDemands(calendar,cfg.days,cfg.weeks),[calendar,cfg.days,cfg.weeks]);
