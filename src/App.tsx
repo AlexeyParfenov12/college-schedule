@@ -94,8 +94,8 @@ export default function App(){
  const targets=useMemo(()=>selected?moveOptions(selected,current,blockedRooms,days,6):[],[selected,current,blockedKey,days]);
  const targetByCell=useMemo(()=>new Map(targets.map(t=>[t.day+':'+t.slot,t])),[targets]);
  const availableTargetCount=targets.filter(t=>t.kind==='available').length;
- const bellTimes=(()=>{try{const v=JSON.parse(localStorage.getItem('college-schedule-extras-v1')||'{}');return Array.isArray(v.times)&&v.times.length===6?v.times as string[]:TIMES}catch{return TIMES}})();
- const resetSeed=()=>{if(window.confirm('Сбросить все изменения в расписании? Синтетическая база останется, черновики будут удалены.')){localStorage.removeItem('college-schedule-edits-v3');localStorage.removeItem('college-schedule-extras-v1');window.location.reload()}};
+ const bellTimes=(()=>{try{const v=JSON.parse((localStorage.getItem('college-schedule-extras-v2')||localStorage.getItem('college-schedule-extras-v1'))||'{}');return Array.isArray(v.times)&&v.times.length===6?v.times as string[]:TIMES}catch{return TIMES}})();
+ const resetSeed=()=>{if(window.confirm('Сбросить все изменения в расписании? Синтетическая база останется, черновики будут удалены.')){localStorage.removeItem('college-schedule-edits-v4');localStorage.removeItem('college-schedule-extras-v2');localStorage.removeItem('college-schedule-edits-v3');localStorage.removeItem('college-schedule-extras-v1');window.location.reload()}};
  const visible=current.filter(x=>view==='group'?x.groups.includes(group):view==='teacher'?x.teacher===teacher:x.room.includes(room));
  const collisions=selected?cellConflict(selected,current):[];
  const issueCount=current.filter(x=>x.status!=='cancelled'&&(cellConflict(x,current).length>0||calendarIssues(x,currentDemoCalendar(),days).length>0)).length;
@@ -380,11 +380,11 @@ export default function App(){
  const render=()=>screen==='schedule'
   ? <>{weekHeader}{schedule}</>
   : screen==='year'?<AnnualPlanner lessons={items} calendar={(()=>{
-      try{const v=JSON.parse(localStorage.getItem('college-schedule-extras-v1')||'{}');return Array.isArray(v.calendar)?v.calendar:CALENDAR}
+      try{const v=JSON.parse((localStorage.getItem('college-schedule-extras-v2')||localStorage.getItem('college-schedule-extras-v1'))||'{}');return Array.isArray(v.calendar)?v.calendar:CALENDAR}
       catch{return CALENDAR}
     })()} notify={setNotice} onApply={(variant,weeks,workweek)=>{
       const calendar=(()=>{
-        try{const value=JSON.parse(localStorage.getItem('college-schedule-extras-v1')||'{}');return Array.isArray(value.calendar)?value.calendar:CALENDAR}
+        try{const value=JSON.parse((localStorage.getItem('college-schedule-extras-v2')||localStorage.getItem('college-schedule-extras-v1'))||'{}');return Array.isArray(value.calendar)?value.calendar:CALENDAR}
         catch{return CALENDAR}
       })();
       const audit=auditAnnualDraft(items,variant.lessons,weeks,calendar,readBlockedRooms(),workweek);
