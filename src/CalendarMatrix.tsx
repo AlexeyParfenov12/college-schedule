@@ -204,33 +204,60 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
  const activeWeek=selection?weeks[selection.anchor]:null;
  const detailDays=useMemo(()=>activeWeek?kugWeekDays(events,group,activeWeek,officialDays,calendarWorkweek):[],
   [events,group,activeWeek,officialDays,calendarWorkweek]);
- const tableRows=useMemo(()=>groups.map((g,i)=>{
-     const sectionStart=i===0||groups[i-1].department!==g.department||groups[i-1].specialty!==g.specialty;
-     return [sectionStart?<tr key={'s-'+g.id} className="kug-section"><th colSpan={weeks.length+1}>{g.department} · {g.specialty}</th></tr>:null,
-      <tr key={g.id} className={rows.includes(g.id)?'kug-group-selected':''}>
-       <th scope="row" className="kug-sticky-label"><label><input type="checkbox" aria-label={'Выбрать группу '+g.id}
-        checked={rows.includes(g.id)} onChange={e=>toggleRow(g.id,e.target.checked)}/><span>{g.id}</span></label></th>
-       {weeks.map(w=>{
-        const cell=cells.get(g.id+':'+w.index)!;
-        const highlighted=rows.includes(g.id)&&selection&&w.index>=start&&w.index<=end;
-        const chosen=phaseInfo(cell.phase);
-        const days=dayCells.get(g.id+':'+w.index)!;
-        return <td key={w.index}><button type="button" aria-label={g.id+', неделя '+(w.index+1)+': '+(cell.mixed?'Смешанная неделя':chosen.name)}
-         title={g.id+' · '+w.start+' — '+w.end+'\n'+(cell.mixed?cell.parts.map(p=>phaseInfo(p).name).join(' / '):chosen.name)+(cell.holidays?'\nПраздничных/неучебных дней: '+cell.holidays:'')}
-         className={'kug-cell kug-'+chosen.color+(cell.mixed?' kug-mixed':'')+(highlighted?' kug-picked':'')+(cell.holidays?' kug-has-holiday':'')}
-         onClick={e=>selectCell(g.id,w.index,e.shiftKey)}
-         onMouseDown={()=>{dragging.current=true}}
-         onMouseEnter={e=>{if(e.buttons===1)markRange(g.id,w.index)}}
-         onMouseUp={()=>dragging.current=false}>
-         <span>{cell.mixed?'◐':chosen.short}</span>
-         <span className="kug-day-strip" aria-hidden="true">
-          {days.map(day=><i key={day.date} className={'kug-day-dot '+(day.withinYear?'kug-day-'+day.kind:'kug-day-outside')}/>)}
-         </span>
-        </button></td>
-       })}
-      </tr>];
-
- }),[groups,weeks,events,rows,selection,start,end,cells,dayCells]);
+ const sections=useMemo(()=>{
+  const buckets=new Map<string,typeof groups>();
+  for(const g of [...groups].sort((a,b)=>a.department.localeCompare(b.department,'ru')||a.course-b.course||a.id.localeCompare(b.id,'ru'))){
+   const key=groupKey(g.department,g.course);
+   if(!buckets.has(key))buckets.set(key,[]);
+   buckets.get(key)!.push(g);
+  }
+  return [...buckets.entries()].map(([key,items])=>({key,items,label:items[0].department+' · '+items[0].course+' курс'}));
+ },[groups]);
+ const tableRows=useMemo(()=>sections.flatMap(section=>{
+  const hidden=collapsed.includes(section.key)&&!query.trim();
+  const heading=<tr key={'section-'+section.key} className="kug-section"><th colSpan={visibleWeeks.length+1}>
+   <button type="button" aria-expanded={!hidden} aria-label={(hidden?'Развернуть ':'Свернуть ')+section.label}
+    onClick={()=>setCollapsed(old=>old.includes(section.key)?old.filter(x=>x!==section.key):[...old,section.key])}>
+    {hidden?<ChevronRight size={13}/>:<ChevronDown size={13}/>} {section.label}<span>{section.items.length} групп</span>
+   </button></th></tr>;
+  if(hidden)return [heading];
+  return [heading,...section.items.map(g=><tr key={g.id} className={rows.includes(g.id)?'kug-group-selected':''}>
+   <th scope="row" className="kug-sticky-label"><label><input type="checkbox" aria-label={'Выбрать группу '+g.id}
+    checked={rows.includes(g.id)} onChange={e=>toggleRow(g.id,e.target.checked)}/><span>{g.id}</span></label></th>
+   {visibleWeeks.map(w=>{
+    const cell=cells.get(g.id+':'+w.index)!;
+    const picked=Boolean(rows.includes(g.id)&&selection&&w.index>=start&&w.index<=end);
+    const chosen=phaseInfo(cell.phase);
+    const special=events.some(e=>e.kind==='holiday'&&e.groups.includes(g.id)&&e.from<=w.end&&e.to>=w.start);
+    return <td key={w.index}><button type="button" aria-label={g.id+', неделя '+(w.index+1)+': '+(cell.mixed?'Смешанная неделя':chosen.name)}
+     title={g.id+' · '+w.start+' — '+w.end+'\n'+(cell.mixed?cell.parts.map(p=>phaseInfo(p).name).join(' / '):chosen.name)}
+     className={'kug-cell kug-'+chosen.color+(cell.mixed?' kug-mixed':'')+(picked?' kug-picked':'')+(special?' kug-group-exception':'')}
+     onClick={e=>selectCell(g.id,w.index,e.shiftKey)}
+     onMouseDown={()=>{dragging.current=true}}
+     onMouseEnter={e=>{if(e.buttons===1)markRange(g.id,w.index)}}
+     onMouseUp={()=>dragging.current=false}>
+     <span className="kug-cell-label">{cell.mixed?'◐':chosen.short}</span>
+     {cell.unassignedDays>0&&<i className="kug-cell-unassigned" aria-hidden="true"/>}
+     {special&&<i className="kug-cell-exception" aria-hidden="true"/>}
+    </button></td>;
+   })}
+  </tr>)];
+ }),[sections,collapsed,query,visibleWeeks,rows,selection,start,end,cells,events]);
+ const globalCalendarRow=<tr className="kug-calendar-row">
+  <th scope="row" className="kug-sticky-label">Праздники и выходные</th>
+  {visibleWeeks.map(w=><td key={w.index}><button type="button" className="kug-calendar-week"
+    aria-label={'Производственный календарь, неделя '+(w.index+1)}
+    title={Array.from({length:7},(_,i)=>officialDays.get(plusDays(w.from,i)))
+     .filter((d):d is CalendarDay=>Boolean(d)&&d.nonWorking)
+     .map(d=>dateText(d.date)+': '+d.label).join('\n')||'Нерабочих дней нет'}
+    onClick={()=>selectCell(group,w.index)}>
+    {Array.from({length:7},(_,i)=>{
+     const date=plusDays(w.from,i),day=officialDays.get(date);
+     return <i key={date} aria-hidden="true"
+      className={'kug-day-dot '+(date<w.start||date>w.end?'kug-day-outside':'kug-day-'+(day?.kind||'work'))}/>;
+    })}
+   </button></td>)}
+ </tr>;
  return <section className="kug" data-testid="calendar-matrix">
   <header className="kug-top">
    <div><span className="kug-kicker">College Schedule · КУГ</span>
