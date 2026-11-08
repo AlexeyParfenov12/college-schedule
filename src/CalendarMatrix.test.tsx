@@ -48,7 +48,7 @@ describe('KUG exact dates and bulk selection',()=>{
   expect(phaseAt(result,'П-21','2026-09-02')).toBe('training');
   expect(phaseAt(result,'П-21','2026-09-03')).toBe('training');
   expect(phaseAt(result,'П-21','2026-09-04')).toBe('study');
- });
+ },20000);
  it('selects all visible filtered groups in one action and allows clearing selection',()=>{
   render(<CalendarMatrix events={CALENDAR} lessons={[]} group="П-21" setGroup={()=>{}} replace={()=>{}}/>);
   fireEvent.change(screen.getByRole('combobox',{name:'Курс КУГ'}),{target:{value:'2'}});

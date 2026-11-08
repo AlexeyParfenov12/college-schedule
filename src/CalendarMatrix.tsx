@@ -5,6 +5,8 @@ import type { CalendarEvent, Lesson } from './data';
 import { assignPeriod, calendarChangeImpact, CALENDAR_PHASES, calendarWeeks, checkCalendar, copyGroupCalendar, importMatrixCSV, matrixCSV, phaseInfo, weekCell } from './calendarMatrixDomain';
 import type { MatrixImport } from './calendarMatrixDomain';
 import type { CalendarPhase, Week } from './calendarMatrixDomain';
+import { classifyCalendarDay, readCollegeWorkweek } from './productionCalendar';
+import { plusDays } from './calendarMatrixDomain';
 import './calendar-matrix.css';
 
 type Props={events:CalendarEvent[];lessons:Lesson[];group:string;setGroup:(group:string)=>void;replace:(events:CalendarEvent[])=>void};
@@ -54,6 +56,21 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
   (course==='all'||String(g.course)===course)&&
   (g.id+' '+g.specialty+' '+g.department).toLowerCase().includes(query.toLowerCase())
  ),[department,course,query]);
+ // Cache official non-working days once per displayed year, not per group and cell.
+ const closedDays=useMemo(()=>{
+  const dates=new Map<string,boolean>(),workweek=readCollegeWorkweek();
+  for(const w of weeks)for(let day=w.start;day<=w.end;day=plusDays(day,1)){
+   if(!dates.has(day))dates.set(day,classifyCalendarDay(day,workweek).nonWorking);
+  }
+  return dates;
+ },[weeks]);
+ const cells=useMemo(()=>{
+  const result=new Map<string,ReturnType<typeof weekCell>>();
+  for(const g of groups)for(const w of weeks){
+   result.set(g.id+':'+w.index,weekCell(events,g.id,w,closedDays));
+  }
+  return result;
+ },[groups,weeks,events,closedDays]);
  const selectedGroups=rows.filter(g=>GROUPS.some(x=>x.id===g));
  const start=selection?Math.min(selection.anchor,selection.end):0;
  const end=selection?Math.max(selection.anchor,selection.end):0;
@@ -66,7 +83,7 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
  const impact=useMemo(()=>projected?calendarChangeImpact(events,projected,lessons,selectedGroups,from,to):null,
   [projected,events,lessons,selectedGroups.join('|'),from,to]);
  const copyReceiver=copyTarget===group?(GROUPS.find(g=>g.id!==group)?.id||copyTarget):copyTarget;
- const findings=useMemo(()=>showCheck?checkCalendar(events,groups.map(x=>x.id),weeks):[],[showCheck,events,groups,weeks]);
+ const findings=useMemo(()=>showCheck?checkCalendar(events,groups.map(x=>x.id),weeks,closedDays):[],[showCheck,events,groups,weeks,closedDays]);
  const phaseName=phaseInfo(phase).name;
  const selectCell=(g:string,index:number,shift=false)=>{
   if(!rows.includes(g))setRows([g]);
@@ -124,7 +141,30 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
   setPrevious(events);replace(copyPending);setCopyPending(null);
   setMessage('График группы '+group+' скопирован в '+copyReceiver+'. Проверь связанные занятия.');
  };
- const groupWeeks=weeks.map(w=>({week:w,cell:weekCell(events,group,w)}));
+ const groupWeeks=useMemo(()=>weeks.map(w=>({week:w,cell:weekCell(events,group,w,closedDays)})),[weeks,events,group,closedDays]);
+ const tableRows=useMemo(()=>groups.map((g,i)=>{
+     const sectionStart=i===0||groups[i-1].department!==g.department||groups[i-1].specialty!==g.specialty;
+     return [sectionStart?<tr key={'s-'+g.id} className="kug-section"><th colSpan={weeks.length+1}>{g.department} · {g.specialty}</th></tr>:null,
+      <tr key={g.id} className={rows.includes(g.id)?'kug-group-selected':''}>
+       <th scope="row" className="kug-sticky-label"><label><input type="checkbox" aria-label={'Выбрать группу '+g.id}
+        checked={rows.includes(g.id)} onChange={e=>toggleRow(g.id,e.target.checked)}/><span>{g.id}</span></label></th>
+       {weeks.map(w=>{
+        const cell=cells.get(g.id+':'+w.index)!;
+        const highlighted=rows.includes(g.id)&&selection&&w.index>=start&&w.index<=end;
+        const chosen=phaseInfo(cell.phase);
+        return <td key={w.index}><button type="button" aria-label={g.id+', неделя '+(w.index+1)+': '+(cell.mixed?'Смешанная неделя':chosen.name)}
+         title={g.id+' · '+w.start+' — '+w.end+'\n'+(cell.mixed?cell.parts.map(p=>phaseInfo(p).name).join(' / '):chosen.name)+(cell.holidays?'\nПраздничных/неучебных дней: '+cell.holidays:'')}
+         className={'kug-cell kug-'+chosen.color+(cell.mixed?' kug-mixed':'')+(highlighted?' kug-picked':'')+(cell.holidays?' kug-has-holiday':'')}
+         onClick={e=>selectCell(g.id,w.index,e.shiftKey)}
+         onMouseDown={()=>{dragging.current=true}}
+         onMouseEnter={e=>{if(e.buttons===1)markRange(g.id,w.index)}}
+         onMouseUp={()=>dragging.current=false}>
+         <span>{cell.mixed?'◐':chosen.short}</span>{cell.holidays>0&&<i aria-hidden="true"/>}
+        </button></td>
+       })}
+      </tr>];
+
+ }),[groups,weeks,events,rows,selection,start,end,cells]);
  return <section className="kug" data-testid="calendar-matrix">
   <header className="kug-top">
    <div><span className="kug-kicker">College Schedule · КУГ</span>
@@ -179,28 +219,7 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
      <tr className="kug-weekheads"><th className="kug-sticky-label">Группа · {weeks.length} недель</th>
       {weeks.map(w=><th key={w.index} title={w.start+' — '+w.end}><b>{w.index+1}</b><small>{dateText(w.start)}</small></th>)}</tr>
     </thead><tbody>
-    {groups.map((g,i)=>{
-     const sectionStart=i===0||groups[i-1].department!==g.department||groups[i-1].specialty!==g.specialty;
-     return [sectionStart?<tr key={'s-'+g.id} className="kug-section"><th colSpan={weeks.length+1}>{g.department} · {g.specialty}</th></tr>:null,
-      <tr key={g.id} className={rows.includes(g.id)?'kug-group-selected':''}>
-       <th scope="row" className="kug-sticky-label"><label><input type="checkbox" aria-label={'Выбрать группу '+g.id}
-        checked={rows.includes(g.id)} onChange={e=>toggleRow(g.id,e.target.checked)}/><span>{g.id}</span></label></th>
-       {weeks.map(w=>{
-        const cell=weekCell(events,g.id,w);
-        const highlighted=rows.includes(g.id)&&selection&&w.index>=start&&w.index<=end;
-        const chosen=phaseInfo(cell.phase);
-        return <td key={w.index}><button type="button" aria-label={g.id+', неделя '+(w.index+1)+': '+(cell.mixed?'Смешанная неделя':chosen.name)}
-         title={g.id+' · '+w.start+' — '+w.end+'\n'+(cell.mixed?cell.parts.map(p=>phaseInfo(p).name).join(' / '):chosen.name)+(cell.holidays?'\nПраздничных/неучебных дней: '+cell.holidays:'')}
-         className={'kug-cell kug-'+chosen.color+(cell.mixed?' kug-mixed':'')+(highlighted?' kug-picked':'')+(cell.holidays?' kug-has-holiday':'')}
-         onClick={e=>selectCell(g.id,w.index,e.shiftKey)}
-         onMouseDown={()=>{dragging.current=true}}
-         onMouseEnter={e=>{if(e.buttons===1)markRange(g.id,w.index)}}
-         onMouseUp={()=>dragging.current=false}>
-         <span>{cell.mixed?'◐':chosen.short}</span>{cell.holidays>0&&<i aria-hidden="true"/>}
-        </button></td>
-       })}
-      </tr>];
-    })}
+    {tableRows}
     </tbody></table>
    </div>
   </>:<div className="kug-single">

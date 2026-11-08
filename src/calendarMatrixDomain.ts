@@ -68,11 +68,12 @@ export const phaseAt=(events:CalendarEvent[],group:string,date:string):CalendarP
 };
 export type WeekCell={phase:CalendarPhase;mixed:boolean;holidays:number;parts:CalendarPhase[];unassignedDays:number};
 /** Never paint an unassigned week as theoretical training. */
-export function weekCell(events:CalendarEvent[],group:string,week:Week):WeekCell{
+export function weekCell(events:CalendarEvent[],group:string,week:Week,closedDays?:ReadonlyMap<string,boolean>):WeekCell{
  const phases:CalendarPhase[]=[],seen=new Set<CalendarPhase>();
  let holidays=0,unassignedDays=0;
+ const workweek=readCollegeWorkweek();
  for(let date=week.start;date<=week.end;date=plusDays(date,1)){
-  if(classifyCalendarDay(date,readCollegeWorkweek()).nonWorking){
+  if((closedDays?.get(date)??classifyCalendarDay(date,workweek).nonWorking)){
    holidays++;continue;
   }
   if(events.some(e=>e.kind==='holiday'&&e.from<=date&&e.to>=date&&
@@ -134,10 +135,10 @@ export function calendarChangeImpact(before:CalendarEvent[],after:CalendarEvent[
  }
  return {affected,newlyBlocked,alreadyBlocked,held};
 }
-export function checkCalendar(events:CalendarEvent[],groups:string[],weeks:Week[]):CalendarFinding[]{
+export function checkCalendar(events:CalendarEvent[],groups:string[],weeks:Week[],closedDays?:ReadonlyMap<string,boolean>):CalendarFinding[]{
  const findings:CalendarFinding[]=[];
  for(const group of groups)for(const week of weeks){
-  const status=weekCell(events,group,week);
+  const status=weekCell(events,group,week,closedDays);
   if(status.unassignedDays)findings.push({level:'error',group,week:week.index,
    message:'Не заполнено учебных дней: '+status.unassignedDays});
   if(status.mixed)findings.push({level:'warning',group,week:week.index,
