@@ -178,6 +178,9 @@ export function planningProgress(lessons:Lesson[],group:string,week:number):numb
 
 /** Read the synthetic calendar shared by the editor and planning tools, never production data. */
 export function currentDemoCalendar():CalendarEvent[]{
- try{const raw=localStorage.getItem('college-schedule-extras-v1');if(raw){const value=JSON.parse(raw);if(Array.isArray(value.calendar))return value.calendar as CalendarEvent[]}}catch{}
+ try{
+  const raw=localStorage.getItem('college-schedule-extras-v2')||localStorage.getItem('college-schedule-extras-v1');
+  if(raw){const value=JSON.parse(raw);if(Array.isArray(value.calendar))return value.calendar as CalendarEvent[]}
+ }catch{}
  return CALENDAR;
 }
