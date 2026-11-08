@@ -299,3 +299,37 @@
 .kug-admin-content .calendar-admin{margin:0}
 @media(max-width:780px){.kug-admin-toggle-main{gap:5px}.kug-admin-toggle{padding:9px 8px}}
 @media print{.kug-admin-accordion{display:none!important}}
+
+
+/* Table-first control layout: filters, view controls and density live next to the data. */
+.kug-table-controls{display:flex;flex-direction:column;gap:7px;border:1px solid #d9e8e0;background:#fff;
+ border-radius:10px;padding:9px 10px}
+.kug-table-controls .kug-filters{border:0;padding:0;background:transparent;box-shadow:none}
+.kug-table-controls .kug-display-options{border-top:1px solid #e8efeb;padding-top:7px;margin-top:0}
+.kug-table-controls .kug-display-options>span{white-space:nowrap}
+.kug-table-controls .kug-modes{margin-left:auto}
+.kug-table-controls .kug-filters .kug-search{max-width:360px}
+.kug-table-controls .kug-filters>label{min-width:100px}
+.kug-workspace-main{gap:7px}
+/* Restore the earlier legible group view instead of a 53-column micro-timeline. */
+.kug .kug-single{padding:11px;min-width:0}
+.kug .kug-single-weeks{display:grid;grid-template-columns:repeat(auto-fill,minmax(184px,1fr));
+ gap:8px;max-height:480px;overflow:auto;min-width:0;align-items:stretch;padding:2px}
+.kug .kug-single .kug-single-week{width:100%;min-width:0;min-height:95px;height:auto;
+ padding:9px 10px;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;
+ gap:6px;text-align:left;border:1px solid #d2e2d9;border-radius:9px}
+.kug .kug-single .kug-single-week>b{font-size:11px;line-height:1.35}
+.kug .kug-single .kug-single-week>span:not(.kug-day-strip){font-size:12px;line-height:1.35;
+ font-weight:600;white-space:normal;overflow-wrap:anywhere}
+.kug .kug-single .kug-single-week>.kug-single-strip{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));
+ gap:3px;width:100%;padding:0;margin-top:auto}
+.kug .kug-single .kug-single-week>.kug-single-strip .kug-day-dot{height:7px;border-radius:2px}
+.kug .kug-single .kug-single-week>small{font-size:10px;line-height:1.25;color:#895c50}
+.kug .kug-single .kug-single-week.kug-picked{box-shadow:inset 0 0 0 2px #168b72}
+@media(max-width:780px){
+ .kug-table-controls{padding:8px;gap:6px}
+ .kug-table-controls .kug-filters{gap:7px}
+ .kug-table-controls .kug-modes{margin-left:0}
+ .kug .kug-single-weeks{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));max-height:50vh}
+}
+@media print{.kug-table-controls{display:none!important}.kug .kug-single-weeks{max-height:none;overflow:visible}}
