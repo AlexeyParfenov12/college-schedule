@@ -9,6 +9,7 @@ import { academicGroupStats, demoAcademicDemands, demoAcademicHorizon, DEMO_SEME
 import type { AnnualConfig, AnnualVariant, YearDemand, PracticeBlock, TeacherPreference } from './yearSolver';
 import { lessonDate } from './plannerDomain';
 import { useProductionCalendarState, getProductionSnapshot } from './productionCalendarSync';
+import { getCollegeDayOverrides, useCollegeOverrideRevision } from './collegeDayOverrides';
 import { ACADEMIC_START, ACADEMIC_END, LEGACY_WEEK_OFFSET } from './weekTimeline';
 import { assessRoomFit } from './roomPolicy';
 import { effectiveGroupRules } from './scheduleConstraints';
@@ -37,6 +38,7 @@ const key=(name:string,subject:string)=>streamKey(name,subject);
 const periodOptions=(weeks:number)=>Array.from({length:weeks},(_,w)=><option key={w} value={w}>{w+1}-я · {w===0?ACADEMIC_START:lessonDate(w,0)}</option>);
 export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
  const production=useProductionCalendarState();
+ const collegeRevision=useCollegeOverrideRevision();
  const horizon=useMemo(()=>demoAcademicHorizon(calendar),[calendar]);
  const [cfg,setCfg]=useState<AnnualConfig>(()=>({...read(),weeks:demoAcademicHorizon(calendar)}));
  const backlog=useMemo(()=>{
@@ -54,7 +56,7 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
   }catch{return null}
  },[]);
  const [tab,setTab]=useState<Tab>('load');
- const demands=useMemo(()=>demoAcademicDemands(calendar,cfg.days,cfg.weeks),[calendar,cfg.days,cfg.weeks,production.revision]);
+ const demands=useMemo(()=>demoAcademicDemands(calendar,cfg.days,cfg.weeks),[calendar,cfg.days,cfg.weeks,production.revision,collegeRevision]);
  const [teacher,setTeacher]=useState(TEACHERS[0]),[teacherSearch,setTeacherSearch]=useState('');
  const [scopeType,setScopeType]=useState<'college'|'department'|'group'>('college');
  const [scopeDepartment,setScopeDepartment]=useState(GROUPS[0].department);
@@ -70,7 +72,7 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
  const [viewWeek,setViewWeek]=useState(0),[viewGroup,setViewGroup]=useState('П-21'),[issueSearch,setIssueSearch]=useState('');
  const [working,setWorking]=useState(false),[progress,setProgress]=useState('');
  const worker=useRef<Worker|null>(null);
- const lastProductionRevision=useRef(production.revision);
+ const lastProductionRevision=useRef(production.revision+'-'+collegeRevision);
  const [calculationRevision,setCalculationRevision]=useState<number|null>(null);
  const change=(next:(config:AnnualConfig)=>AnnualConfig)=>{
   setCfg(current=>{const value=next(current);try{localStorage.setItem('college-year-preferences-v3',JSON.stringify(value))}catch{}return value});
@@ -78,12 +80,13 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
  };
  useEffect(()=>()=>{worker.current?.terminate()},[]);
  useEffect(()=>{
-  if(lastProductionRevision.current===production.revision)return;
-  lastProductionRevision.current=production.revision;
+  const updated=production.revision+'-'+collegeRevision;
+  if(lastProductionRevision.current===updated)return;
+  lastProductionRevision.current=updated;
   worker.current?.terminate();worker.current=null;
   setWorking(false);setVariants([]);setCalculationRevision(null);
   setProgress('Производственный календарь обновлён. Пересчитайте варианты расписания.');
- },[production.revision]);
+ },[production.revision,collegeRevision]);
  useEffect(()=>{
   if(cfg.weeks!==horizon)change(current=>({...current,weeks:horizon}));
  },[cfg.weeks,horizon]);
@@ -143,7 +146,7 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
   }}
  }));
  const run=()=>{
-  worker.current?.terminate();setWorking(true);setProgress('Вычисление вариантов...');setVariants([]);setCalculationRevision(production.revision);setTab('results');
+  worker.current?.terminate();setWorking(true);setProgress('Вычисление вариантов...');setVariants([]);setCalculationRevision(production.revision+collegeRevision);setTab('results');
   const w=new Worker(new URL('./yearPlanner.worker.ts',import.meta.url),{type:'module'});worker.current=w;
   w.onmessage=(e:MessageEvent<{type:string;current?:number;name?:string;variants?:AnnualVariant[];message?:string}>)=>{
    if(e.data.type==='progress')setProgress('Вариант '+e.data.current+'/4: '+e.data.name);
@@ -151,7 +154,7 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
    if(e.data.type==='error'){setProgress(e.data.message||'Ошибка расчёта');setWorking(false);notify(e.data.message||'Ошибка расчёта');w.terminate();worker.current=null}
   };
   w.onerror=e=>{setWorking(false);setProgress('Ошибка запуска расчёта');notify(e.message);w.terminate();worker.current=null};
-  w.postMessage({demands,config:cfg,calendar,locked:lessons.filter(l=>l.status==='held'),production:getProductionSnapshot()});
+  w.postMessage({demands,config:cfg,calendar,locked:lessons.filter(l=>l.status==='held'),production:getProductionSnapshot(),collegeOverrides:getCollegeDayOverrides()});
  };
  const stop=()=>{worker.current?.terminate();worker.current=null;setWorking(false);setProgress('Расчёт остановлен')};
  const addPractice=()=>{
@@ -176,7 +179,7 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
  };
  const applyVariant=()=>{
   if(!selected)return;
-  if(calculationRevision!==production.revision)return notify('Производственный календарь изменился. Сначала пересчитайте 4 варианта.');
+  if(calculationRevision!==production.revision+collegeRevision)return notify('Производственный календарь изменился. Сначала пересчитайте 4 варианта.');
   const gaps=selected.unplaced.length,practice=selected.practiceIssues.length;
   const details=gaps||practice
    ?'ВНИМАНИЕ: вариант неполный. Неразмещённых назначений: '+gaps+'. Проблем практики: '+practice+'. Они сохранятся для разбора учебной частью. '

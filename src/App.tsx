@@ -17,6 +17,8 @@ import { lessonDate, WEEK_COUNT, calendarIssues, currentDemoCalendar } from './p
 import { LEGACY_WEEK_OFFSET, shiftLegacyWeek } from './weekTimeline';
 import { classifyCalendarDay, productionDiffersFromBaseline } from './productionCalendar';
 import { useProductionCalendarState } from './productionCalendarSync';
+import CalendarAdminCenter from './CalendarAdminCenter';
+import { useCollegeOverrideRevision } from './collegeDayOverrides';
 import { auditAnnualDraft } from './yearAudit';
 import { readCollegeWorkweek } from './productionCalendar';
 
@@ -55,6 +57,7 @@ function Field({label,children}:{label:string;children:ReactNode}){return <label
 
 export default function App(){
  const production=useProductionCalendarState();
+ const collegeRevision=useCollegeOverrideRevision();
  const [screen,setScreen]=useState<Screen>('schedule');
  const [collapsed,setCollapsed]=useState(false);
  const [mobileNavOpen,setMobileNavOpen]=useState(false);
@@ -102,7 +105,7 @@ export default function App(){
  const collisions=selected?cellConflict(selected,current):[];
  const issueCount=current.filter(x=>x.status!=='cancelled'&&(cellConflict(x,current).length>0||calendarIssues(x,currentDemoCalendar(),days).length>0)).length;
  const productionChangedLessons=useMemo(()=>items.filter(x=>x.status!=='cancelled'&&
-  productionDiffersFromBaseline(lessonDate(x.week||0,x.day),days)),[items,days,production.revision]);
+  productionDiffersFromBaseline(lessonDate(x.week||0,x.day),days)),[items,days,production.revision,collegeRevision]);
  const weekProductionDays=Array.from({length:days},(_,i)=>classifyCalendarDay(lessonDate(week,i),days));
  const closedWithLessons=current.filter(x=>x.status!=='cancelled'&&weekProductionDays[x.day]?.nonWorking);
  const displayName=NAV.find(x=>x[0]===screen)?.[1]||'Расписание';
@@ -329,9 +332,7 @@ export default function App(){
        day.kind==='shortened'?'Сокращённый':day.kind==='working-weekend'?'Рабочая суббота':'Рабочий'}
     </span>)}
   </div>
-  {production.warnings.length>0&&<div className="schedule-production-warning" title={production.warnings.join('\n')}>
-   <AlertTriangle size={15}/> Справочный API расходится с подтверждёнными постановлениями ({production.warnings.length}). Приоритет имеют официальные правила. Подробности при наведении.
-  </div>}
+  <CalendarAdminCenter mode="summary" lessons={items} onOpen={()=>show('calendar')}/>
   {(closedWithLessons.length>0||productionChangedLessons.length>0)&&<div className="schedule-production-warning">
    <AlertTriangle size={15}/> {closedWithLessons.length>0
      ?'На нерабочие дни текущей недели назначено пар: '+closedWithLessons.length+'. Проверьте или перенесите их вручную.'

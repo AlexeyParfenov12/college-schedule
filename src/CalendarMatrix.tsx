@@ -11,6 +11,8 @@ import { lessonDate } from './plannerDomain';
 import type { CalendarDay } from './productionCalendar';
 import { plusDays } from './calendarMatrixDomain';
 import './calendar-matrix.css';
+import CalendarAdminCenter from './CalendarAdminCenter';
+import { useCollegeOverrideRevision } from './collegeDayOverrides';
 
 type Props={events:CalendarEvent[];lessons:Lesson[];group:string;setGroup:(group:string)=>void;replace:(events:CalendarEvent[])=>void};
 type Selected={anchor:number;end:number;group:string};
@@ -34,6 +36,7 @@ function HeaderMonths({weeks}:{weeks:Week[]}){
 }
 export default function CalendarMatrix({events,lessons,group,setGroup,replace}:Props){
  const production=useProductionCalendarState();
+ const collegeRevision=useCollegeOverrideRevision();
  const [year,setYear]=useState(2026);
  const [mode,setMode]=useState<'all'|'single'>('all');
  const [query,setQuery]=useState('');
@@ -71,7 +74,7 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    if(!dates.has(date))dates.set(date,classifyCalendarDay(date,workweek));
   }
   return dates;
- },[weeks,production.revision,calendarWorkweek]);
+ },[weeks,production.revision,calendarWorkweek,collegeRevision]);
  const closedDays=useMemo(()=>new Map([...officialDays].map(([date,day])=>[date,day.nonWorking])),[officialDays]);
  const affectedLessons=useMemo(()=>lessons.filter(l=>l.status!=='cancelled'&&
    productionDiffersFromBaseline(lessonDate(l.week||0,l.day),calendarWorkweek)),[lessons,calendarWorkweek,production.revision]);
@@ -262,6 +265,7 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    </b>}
    {affectedLessons.length>0&&<b className="kug-production-affected">Проверьте {affectedLessons.length} занятий после обновления</b>}
   </div>
+  <CalendarAdminCenter lessons={lessons}/>
   <div className="kug-legend" aria-label="Обозначения периодов">
    {CALENDAR_PHASES.filter(x=>x.id!=='unassigned').map(p=><span key={p.id}><i className={'kug-fill kug-'+p.color}/><b>{p.short}</b> {p.name}</span>)}
    <span><i className="kug-fill kug-unassigned"/>— Не заполнено</span>
