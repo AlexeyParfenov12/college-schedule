@@ -77,6 +77,14 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
   }
   return result;
  },[groups,weeks,events,closedDays]);
+ // Stable daily overlays: do not recompute 7*53*groups day classifications on each click.
+ const dayCells=useMemo(()=>{
+  const cache=new Map<string,ReturnType<typeof kugWeekDays>>();
+  for(const g of groups)for(const w of weeks){
+   cache.set(g.id+':'+w.index,kugWeekDays(events,g.id,w,officialDays,calendarWorkweek));
+  }
+  return cache;
+ },[groups,weeks,events,officialDays,calendarWorkweek]);
  const selectedGroups=rows.filter(g=>GROUPS.some(x=>x.id===g));
  const start=selection?Math.min(selection.anchor,selection.end):0;
  const end=selection?Math.max(selection.anchor,selection.end):0;
@@ -177,7 +185,7 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
         const cell=cells.get(g.id+':'+w.index)!;
         const highlighted=rows.includes(g.id)&&selection&&w.index>=start&&w.index<=end;
         const chosen=phaseInfo(cell.phase);
-        const days=kugWeekDays(events,g.id,w,officialDays,calendarWorkweek);
+        const days=dayCells.get(g.id+':'+w.index)!;
         return <td key={w.index}><button type="button" aria-label={g.id+', неделя '+(w.index+1)+': '+(cell.mixed?'Смешанная неделя':chosen.name)}
          title={g.id+' · '+w.start+' — '+w.end+'\n'+(cell.mixed?cell.parts.map(p=>phaseInfo(p).name).join(' / '):chosen.name)+(cell.holidays?'\nПраздничных/неучебных дней: '+cell.holidays:'')}
          className={'kug-cell kug-'+chosen.color+(cell.mixed?' kug-mixed':'')+(highlighted?' kug-picked':'')+(cell.holidays?' kug-has-holiday':'')}
@@ -193,7 +201,7 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
        })}
       </tr>];
 
- }),[groups,weeks,events,rows,selection,start,end,cells,officialDays,calendarWorkweek]);
+ }),[groups,weeks,events,rows,selection,start,end,cells,dayCells]);
  return <section className="kug" data-testid="calendar-matrix">
   <header className="kug-top">
    <div><span className="kug-kicker">College Schedule · КУГ</span>
