@@ -25,7 +25,7 @@ DOCUMENTS=[
   "url":BASE+"/document/0001202609180037"}
 ]
 RELEVANT=re.compile(r"перенос.{0,24}выходн|нерабоч.{0,24}празднич|производственн.{0,15}календар|внесении изменений.{0,110}(?:1187|1466)",re.I|re.S)
-ID=re.compile(r"Номер опубликования\s*:\s*(000120\d{14})")
+ID=re.compile(r"Номер опубликования\s*:\s*(000120\d{10})")
 
 class PageText(HTMLParser):
  def __init__(self):
