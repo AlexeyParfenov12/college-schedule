@@ -44,3 +44,15 @@
 @media(max-width:800px){.calendar-admin-form{grid-template-columns:repeat(2,minmax(0,1fr))}.calendar-admin-form .calendar-admin-reason{grid-column:1/-1}}
 @media(max-width:480px){.calendar-admin-status,.calendar-admin-form{grid-template-columns:1fr}.calendar-admin-form .calendar-admin-reason{grid-column:auto}}
 @media print{.calendar-admin{display:none!important}}
+
+.calendar-admin-notice{background:#eef7f4;padding:10px 12px;border:1px solid #cfe4dc;border-radius:7px;color:#396c5c;font-size:11px;line-height:1.55}
+.calendar-admin-alert-controls{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.calendar-admin-alert-controls button,.calendar-admin-review-toggle,.calendar-admin-alert.acknowledged>button{border:1px solid #cddfd5;border-radius:7px;padding:8px 10px;min-height:32px;background:#f3faf6;color:#265d4e;font-size:11px;font-weight:700;cursor:pointer}
+.calendar-admin-alert-controls button.calendar-admin-mark{background:#176756;border-color:#176756;color:white}
+.calendar-admin-alert-controls button:hover,.calendar-admin-review-toggle:hover{filter:brightness(.95)}
+.calendar-admin-reviewed{border-top:1px solid #e3d9ca;margin-top:6px;padding-top:9px}
+.calendar-admin-reviewed>.calendar-admin-alert-items{margin-top:9px;padding:0}
+.calendar-admin-alert.acknowledged{background:#f7faf8;border-color:#d9e4dc}
+.calendar-admin-review-toggle{width:100%;text-align:left}
+.calendar-admin-manual{scroll-margin-top:80px}
+@media(max-width:480px){.calendar-admin-alert-controls button{width:100%}}
