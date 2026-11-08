@@ -186,14 +186,14 @@ describe('React interface smoke checks',()=>{
   expect(focused!.dataset.lessonId).toBeTruthy();
   expect(focused!.classList.contains('picked')).toBe(true);
  },20000);
- it('permits moving a lesson to the second half of the 40-week demo horizon',()=>{
+ it('offers all 53 calendar weeks for inter-week moves',()=>{
   render(<App/>);
   const first=document.querySelector<HTMLButtonElement>('.lesson');
   expect(first).toBeTruthy();
   fireEvent.click(first!);
   fireEvent.click(screen.getByRole('button',{name:'Другая неделя'}));
   const select=screen.getByRole('combobox',{name:'Целевая неделя'}) as HTMLSelectElement;
-  expect(select.options).toHaveLength(40);
+  expect(select.options).toHaveLength(53);
   fireEvent.change(select,{target:{value:'25'}});
   expect(select.value).toBe('25');
  },20000);
