@@ -7,6 +7,7 @@ import type { MoveOption } from './scheduleAssist';
 import { lessonDate } from './plannerDomain';
 import { withinAcademicYear } from './weekTimeline';
 import { classifyCalendarDay } from './productionCalendar';
+import { useProductionCalendarState } from './productionCalendarSync';
 
 /** Touch-first agenda for small screens; the desktop timetable remains unchanged. */
 export type MobileScheduleProps={
@@ -18,6 +19,7 @@ export type MobileScheduleProps={
 export default function MobileSchedule({
  week,days,times,lessons,day,selectedId,moveMode,targets,onDayChange,onOpen,onAdd,onTarget,onCancelMove
 }:MobileScheduleProps){
+ useProductionCalendarState();
  const touchOrigin=useRef<{x:number;y:number}|null>(null);
  const chosenDay=Math.min(Math.max(day,0),days-1);
  const onTouchStart=(event:TouchEvent<HTMLElement>)=>{
