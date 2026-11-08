@@ -123,6 +123,8 @@ describe('React interface smoke checks',()=>{
   const lesson=document.querySelector<HTMLButtonElement>('.lesson')!;
   fireEvent.contextMenu(lesson,{clientX:148,clientY:194});
   const menu=screen.getByRole('menu',{name:'Действия с занятием'});
+  expect(screen.queryByTestId('lesson-assistant')).toBeNull();
+  expect(screen.queryByTestId('smart-lesson-editor')).toBeNull();
   expect(within(menu).getByRole('menuitem',{name:'Открыть свойства'})).toBeTruthy();
   fireEvent.click(within(menu).getByRole('menuitem',{name:'Открыть свойства'}));
   expect(screen.queryByRole('menu',{name:'Действия с занятием'})).toBeNull();
@@ -130,6 +132,54 @@ describe('React interface smoke checks',()=>{
   expect(screen.queryByTestId('smart-lesson-editor')).toBeNull();
   fireEvent.contextMenu(lesson,{clientX:130,clientY:160});
   fireEvent.click(screen.getByRole('menuitem',{name:'Изменить занятие'}));
+  expect(screen.getByTestId('smart-lesson-editor')).toBeTruthy();
+ },20000);
+ it('right click on another lesson does not replace the current selected properties',()=>{
+  render(<App/>);
+  const lessons=Array.from(document.querySelectorAll<HTMLButtonElement>('.lesson'));
+  fireEvent.click(lessons[0]);
+  expect(lessons[0].classList.contains('picked')).toBe(true);
+  fireEvent.contextMenu(lessons[1],{clientX:174,clientY:204});
+  expect(screen.getByRole('menu',{name:'Действия с занятием'})).toBeTruthy();
+  expect(lessons[0].classList.contains('picked')).toBe(true);
+  expect(lessons[1].classList.contains('picked')).toBe(false);
+  fireEvent.click(screen.getByRole('menuitem',{name:'Открыть свойства'}));
+  expect(lessons[1].classList.contains('picked')).toBe(true);
+ },20000);
+ it('right click on an empty timetable cell shows actions without opening the editor',()=>{
+  render(<App/>);
+  const empty=document.querySelector<HTMLButtonElement>('.slot-cell .empty-slot:not([disabled])');
+  expect(empty).toBeTruthy();
+  fireEvent.contextMenu(empty!,{clientX:220,clientY:200});
+  const menu=screen.getByRole('menu',{name:'Действия с пустой ячейкой'});
+  expect(within(menu).getByRole('menuitem',{name:'Создать занятие'})).toBeTruthy();
+  expect(screen.queryByTestId('lesson-assistant')).toBeNull();
+  expect(screen.queryByTestId('smart-lesson-editor')).toBeNull();
+  fireEvent.click(within(menu).getByRole('menuitem',{name:'Создать занятие'}));
+  expect(screen.queryByRole('menu',{name:'Действия с пустой ячейкой'})).toBeNull();
+  expect(screen.getByTestId('smart-lesson-editor')).toBeTruthy();
+  expect(screen.getByTestId('selected-schedule-cell')).toBeTruthy();
+ },20000);
+ it('explains non-working days when right clicking an empty holiday cell',()=>{
+  render(<App/>);
+  fireEvent.click(screen.getByRole('button',{name:'Предыдущая неделя'}));
+  const blocked=document.querySelector<HTMLButtonElement>('.federal-closed-cell .empty-slot');
+  expect(blocked).toBeTruthy();
+  fireEvent.contextMenu(blocked!.closest('.slot-cell')!,{clientX:145,clientY:200});
+  const menu=screen.getByRole('menu',{name:'Действия с пустой ячейкой'});
+  expect(within(menu).getByRole('menuitem',{name:'Создать занятие'}).hasAttribute('disabled')).toBe(true);
+  expect(within(menu).getByText(/Нельзя назначить занятие/)).toBeTruthy();
+  fireEvent.click(within(menu).getByRole('menuitem',{name:'Открыть учебный календарь'}));
+  expect(screen.getByRole('heading',{name:'Учебный календарь'})).toBeTruthy();
+ },20000);
+ it('closes the empty-cell menu with Escape and keeps left click creation working',()=>{
+  render(<App/>);
+  const empty=document.querySelector<HTMLButtonElement>('.slot-cell .empty-slot:not([disabled])')!;
+  fireEvent.contextMenu(empty,{clientX:170,clientY:210});
+  expect(screen.getByRole('menu',{name:'Действия с пустой ячейкой'})).toBeTruthy();
+  fireEvent.keyDown(window,{key:'Escape'});
+  expect(screen.queryByRole('menu',{name:'Действия с пустой ячейкой'})).toBeNull();
+  fireEvent.click(empty);
   expect(screen.getByTestId('smart-lesson-editor')).toBeTruthy();
  },20000);
  it('expands grouped menus, keeps real routes and hides previews by default',()=>{
