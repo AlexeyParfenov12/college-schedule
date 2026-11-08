@@ -8,7 +8,7 @@ import { defaultAnnualConfig, streamKey, teacherRule, practiceWeekActive } from 
 import { academicGroupStats, demoAcademicDemands, demoAcademicHorizon, DEMO_SEMESTERS } from './academicPlanning';
 import type { AnnualConfig, AnnualVariant, YearDemand, PracticeBlock, TeacherPreference } from './yearSolver';
 import { lessonDate } from './plannerDomain';
-import { useProductionCalendarState } from './productionCalendarSync';
+import { useProductionCalendarState, getProductionSnapshot } from './productionCalendarSync';
 import { ACADEMIC_START, ACADEMIC_END, LEGACY_WEEK_OFFSET } from './weekTimeline';
 import { assessRoomFit } from './roomPolicy';
 import { effectiveGroupRules } from './scheduleConstraints';
@@ -142,7 +142,7 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
    if(e.data.type==='error'){setProgress(e.data.message||'Ошибка расчёта');setWorking(false);notify(e.data.message||'Ошибка расчёта');w.terminate();worker.current=null}
   };
   w.onerror=e=>{setWorking(false);setProgress('Ошибка запуска расчёта');notify(e.message);w.terminate();worker.current=null};
-  w.postMessage({demands,config:cfg,calendar,locked:lessons.filter(l=>l.status==='held')});
+  w.postMessage({demands,config:cfg,calendar,locked:lessons.filter(l=>l.status==='held'),production:getProductionSnapshot()});
  };
  const stop=()=>{worker.current?.terminate();worker.current=null;setWorking(false);setProgress('Расчёт остановлен')};
  const addPractice=()=>{
