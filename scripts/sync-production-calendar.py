@@ -91,6 +91,42 @@ def reconcile_legal_anchors(records: dict) -> list[str]:
     return warnings
 
 
+
+LEGAL_DOCUMENTS = {
+    "holiday": {
+        "title": "Статья 112 Трудового кодекса РФ (разъяснение Минтруда)",
+        "url": "https://mintrud.gov.ru/labour/relationship/351",
+    },
+    "2026": {
+        "title": "Постановление Правительства РФ от 24.09.2025 № 1466",
+        "url": "https://static.government.ru/media/files/4jeB8hNKm69ggOa9yDiYOli6YoAyM21i.pdf",
+        "officialPublication": "https://publication.pravo.gov.ru/document/0001202509240023",
+    },
+    "2027": {
+        "title": "Постановление Правительства РФ от 17.09.2026 № 1187",
+        "url": "https://publication.pravo.gov.ru/document/0001202609180037",
+        "officialPublication": "https://publication.pravo.gov.ru/document/0001202609180037",
+    },
+}
+def explain_discrepancy(warning: str) -> dict:
+    import re
+    match = re.match(r"(\d{4}-\d{2}-\d{2}): (five|six), справочный API=([012]), постановление=([012])", warning)
+    if not match:
+        raise ValueError("Не удалось разобрать расхождение: " + warning)
+    date,mode,reference,official=match.groups()
+    is_holiday = date.endswith("-11-04")
+    document=LEGAL_DOCUMENTS["holiday" if is_holiday else date[:4]]
+    kind = "федеральный нерабочий праздничный день" if is_holiday else "перенос выходного дня"
+    reason=(f"{date}: {kind}. Справочный isdayoff.ru считает день "
+            f"{'рабочим' if reference in ('0','2') else 'нерабочим'}, "
+            f"а подтверждённое правило — {'нерабочим' if official=='1' else 'рабочим'}. "
+            "Поэтому в College Schedule сохранено нормативное правило, а не ответ API.")
+    return {"id":f"federal-{date}-{mode}","date":date,"workweek":5 if mode=="five" else 6,
+            "apiCode":reference,"legalCode":official,"explanation":reason,
+            "documentTitle":document["title"],"officialUrl":document["url"],
+            "publicationUrl":document.get("officialPublication",document["url"]),
+            "status":"review_required","scope":"federal"}
+
 def main() -> int:
     previous = {}
     if DEST.exists():
@@ -119,6 +155,14 @@ def main() -> int:
     except ValueError as error:
         print(f"ERROR: {error}. Existing snapshot will remain untouched.", file=sys.stderr)
         return 1
+    discrepancies = [explain_discrepancy(warning) for warning in warnings]
+    official_monitor_path=ROOT/"public"/"official-calendar-monitor.json"
+    official_monitor=None
+    if official_monitor_path.exists():
+        try:
+            official_monitor=json.loads(official_monitor_path.read_text(encoding="utf-8"))
+        except (ValueError,OSError):
+            official_monitor=None
     DEST.parent.mkdir(parents=True, exist_ok=True)
     snapshot = {
         "version": 1,
@@ -126,12 +170,17 @@ def main() -> int:
         "checkedAt": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "years": records,
         "warnings": warnings,
+        "discrepancies": discrepancies,
+        "officialMonitor": official_monitor,
     }
     # Avoid rewrite on rapid successive runs while recording a new check every day.
     if DEST.exists():
         try:
             previous_data = json.loads(DEST.read_text(encoding="utf-8"))
-            if previous_data.get("years") == records and previous_data.get("checkedAt", "")[:10] == snapshot["checkedAt"][:10]:
+            if (previous_data.get("years") == records
+                and previous_data.get("discrepancies") == discrepancies
+                and previous_data.get("officialMonitor") == official_monitor
+                and previous_data.get("checkedAt", "")[:10] == snapshot["checkedAt"][:10]):
                 print("Already checked today; no changes.")
                 return 0
         except (OSError, ValueError):
