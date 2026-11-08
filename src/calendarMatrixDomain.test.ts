@@ -102,9 +102,9 @@ describe('calendar validation and actual impact',()=>{
   expect(bad.some(f=>f.level==='error'&&f.message.includes('Конфликт периодов'))).toBe(true);
  });
  it('counts only lessons made newly incompatible, not every lesson in changed weeks',()=>{
-  const lessons=[{id:'lesson-1',week:0,day:0,slot:1,subject:'Математика',teacher:'Тест',
+  const lessons=[{id:'lesson-1',week:10,day:0,slot:1,subject:'Математика',teacher:'Тест',
    groups:['П-21'],room:'101',type:'regular' as const,mode:'offline' as const},
-   {id:'lesson-2',week:0,day:0,slot:1,subject:'История',teacher:'Тест',
+   {id:'lesson-2',week:10,day:0,slot:1,subject:'История',teacher:'Тест',
    groups:['П-22'],room:'102',type:'regular' as const,mode:'offline' as const}];
   const after=assignPeriod(CALENDAR,['П-21'],'2026-11-09','2026-11-15','vacation');
   const impact=calendarChangeImpact(CALENDAR,after,lessons,['П-21'],'2026-11-09','2026-11-15');
