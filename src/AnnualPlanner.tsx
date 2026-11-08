@@ -70,11 +70,20 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
  const [viewWeek,setViewWeek]=useState(0),[viewGroup,setViewGroup]=useState('П-21'),[issueSearch,setIssueSearch]=useState('');
  const [working,setWorking]=useState(false),[progress,setProgress]=useState('');
  const worker=useRef<Worker|null>(null);
+ const lastProductionRevision=useRef(production.revision);
+ const [calculationRevision,setCalculationRevision]=useState<number|null>(null);
  const change=(next:(config:AnnualConfig)=>AnnualConfig)=>{
   setCfg(current=>{const value=next(current);try{localStorage.setItem('college-year-preferences-v3',JSON.stringify(value))}catch{}return value});
   setVariants([]);
  };
  useEffect(()=>()=>{worker.current?.terminate()},[]);
+ useEffect(()=>{
+  if(lastProductionRevision.current===production.revision)return;
+  lastProductionRevision.current=production.revision;
+  worker.current?.terminate();worker.current=null;
+  setWorking(false);setVariants([]);setCalculationRevision(null);
+  setProgress('Производственный календарь обновлён. Пересчитайте варианты расписания.');
+ },[production.revision]);
  useEffect(()=>{
   if(cfg.weeks!==horizon)change(current=>({...current,weeks:horizon}));
  },[cfg.weeks,horizon]);
@@ -134,7 +143,7 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
   }}
  }));
  const run=()=>{
-  worker.current?.terminate();setWorking(true);setProgress('Вычисление вариантов...');setVariants([]);setTab('results');
+  worker.current?.terminate();setWorking(true);setProgress('Вычисление вариантов...');setVariants([]);setCalculationRevision(production.revision);setTab('results');
   const w=new Worker(new URL('./yearPlanner.worker.ts',import.meta.url),{type:'module'});worker.current=w;
   w.onmessage=(e:MessageEvent<{type:string;current?:number;name?:string;variants?:AnnualVariant[];message?:string}>)=>{
    if(e.data.type==='progress')setProgress('Вариант '+e.data.current+'/4: '+e.data.name);
@@ -167,6 +176,7 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
  };
  const applyVariant=()=>{
   if(!selected)return;
+  if(calculationRevision!==production.revision)return notify('Производственный календарь изменился. Сначала пересчитайте 4 варианта.');
   const gaps=selected.unplaced.length,practice=selected.practiceIssues.length;
   const details=gaps||practice
    ?'ВНИМАНИЕ: вариант неполный. Неразмещённых назначений: '+gaps+'. Проблем практики: '+practice+'. Они сохранятся для разбора учебной частью. '
