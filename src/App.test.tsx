@@ -135,12 +135,14 @@ describe('React interface smoke checks',()=>{
  it('expands grouped menus, keeps real routes and hides previews by default',()=>{
   render(<App/>);
   const nav=within(document.querySelector('aside.nav nav')!);
-  expect(nav.queryByRole('button',{name:'Предпросмотр преподавателя'})).toBeNull();
+  const rolePreview=nav.getByText('Предпросмотр ролей').closest('details');
+  expect(rolePreview?.open).toBe(false);
   fireEvent.click(nav.getByRole('button',{name:'Развернуть Справочники'}));
   fireEvent.click(nav.getByRole('button',{name:'Группы и подгруппы'}));
   expect(screen.getByRole('heading',{name:'Группы и подгруппы'})).toBeTruthy();
   expect(nav.getByRole('button',{name:'Свернуть Справочники'})).toBeTruthy();
   fireEvent.click(nav.getByText('Предпросмотр ролей'));
+  expect(rolePreview?.open).toBe(true);
   fireEvent.click(nav.getByRole('button',{name:'Предпросмотр преподавателя'}));
   expect(screen.getByRole('heading',{name:'Преподаватель'})).toBeTruthy();
  },20000);

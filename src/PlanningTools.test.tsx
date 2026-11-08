@@ -5,7 +5,20 @@ import App from './App';
 
 beforeEach(()=>{localStorage.clear()});
 afterEach(()=>cleanup());
-const navigation=(name:string)=>{fireEvent.click(within(document.querySelector('aside.nav nav')!).getByRole('button',{name}))};
+const navigation=(name:string)=>{
+ const nav=within(document.querySelector('aside.nav nav')!);
+ const nested:Record<string,{parent:string;label:string}>={
+  'Шаблоны':{parent:'Расписание',label:'Шаблоны расписания'},
+  'Автосоставление':{parent:'Планирование',label:'Автосоставление на неделю'},
+  'Аудитории':{parent:'Справочники',label:'Аудитории'}
+ };
+ const tool=nested[name];
+ if(tool){
+  const expand=nav.queryByRole('button',{name:'Развернуть '+tool.parent});
+  if(expand)fireEvent.click(expand);
+  fireEvent.click(nav.getByRole('button',{name:tool.label}));
+ }else fireEvent.click(nav.getByRole('button',{name}));
+};
 
 describe('visual guided planning workflows',()=>{
  it('shows one KUG editor with official holidays embedded instead of the old production-calendar block',()=>{

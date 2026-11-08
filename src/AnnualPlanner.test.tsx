@@ -4,7 +4,7 @@ import { cleanup,fireEvent,render,screen,within } from '@testing-library/react';
 import App from './App';
 
 beforeEach(()=>localStorage.clear());afterEach(()=>cleanup());
-const open=()=>{render(<App/>);const nav=within(document.querySelector('aside.nav nav')!);fireEvent.click(nav.getByRole('button',{name:'Годовой планировщик'}))};
+const open=()=>{render(<App/>);const nav=within(document.querySelector('aside.nav nav')!);fireEvent.click(nav.getByRole('button',{name:'Планирование'}))};
 describe('Annual scheduler navigation and group practices',()=>{
  it('shows the large annual wizard with constraints and variants',()=>{
   open();
