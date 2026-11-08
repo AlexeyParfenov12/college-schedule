@@ -14,12 +14,12 @@ function openScreen(key:ScreenKey){
  }
  const group=NAV_SECTIONS.find(item=>item.key===key||item.children.some(([child])=>child===key));
  if(group){
-  if(group.key===key)fireEvent.click(nav.getByRole('button',{name:group.label,exact:true}));
+  if(group.key===key)fireEvent.click(nav.getByRole('button',{name:group.label}));
   else{
    const toggle=nav.queryByRole('button',{name:'Развернуть '+group.label});
    if(toggle)fireEvent.click(toggle);
    const child=group.children.find(([child])=>child===key)!;
-   fireEvent.click(nav.getByRole('button',{name:child[1],exact:true}));
+   fireEvent.click(nav.getByRole('button',{name:child[1]}));
   }
   return;
  }
@@ -28,7 +28,7 @@ function openScreen(key:ScreenKey){
   const summary=nav.getByText('Предпросмотр ролей');
   const detail=summary.closest('details');
   if(detail&&!detail.open)fireEvent.click(summary);
-  fireEvent.click(nav.getByRole('button',{name:preview[1],exact:true}));
+  fireEvent.click(nav.getByRole('button',{name:preview[1]}));
  }
 }
 
@@ -55,7 +55,7 @@ describe('React interface smoke checks',()=>{
   expect(screen.getByRole('heading',{name:'Расписание'})).toBeTruthy();
   const nav=within(document.querySelector('aside.nav nav')!);
   expect(NAV_SECTIONS).toHaveLength(8);
-  for(const section of NAV_SECTIONS)expect(nav.getByRole('button',{name:section.label,exact:true})).toBeTruthy();
+  for(const section of NAV_SECTIONS)expect(nav.getByRole('button',{name:section.label})).toBeTruthy();
   for(const [key] of NAV)expect(menuContainsScreen(key)).toBe(true);
   expect(nav.getByRole('button',{name:'Шаблоны расписания'})).toBeTruthy();
   expect(nav.getByRole('button',{name:'Развернуть Планирование'})).toBeTruthy();
