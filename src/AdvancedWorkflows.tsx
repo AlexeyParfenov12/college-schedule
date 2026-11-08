@@ -8,6 +8,7 @@ import { exportCSV, exportJSON, findFree, validate, groupCount, workload, report
 import { CalendarStudio, TemplateStudio, GeneratorStudio } from './PlanningTools';
 import { MiniSchedule, LoadBars, PeriodTimeline } from './ScheduleVisuals';
 import { WEEK_COUNT, calendarIssues } from './plannerDomain';
+import { LEGACY_WEEK_OFFSET, shiftLegacyWeek } from './weekTimeline';
 import RoomManager from './RoomManager';
 import { demoAcademicDemands, demoAcademicHorizon } from './academicPlanning';
 
@@ -17,9 +18,24 @@ type Template={id:string;name:string;week:number;group:string;weeks:number;locke
 type Roster=Record<string,{id:string;name:string;subgroup:number}[]>;
 type RoomsMap=Record<string,{blocked:boolean;reason:string}>;
 type Store={calendar:CalendarEvent[];roster:Roster;absences:Absence[];rooms:RoomsMap;rules:Rule[];snapshots:Snapshot[];templates:Template[];times:string[];notifications:string[]};
-const key='college-schedule-extras-v1';
-const defaults=():Store=>({calendar:CALENDAR,roster:ROSTERS,absences:ABSENCES,rooms:{},rules:RULES,snapshots:[],templates:[{id:'template-a',name:'Двухнедельный цикл ИТ',week:0,group:'П-21',weeks:2,locked:true},{id:'template-b',name:'Основной цикл радиотехники',week:0,group:'Р-21',weeks:4,locked:false}],times:[...TIMES],notifications:[]});
-const saved=():Store=>{try{const v=localStorage.getItem(key);if(v){const s=JSON.parse(v);return {...defaults(),...s}}}catch{}return defaults()};
+const key='college-schedule-extras-v2';
+const legacyKey='college-schedule-extras-v1';
+const defaults=():Store=>({calendar:CALENDAR,roster:ROSTERS,absences:ABSENCES.map(x=>({...x,from:x.from+LEGACY_WEEK_OFFSET,to:x.to+LEGACY_WEEK_OFFSET})),rooms:{},rules:RULES,snapshots:[],templates:[{id:'template-a',name:'Двухнедельный цикл ИТ',week:LEGACY_WEEK_OFFSET,group:'П-21',weeks:2,locked:true},{id:'template-b',name:'Основной цикл радиотехники',week:LEGACY_WEEK_OFFSET,group:'Р-21',weeks:4,locked:false}],times:[...TIMES],notifications:[]});
+/** Read v1 once in memory. Its week numbers are November-based; the v1 key stays untouched. */
+const saved=():Store=>{try{
+ const modern=localStorage.getItem(key);
+ if(modern)return {...defaults(),...JSON.parse(modern)};
+ const legacy=localStorage.getItem(legacyKey);
+ if(legacy){
+  const old=JSON.parse(legacy) as Partial<Store>;
+  return {...defaults(),...old,
+   templates:old.templates?.map(t=>({...t,week:t.week+LEGACY_WEEK_OFFSET}))??defaults().templates,
+   absences:old.absences?.map(a=>({...a,from:a.from+LEGACY_WEEK_OFFSET,to:a.to+LEGACY_WEEK_OFFSET}))??defaults().absences,
+   snapshots:old.snapshots?.map(v=>({...v,week:v.week+LEGACY_WEEK_OFFSET,
+    lessons:v.lessons.map(shiftLegacyWeek)}))??[]
+  };
+ }
+}catch{}return defaults()};
 const newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const stamp=()=>new Date().toLocaleString('ru-RU');
 const validRoom=(room:string)=>ROOMS.find(r=>r.id===room);
