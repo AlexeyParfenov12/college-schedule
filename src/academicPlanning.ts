@@ -7,6 +7,7 @@
  */
 import { GROUPS, TEACHERS, CALENDAR } from './data';
 import type { CalendarEvent } from './data';
+import { phaseAt } from './calendarMatrixDomain';
 import { lessonDate, WEEK_COUNT } from './plannerDomain';
 import { classifyCalendarDay } from './productionCalendar';
 import type { Workweek } from './productionCalendar';
@@ -45,9 +46,8 @@ function relevant(e:CalendarEvent,group:string,date:string){
 }
 export function isTeachingDate(date:string,group:string,calendar:CalendarEvent[],workweek:Workweek):boolean{
  if(classifyCalendarDay(date,workweek).nonWorking)return false;
- const study=calendar.filter(e=>e.kind==='study'&&(e.groups.length===0||e.groups.includes(group)));
- if(!study.length||!study.some(e=>relevant(e,group,date)))return false;
- return !calendar.some(e=>e.kind!=='study'&&relevant(e,group,date));
+ if(calendar.some(e=>e.kind==='holiday'&&relevant(e,group,date)))return false;
+ return phaseAt(calendar,group,date)==='study';
 }
 /** Returns weeks with at least one permissible lesson day during a fixture semester. */
 export function teachingWeeks(group:string,calendar:CalendarEvent[],workweek:Workweek,weeks:number,semester:SemesterFixture){

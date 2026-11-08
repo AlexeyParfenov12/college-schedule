@@ -11,6 +11,7 @@ describe('visual guided planning workflows',()=>{
  it('shows the semester timeline and a preview of calendar impact',()=>{
   render(<App/>);
   navigation('Учебный календарь');
+  fireEvent.click(screen.getByText('Расширенный редактор и производственный календарь'));
   expect(screen.getByTestId('calendar-studio')).toBeTruthy();
   expect(screen.getByTestId('academic-timeline')).toBeTruthy();
   expect(screen.getByText(/Учебный календарь — когда колледж учится/)).toBeTruthy();
@@ -76,6 +77,7 @@ describe('visual guided planning workflows',()=>{
  it('can assign one academic period to several selected groups without creating duplicate calendars',()=>{
   render(<App/>);
   navigation('Учебный календарь');
+  fireEvent.click(screen.getByText('Расширенный редактор и производственный календарь'));
   expect(screen.getByRole('combobox',{name:'Просмотр календаря группы'})).toBeTruthy();
   fireEvent.change(screen.getByRole('combobox',{name:'Тип периода'}),{target:{value:'study'}});
   fireEvent.change(screen.getByRole('combobox',{name:'На кого действует'}),{target:{value:'custom'}});
@@ -91,6 +93,7 @@ describe('visual guided planning workflows',()=>{
  it('adds college vacations with explicit dates for a selected department, without inventing official periods',()=>{
   render(<App/>);
   navigation('Учебный календарь');
+  fireEvent.click(screen.getByText('Расширенный редактор и производственный календарь'));
   expect(screen.getByRole('region',{name:'Каникулы выбранной группы'}).textContent).toContain('Зимний межсеместровый перерыв');
   expect(screen.queryByRole('button',{name:'Осенние каникулы'})).toBeNull();
   expect(screen.queryByRole('button',{name:'Весенние каникулы'})).toBeNull();

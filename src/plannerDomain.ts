@@ -1,5 +1,6 @@
 import { DAYS, GROUPS, ROOMS, TEACHERS, SUBJECTS, CALENDAR } from './data';
 import type { Lesson, CalendarEvent } from './data';
+import { phaseAt } from './calendarMatrixDomain';
 import { occupiedRooms, validate } from './demoLogic';
 import { assessRoomFit, needsComputers } from './roomPolicy';
 import { classifyCalendarDay, readCollegeWorkweek } from './productionCalendar';
@@ -64,7 +65,16 @@ export function calendarIssues(lesson:Lesson,calendar:CalendarEvent[],workweek:W
  const custom=calendar.filter(e=>e.from<=date&&date<=e.to&&(e.groups.length===0||lesson.groups.some(g=>e.groups.includes(g))))
   .filter(e=>e.kind==='holiday'||e.kind==='vacation'||(e.kind==='practice'&&!lesson.practiceBlockId))
   .map(e=>'Учебный календарь: '+e.title+' ('+date+')');
- return [...new Set([...results,...custom])];
+ const activity=calendar.length?lesson.groups.flatMap(group=>{
+  const phase=phaseAt(calendar,group,date);
+  if(phase==='unassigned')return ['График '+group+': учебный период не назначен ('+date+')'];
+  if(['exam','state'].includes(phase)&&!/экзамен|зач[её]т|аттестац|консультац/i.test(lesson.subject))
+   return ['График '+group+': в период аттестации нельзя назначить обычную пару'];
+  if(['training','industrial','prediploma'].includes(phase)&&!lesson.practiceBlockId)
+   return ['График '+group+': период практики требует соответствующего назначения'];
+  return [];
+ }):[];
+ return [...new Set([...results,...custom,...activity])];
 }
 export function calendarWarnings(lesson:Lesson,calendar:CalendarEvent[]):string[]{
  const day=lessonDate(lesson.week||0,lesson.day);

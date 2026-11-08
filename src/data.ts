@@ -50,7 +50,7 @@ export const INITIAL:Lesson[]=[
  make('demo-19',4,4,'Базы данных',TEACHERS[5],['П-21'],'105')
 ];
 export const ROSTERS: Record<string,{id:string;name:string;subgroup:number}[]> = Object.fromEntries(GROUPS.map((g,i)=>[g.id,Array.from({length:g.count},(_,j)=>({id:g.id+'-'+String(j+1).padStart(2,'0'),name:['Иванов','Петров','Сидоров','Смирнов','Кузнецов','Попов','Орлов','Волков','Соколов','Крылов','Егоров','Сергеев'][j%12]+' '+['Александр','Максим','Мария','Екатерина','Дмитрий','Артём','Анна','Никита','Полина','Иван','София','Павел'][(j+i)%12]+' '+(j%2?'В.':'А.'),subgroup:j<Math.ceil(g.count/2)?1:2}))]));
-export type CalendarEvent={id:string;title:string;kind:'study'|'exam'|'vacation'|'practice'|'holiday';from:string;to:string;groups:string[]};
+export type CalendarEvent={id:string;title:string;kind:'study'|'exam'|'vacation'|'practice'|'holiday';from:string;to:string;groups:string[];periodCode?:import('./calendarMatrixDomain').CalendarPhase};
 export const CALENDAR:CalendarEvent[]=[
  {id:'cal-1',title:'Учебные недели',kind:'study',from:'2026-09-01',to:'2026-12-28',groups:[]},
  {id:'cal-2',title:'Экзаменационная сессия',kind:'exam',from:'2027-01-11',to:'2027-01-25',groups:[]},

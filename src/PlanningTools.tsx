@@ -1,4 +1,5 @@
 import PolishedSelect from './PolishedSelect';
+import CalendarMatrix from './CalendarMatrix';
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowRight, CalendarDays, Check, ChevronRight, Copy, HelpCircle, Layers3, RotateCcw, Search, ShieldCheck, Sparkles, WandSparkles } from 'lucide-react';
 import { DAYS, GROUPS, TIMES } from './data';
@@ -19,8 +20,8 @@ function Field({name,children}:{name:string;children:React.ReactNode}){return <l
 function Info({children}:{children:React.ReactNode}){return <p className="plan-info"><HelpCircle size={15}/><span>{children}</span></p>}
 function Cmd({onClick,children,disabled=false}:{onClick:()=>void;children:React.ReactNode;disabled?:boolean}){return <button type="button" className="plan-command" disabled={disabled} onClick={onClick}>{children}</button>}
 
-type CalendarProps={events:CalendarEvent[];lessons:Lesson[];group:string;setGroup:(g:string)=>void;week:number;setWeek:(w:number)=>void;add:(v:CalendarEvent)=>void;remove:(id:string)=>void};
-export function CalendarStudio({events,lessons,group,setGroup,week,setWeek,add,remove}:CalendarProps){
+type CalendarProps={events:CalendarEvent[];lessons:Lesson[];group:string;setGroup:(g:string)=>void;week:number;setWeek:(w:number)=>void;add:(v:CalendarEvent)=>void;remove:(id:string)=>void;replace:(v:CalendarEvent[])=>void};
+export function CalendarStudio({events,lessons,group,setGroup,week,setWeek,add,remove,replace}:CalendarProps){
  const [kind,setKind]=useState<CalendarEvent['kind']>('practice');
  const [title,setTitle]=useState('Учебная практика');
  const [from,setFrom]=useState('2026-11-16');
@@ -53,6 +54,8 @@ export function CalendarStudio({events,lessons,group,setGroup,week,setWeek,add,r
   setConfirmed(false);setPeriodError('');setVacationNote(true);
  };
  return <div className="plan-page" data-testid="calendar-studio">
+  <CalendarMatrix events={events} lessons={lessons} group={group} setGroup={setGroup} replace={replace}/>
+  <details className="kug-legacy"><summary>Расширенный редактор и производственный календарь</summary>
   <div className="plan-intro"><div><strong>Учебный календарь — когда колледж учится</strong><p>Определяет учебные недели, практики, сессии, каникулы и выходные. Расписание строится внутри разрешённых периодов. Календарь не заменяет расписание занятий.</p></div><CalendarDays size={25}/></div>
   <OfficialCalendar/>
   <Heading step={1}>Посмотри учебные периоды выбранной группы</Heading>
@@ -102,6 +105,7 @@ export function CalendarStudio({events,lessons,group,setGroup,week,setWeek,add,r
    </section>
   </div>
   <Info>Позже календарь будет формироваться из общего Academic Core: академический год, семестры, график практики, производственный календарь и периоды аттестации. Здесь редактируется только демоверсия.</Info>
+  </details>
  </div>;
 }
 

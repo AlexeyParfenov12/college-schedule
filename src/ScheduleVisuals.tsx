@@ -35,7 +35,7 @@ export function MiniSchedule({lessons,week,group,teacher,room,highlightIds=[],on
 export function PeriodTimeline({calendar,lessons,group,onWeek,activeWeek=0}:{calendar:CalendarEvent[];lessons:Lesson[];group:string;onWeek?:(week:number)=>void;activeWeek?:number}){
  const summaries=calendarWeekSummaries(calendar,lessons,group);
  return <div className="viz-period" data-testid="academic-timeline">
-  <div className="viz-period-head"><div><strong>Карта учебных недель</strong><small>{group} · 16 недель · учёба, практики, сессии, каникулы</small></div><CalendarDays size={19}/></div>
+  <div className="viz-period-head"><div><strong>Карта учебных недель</strong><small>{group} · {summaries.length} недель демопланировщика · учёба, практики, сессии, каникулы</small></div><CalendarDays size={19}/></div>
   <div className="viz-period-grid">{summaries.map(s=>{
    const event=calendar.find(e=>e.from<=lessonDate(s.week,6)&&e.to>=s.start&&(e.groups.length===0||e.groups.includes(group))&&e.kind!=='study');
    const kind=event?.kind||'study';
