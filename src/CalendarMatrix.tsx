@@ -264,13 +264,13 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
     <h2>Календарный учебный график</h2>
     <p>Сначала периоды групп — затем расписание занятий. Выдели недели и назначь вид учебной деятельности.</p>
    </div>
-   <div className="kug-actions">
+   <details className="kug-tools"><summary>Импорт, экспорт и печать</summary><div className="kug-actions">
     <button onClick={handleExport}><Download size={15}/> CSV для Excel</button>
     <button onClick={handleJSON}><Download size={15}/> Резервная копия JSON</button>
     <label className="kug-import-label"><span>Импорт CSV</span><input type="file" accept=".csv,text/csv" aria-label="Загрузить график из CSV" onChange={e=>{void readCSV(e.target.files?.[0]);e.target.value=''}}/></label>
     <label className="kug-import-label"><span>Восстановить JSON</span><input type="file" accept=".json,application/json" aria-label="Восстановить календарь из JSON" onChange={e=>{void readBackup(e.target.files?.[0]);e.target.value=''}}/></label>
     <button onClick={()=>window.print()}>Печать</button>
-   </div>
+   </div></details>
   </header>
   <div className="kug-filters">
    <label>Учебный год<select aria-label="Учебный год КУГ" value={year} onChange={e=>{setYear(Number(e.target.value));setSelection(null);setPreview(false);setImportPending(null);setBackupPending(null);setCopyPending(null)}}>
@@ -280,10 +280,27 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    <label>Курс<select aria-label="Курс КУГ" value={course} onChange={e=>setCourse(e.target.value)}><option value="all">Все курсы</option>
     {[1,2,3,4].map(x=><option key={x} value={x}>{x} курс</option>)}</select></label>
    <label className="kug-search"><span>Поиск групп</span><span><Search size={15}/><input aria-label="Поиск группы КУГ" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Группа, специальность..."/></span></label>
+   <label>Показать<select aria-label="Фильтр проблем КУГ" value={issueFilter} onChange={e=>setIssueFilter(e.target.value as IssueFilter)}>
+    <option value="all">Все группы</option><option value="unassigned">С незаполненными днями</option>
+    <option value="conflicts">С конфликтами</option><option value="practice">С практикой</option>
+   </select></label>
    <div className="kug-modes" role="group" aria-label="Режим календаря">
-    <button className={mode==='all'?'active':''} aria-pressed={mode==='all'} onClick={()=>setMode('all')}><Table2 size={15}/> Все группы</button>
-    <button className={mode==='single'?'active':''} aria-pressed={mode==='single'} onClick={()=>setMode('single')}><Users size={15}/> Одна группа</button>
+    <button className={mode==='year'?'active':''} aria-pressed={mode==='year'} onClick={()=>setMode('year')}><Table2 size={15}/> Весь год</button>
+    <button className={mode==='quarter'?'active':''} aria-pressed={mode==='quarter'} onClick={()=>setMode('quarter')}><Table2 size={15}/> 4 месяца</button>
+    <button className={mode==='single'?'active':''} aria-pressed={mode==='single'} onClick={()=>setMode('single')}><Users size={15}/> Группа</button>
    </div>
+  </div>
+  <div className="kug-display-options">
+   {mode==='quarter'&&<div className="kug-term-switch" role="group" aria-label="Период четырёх месяцев">
+    {([{start:0,label:'Сентябрь — декабрь'},{start:4,label:'Январь — апрель'},{start:8,label:'Май — август'}] as const)
+     .map(t=><button type="button" key={t.start} className={quarter===t.start?'active':''} aria-pressed={quarter===t.start}
+     onClick={()=>setQuarter(t.start)}>{t.label}</button>)}
+   </div>}
+   <label>Плотность<select aria-label="Плотность календаря" value={density} onChange={e=>setDensity(e.target.value as Density)}>
+    <option value="compact">Компактная</option><option value="standard">Стандартная</option>
+    <option value="detailed">Подробная</option>
+   </select></label>
+   <span>{visibleWeeks.length} недель · {groups.length} групп</span>
   </div>
   {importError&&<p className="kug-alert" role="alert">{importError}</p>}
   {backupError&&<p className="kug-alert" role="alert">{backupError}</p>}
@@ -313,8 +330,8 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    </b>}
    {affectedLessons.length>0&&<b className="kug-production-affected">Проверьте {affectedLessons.length} занятий после обновления</b>}
   </div>
-  <CalendarAdminCenter lessons={lessons}/>
-  <div className="kug-legend" aria-label="Обозначения периодов">
+  <details className="kug-admin-details"><summary>Уведомления учебной части и ручные изменения календаря</summary><CalendarAdminCenter lessons={lessons}/></details>
+  <details className="kug-legend-details"><summary>Условные обозначения периодов и календарных дней</summary><div className="kug-legend" aria-label="Обозначения периодов">
    {CALENDAR_PHASES.filter(x=>x.id!=='unassigned').map(p=><span key={p.id}><i className={'kug-fill kug-'+p.color}/><b>{p.short}</b> {p.name}</span>)}
    <span><i className="kug-fill kug-unassigned"/>— Не заполнено</span>
    <span className="kug-legend-day"><i className="kug-day-dot kug-day-weekend"/> Выходной</span>
@@ -324,7 +341,7 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    <span className="kug-legend-day"><i className="kug-day-dot kug-day-shortened"/> Сокращённый день</span>
    <span className="kug-legend-day"><i className="kug-day-dot kug-day-college"/> Доп. выходной колледжа</span>
    <span className="kug-legend-day"><i className="kug-day-dot kug-day-college-work"/> Рабочий день колледжа</span>
-  </div>
+  </div></details>
   {mode==='all'?<>
    <div className="kug-matrix-help">
     <span>Отметь группы, затем выбери неделю. <b>Shift + нажатие</b> или протягивание выделит интервал.</span>
