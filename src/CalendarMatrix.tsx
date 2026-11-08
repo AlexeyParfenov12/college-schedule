@@ -63,16 +63,16 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
   (course==='all'||String(g.course)===course)&&
   (g.id+' '+g.specialty+' '+g.department).toLowerCase().includes(query.toLowerCase())
  ),[department,course,query]);
+ const calendarWorkweek=readCollegeWorkweek();
  // Cache official non-working days once per displayed year, not per group and cell.
  const officialDays=useMemo(()=>{
-  const dates=new Map<string,CalendarDay>(),workweek=readCollegeWorkweek();
+  const dates=new Map<string,CalendarDay>(),workweek=calendarWorkweek;
   for(const week of weeks)for(let date=week.from;date<=week.to;date=plusDays(date,1)){
    if(!dates.has(date))dates.set(date,classifyCalendarDay(date,workweek));
   }
   return dates;
- },[weeks,production.revision]);
+ },[weeks,production.revision,calendarWorkweek]);
  const closedDays=useMemo(()=>new Map([...officialDays].map(([date,day])=>[date,day.nonWorking])),[officialDays]);
- const calendarWorkweek=readCollegeWorkweek();
  const affectedLessons=useMemo(()=>lessons.filter(l=>l.status!=='cancelled'&&
    productionDiffersFromBaseline(lessonDate(l.week||0,l.day),calendarWorkweek)),[lessons,calendarWorkweek,production.revision]);
  const cells=useMemo(()=>{
