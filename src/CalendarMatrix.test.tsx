@@ -150,3 +150,32 @@ describe('three KUG view modes and the hidden academic-office center',()=>{
   expect(screen.queryByLabelText('Дата исключения колледжа')).toBeNull();
  },20000);
 });
+
+
+describe('KUG controls next to table and restored weekly group cards',()=>{
+ it('places year, department, course, group search, and density adjacent to the data',()=>{
+  const {container}=render(<CalendarMatrix events={CALENDAR} lessons={[]} group="П-21" setGroup={()=>{}} replace={()=>{}}/>);
+  const controls=container.querySelector('.kug-workspace-main > .kug-table-controls');
+  expect(controls).not.toBeNull();
+  expect(controls!.querySelector('[aria-label="Учебный год КУГ"]')).not.toBeNull();
+  expect(controls!.querySelector('[aria-label="Отделение КУГ"]')).not.toBeNull();
+  expect(controls!.querySelector('[aria-label="Курс КУГ"]')).not.toBeNull();
+  expect(controls!.querySelector('[aria-label="Поиск группы КУГ"]')).not.toBeNull();
+  expect(controls!.querySelector('[aria-label="Плотность календаря"]')).not.toBeNull();
+  expect(controls!.nextElementSibling?.classList.contains('kug-matrix-help')).toBe(true);
+ },20000);
+ it('shows 53 readable dated week cards with a daily strip for a group',()=>{
+  const {container}=render(<CalendarMatrix events={CALENDAR} lessons={[]} group="П-21" setGroup={()=>{}} replace={()=>{}}/>);
+  fireEvent.click(screen.getByRole('button',{name:'Группа'}));
+  const cards=screen.getByRole('group',{name:'Годовая линия группы П-21'});
+  expect(cards.querySelectorAll('button')).toHaveLength(53);
+  const january=[...cards.querySelectorAll('button')].find(b=>b.textContent?.includes('18.01'));
+  expect(january).toBeTruthy();
+  expect(january!.textContent).toContain('Каникулы');
+  expect(january!.querySelectorAll('.kug-day-dot')).toHaveLength(7);
+  const february=[...cards.querySelectorAll('button')].find(b=>b.textContent?.includes('01.02'));
+  expect(february).toBeTruthy();
+  expect(february!.textContent).toContain('Теоретическое');
+  expect(container.querySelector('.kug-single-timeline')).toBeNull();
+ },20000);
+});
