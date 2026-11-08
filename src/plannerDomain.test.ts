@@ -29,7 +29,7 @@ describe('calendar is an academic constraint, not a second schedule',()=>{
   expect(lessonDate(11,0)).toBe('2026-11-16');
   expect(calendarIssues(l({week:10}),[absence])).toEqual([]);
   expect(calendarIssues(l({week:11}),[absence])).toHaveLength(1);
-  expect(eventAffectedLessons(absence,[l(),l({id:'second',week:1})])).toHaveLength(1);
+  expect(eventAffectedLessons(absence,[l(),l({id:'second',week:11})])).toHaveLength(1);
  });
  it('shows blocked already-assigned lessons on the semester timeline',()=>{
   const week1=l({week:11,id:'w1'}),w0=l();
