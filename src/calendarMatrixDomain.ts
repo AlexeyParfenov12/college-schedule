@@ -285,7 +285,7 @@ export function parseCalendarBackup(source:string,expectedYear:number,allowedGro
   if(!Array.isArray(e.groups)||!e.groups.every((id:unknown)=>typeof id==='string'&&groupIds.has(id)))
    throw new Error('Неизвестная группа в периоде №'+(index+1));
   if(new Set(e.groups).size!==e.groups.length)throw new Error('Повтор группы в периоде №'+(index+1));
-  if(e.periodCode!==undefined&&(!codes.has(String(e.periodCode))||
+  if(e.periodCode!==undefined&&(!codes.has(e.periodCode as CalendarPhase)||
      phaseInfo(e.periodCode as CalendarPhase).kind!==e.kind))
    throw new Error('Некорректный код учебного периода №'+(index+1));
   return {id:e.id,title:e.title,kind:e.kind,from:e.from,to:e.to,
