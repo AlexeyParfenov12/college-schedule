@@ -3,7 +3,7 @@ import type { Lesson } from './data';
 import { ROOMS, TEACHERS } from './data';
 import { countAvailable, explainCandidate, moveOptions, teacherSuggestions, roomSuggestions, swapOptions } from './scheduleAssist';
 const src=(changes:Partial<Lesson>={}):Lesson=>({
- id:'original',week:0,day:0,slot:1,subject:'Программирование',teacher:TEACHERS[0],
+ id:'original',week:10,day:0,slot:1,subject:'Программирование',teacher:TEACHERS[0],
  groups:['П-21'],room:'109',type:'regular',mode:'offline',...changes
 });
 describe('contextual scheduling assistant',()=>{
