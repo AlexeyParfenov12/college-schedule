@@ -189,7 +189,7 @@ export default function AdvancedWorkflows(p:Props){
  const makeCalendar=()=> <CalendarStudio events={db.calendar} lessons={p.items} group={p.group} setGroup={p.setGroup} week={p.week} setWeek={p.setWeek}
    add={event=>{put(d=>({...d,calendar:[...d.calendar,event]}));p.notify('Период добавлен в учебный календарь (демо)')}}
    remove={id=>put(d=>({...d,calendar:d.calendar.filter(e=>e.id!==id)}))}
-   replace={next=>put(d=>({...d,calendar:next}))}/>;
+   replace={next=>{put(d=>({...d,calendar:next}));p.markDraft()}}/>;
  const makeTemplates=()=> <TemplateStudio lessons={p.items} calendar={db.calendar} group={p.group} week={p.week} saved={db.templates}
    blocked={Object.entries(db.rooms).filter(([,x])=>x.blocked).map(([id])=>id)}
    onApply={(next,count)=>editData(()=>next,'Шаблон применён: '+count+' занятий добавлено')}

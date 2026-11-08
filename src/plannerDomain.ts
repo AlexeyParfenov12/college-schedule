@@ -62,19 +62,30 @@ export function calendarIssues(lesson:Lesson,calendar:CalendarEvent[],workweek:W
  const date=lessonDate(lesson.week||0,lesson.day);
  const automatic=classifyCalendarDay(date,workweek);
  const results=automatic.nonWorking?['Производственный календарь: '+automatic.label+' ('+date+')']:[];
- const custom=calendar.filter(e=>e.from<=date&&date<=e.to&&(e.groups.length===0||lesson.groups.some(g=>e.groups.includes(g))))
-  .filter(e=>e.kind==='holiday'||e.kind==='vacation'||(e.kind==='practice'&&!lesson.practiceBlockId))
+ const custom=calendar.filter(e=>e.kind==='holiday'&&e.from<=date&&date<=e.to&&
+  (e.groups.length===0||lesson.groups.some(g=>e.groups.includes(g))))
   .map(e=>'Учебный календарь: '+e.title+' ('+date+')');
- const activity=calendar.some(e=>e.kind==='study'||Boolean(e.periodCode))?lesson.groups.flatMap(group=>{
+ const hasGraph=calendar.some(e=>e.kind==='study'||Boolean(e.periodCode));
+ const activity=hasGraph?lesson.groups.flatMap(group=>{
   const phase=phaseAt(calendar,group,date);
   if(phase==='unassigned')return ['График '+group+': учебный период не назначен ('+date+')'];
+  if(phase==='vacation'){
+   const event=calendar.filter(e=>e.kind==='vacation'&&e.from<=date&&e.to>=date&&
+    (e.groups.length===0||e.groups.includes(group))).at(-1);
+   return ['Учебный календарь: '+(event?.title||'Каникулы')+' ('+date+')'];
+  }
   if(['exam','state'].includes(phase)&&!/экзамен|зач[её]т|аттестац|консультац/i.test(lesson.subject))
    return ['График '+group+': в период аттестации нельзя назначить обычную пару'];
   if(['training','industrial','prediploma'].includes(phase)&&!lesson.practiceBlockId)
    return ['График '+group+': период практики требует соответствующего назначения'];
   return [];
  }):[];
- return [...new Set([...results,...custom,...activity])];
+ // Keep legacy standalone vacation/practice events useful without a complete academic graph.
+ const standalone=!hasGraph?calendar.filter(e=>e.from<=date&&date<=e.to&&
+  (e.groups.length===0||lesson.groups.some(g=>e.groups.includes(g)))&&
+  (e.kind==='vacation'||e.kind==='practice'&&!lesson.practiceBlockId))
+  .map(e=>'Учебный календарь: '+e.title+' ('+date+')'):[];
+ return [...new Set([...results,...custom,...activity,...standalone])];
 }
 export function calendarWarnings(lesson:Lesson,calendar:CalendarEvent[]):string[]{
  const day=lessonDate(lesson.week||0,lesson.day);

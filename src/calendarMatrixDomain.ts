@@ -127,13 +127,13 @@ export function matrixCSV(events:CalendarEvent[],groups:string[],weeks:Week[]):s
  const quote=(v:string)=>'"'+v.replace(/"/g,'""')+'"';
  const first=['Группа',...weeks.map(w=>'Неделя '+(w.index+1)+' ('+w.start+'—'+w.end+')')];
  return '\uFEFF'+[first,...groups.map(g=>[g,...weeks.map(w=>{
-  const cell=weekCell(events,g,w);
-  if(!cell.mixed)return phaseInfo(cell.phase).short;
-  // Seven unambiguous weekday codes permit an exact round-trip even for mixed weeks.
-  return Array.from({length:7},(_,i)=>{
+  // Export exact dates even when a holiday masks a transition on the weekly view.
+  const days=Array.from({length:7},(_,i)=>{
    const date=plusDays(w.from,i);
    return date<w.start||date>w.end?'~':phaseInfo(phaseAt(events,g,date)).short;
-  }).join('|');
+  });
+  const present=days.filter(x=>x!=='~');
+  return present.every(x=>x===present[0])?present[0]:days.join('|');
  })])].map(row=>row.map(quote).join(';')).join('\r\n');
 }
 

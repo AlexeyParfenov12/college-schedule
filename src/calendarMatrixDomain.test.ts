@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CALENDAR } from './data';
 import type { CalendarEvent } from './data';
-import { assignPeriod, calendarWeeks, checkCalendar, matrixCSV, phaseAt, weekCell } from './calendarMatrixDomain';
+import { assignPeriod, calendarWeeks, checkCalendar, copyGroupCalendar, importMatrixCSV, matrixCSV, phaseAt, weekCell } from './calendarMatrixDomain';
 
 describe('college academic calendar matrix domain',()=>{
  it('covers the full academic year including partial boundary weeks',()=>{
@@ -55,5 +55,34 @@ describe('college academic calendar matrix domain',()=>{
   expect(text).toContain('"Группа"');
   expect(text).toContain('"П-21"');
   expect(text).toContain('"Неделя 53');
+ });
+});
+
+describe('KUG structured CSV import and group copying',()=>{
+ it('imports an exact mixed week with day-level codes',()=>{
+  const weeks=calendarWeeks(2026);
+  const a=assignPeriod(CALENDAR,['П-21'],'2026-09-01','2026-09-02','training');
+  const b=assignPeriod(a,['П-21'],'2026-09-03','2026-09-05','industrial');
+  const exported=matrixCSV(b,['П-21'],weeks);
+  expect(exported).toContain('|');
+  const imported=importMatrixCSV(exported,CALENDAR,2026,['П-21']);
+  expect(imported.groups).toBe(1);
+  expect(phaseAt(imported.next,'П-21','2026-09-02')).toBe('training');
+  expect(phaseAt(imported.next,'П-21','2026-09-04')).toBe('industrial');
+  expect(phaseAt(imported.next,'П-22','2026-09-04')).toBe('study');
+ });
+ it('rejects a CSV with the wrong year, unknown group, or ambiguous mixed codes',()=>{
+  const correct=matrixCSV(CALENDAR,['П-21'],calendarWeeks(2026));
+  expect(()=>importMatrixCSV(correct,CALENDAR,2025,['П-21'])).toThrow(/заголовок|учебный год/i);
+  expect(()=>importMatrixCSV(correct,CALENDAR,2026,['П-22'])).toThrow(/Неизвестная группа/);
+  expect(()=>importMatrixCSV(correct.replace('"Т"','"Т/УП"'),CALENDAR,2026,['П-21'])).toThrow(/Неизвестный код/);
+ });
+ it('copies a group to another without overwriting unless explicitly requested',()=>{
+  const a=assignPeriod(CALENDAR,['П-21'],'2026-09-14','2026-09-20','industrial');
+  const skipped=copyGroupCalendar(a,'П-21','П-22',2026,false);
+  expect(phaseAt(skipped,'П-22','2026-09-17')).toBe('study');
+  const overwritten=copyGroupCalendar(a,'П-21','П-22',2026,true);
+  expect(phaseAt(overwritten,'П-22','2026-09-17')).toBe('industrial');
+  expect(phaseAt(overwritten,'П-21','2026-09-17')).toBe('industrial');
  });
 });
