@@ -1,5 +1,6 @@
 import type { CalendarEvent, Lesson } from './data';
 import { classifyCalendarDay, readCollegeWorkweek } from './productionCalendar';
+import type { CalendarDay, CalendarDayKind } from './productionCalendar';
 import { calendarIssues, lessonDate } from './plannerDomain';
 
 export type CalendarPhase =
@@ -290,5 +291,32 @@ export function parseCalendarBackup(source:string,expectedYear:number,allowedGro
    throw new Error('Некорректный код учебного периода №'+(index+1));
   return {id:e.id,title:e.title,kind:e.kind,from:e.from,to:e.to,
    groups:[...e.groups],...(e.periodCode===undefined?{}:{periodCode:e.periodCode})} as CalendarEvent;
+ });
+}
+
+/** Same official holiday calculation as every scheduling workflow. A college-only
+ * holiday adds a closure without replacing the academic period of the group. */
+export type KugDayStatus={
+ date:string;withinYear:boolean;dayName:string;label:string;phase:CalendarPhase;
+ nonWorking:boolean;kind:CalendarDayKind|'college';confirmedTransfers:boolean;
+ canScheduleTheory:boolean;basis:string;
+};
+const KUG_DAY_NAMES=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'] as const;
+export function kugWeekDays(events:CalendarEvent[],group:string,week:Week,
+ officialDays?:ReadonlyMap<string,CalendarDay>,workweek=readCollegeWorkweek()):KugDayStatus[]{
+ return Array.from({length:7},(_,index)=>{
+  const date=plusDays(week.from,index);
+  const withinYear=date>=week.start&&date<=week.end;
+  const official=officialDays?.get(date)??classifyCalendarDay(date,workweek);
+  const extra=events.find(e=>e.kind==='holiday'&&e.from<=date&&e.to>=date&&
+   (e.groups.length===0||e.groups.includes(group)));
+  const nonWorking=Boolean(extra)||official.nonWorking;
+  const phase=withinYear?phaseAt(events,group,date):'unassigned';
+  return {date,withinYear,dayName:KUG_DAY_NAMES[index],phase,nonWorking,
+   kind:extra?'college':official.kind,
+   label:extra?'Нерабочий день колледжа: '+extra.title:official.label,
+   confirmedTransfers:official.confirmedTransfers,
+   canScheduleTheory:withinYear&&!nonWorking&&phase==='study',
+   basis:extra?'Учебный календарь колледжа':official.basis};
  });
 }
