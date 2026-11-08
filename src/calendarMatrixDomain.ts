@@ -311,12 +311,15 @@ export function kugWeekDays(events:CalendarEvent[],group:string,week:Week,
   const extra=events.find(e=>e.kind==='holiday'&&e.from<=date&&e.to>=date&&
    (e.groups.length===0||e.groups.includes(group)));
   const nonWorking=Boolean(extra)||official.nonWorking;
+  // If the same date is both federally closed and listed by the college,
+  // retain the authoritative federal reason (no double-count or hidden holiday name).
+  const additional=Boolean(extra)&&!official.nonWorking;
   const phase=withinYear?phaseAt(events,group,date):'unassigned';
   return {date,withinYear,dayName:KUG_DAY_NAMES[index],phase,nonWorking,
-   kind:extra?'college':official.kind,
-   label:extra?'Нерабочий день колледжа: '+extra.title:official.label,
+   kind:additional?'college':official.kind,
+   label:additional?'Нерабочий день колледжа: '+extra!.title:official.label,
    confirmedTransfers:official.confirmedTransfers,
    canScheduleTheory:withinYear&&!nonWorking&&phase==='study',
-   basis:extra?'Учебный календарь колледжа':official.basis};
+   basis:additional?'Учебный календарь колледжа':official.basis};
  });
 }
