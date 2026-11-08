@@ -57,7 +57,7 @@ describe('visual guided planning workflows',()=>{
   navigation('Аудитории');
   expect(screen.getByTestId('mini-schedule')).toBeTruthy();
   expect(screen.getByTestId('load-bars')).toBeTruthy();
-  fireEvent.click(screen.getByRole('button',{name:/Свернуть/}));
+  fireEvent.click(within(document.querySelector('.studio-context-box')!).getByRole('button',{name:/Свернуть/}));
   expect(screen.queryByTestId('mini-schedule')).toBeNull();
  },20000);
  it('opens a guided editor with teacher assignment and selectable room',()=>{
