@@ -172,7 +172,7 @@ function candidateScore(state:WeekState,l:Lesson,cfg:AnnualConfig,variant:number
  * A move may not increase the number of group OR teacher windows.
  */
 export function compactAnnualWeek(lessons:Lesson[],cfg:AnnualConfig,calendar:CalendarEvent[],passes=2):number{
- const roomCodes=(l:Lesson)=>l.mode==='online'?[]:l.room.match(/\b\d{3}\b/g)||[];
+ const roomCodes=(l:Lesson):string[]=>l.mode==='online'?[]:l.room.match(/\b\d{3}\b/g)||[];
  const metric=(list:Lesson[])=>{
   const gm=new Map<string,Lesson[]>(),tm=new Map<string,Lesson[]>();
   const groupDays=new Set<string>(),teacherDays=new Set<string>();
