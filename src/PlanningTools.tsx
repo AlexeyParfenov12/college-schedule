@@ -5,7 +5,7 @@ import { ArrowRight, Check, Copy, HelpCircle, Layers3, Search, Sparkles, WandSpa
 import { GROUPS, TIMES } from './data';
 import type { CalendarEvent, Lesson } from './data';
 import { WEEK_COUNT, lessonDate, previewTemplate, previewAutofill, needsComputers } from './plannerDomain';
-import { demoAcademicDemands, demoAcademicHorizon } from './academicPlanning';
+import { demoAcademicDemands, demoAcademicHorizon, isTeachingDate } from './academicPlanning';
 import { readCollegeWorkweek } from './productionCalendar';
 import type { PreviewPlan } from './plannerDomain';
 import { MiniSchedule, LoadBars, PlanningSummary } from './ScheduleVisuals';

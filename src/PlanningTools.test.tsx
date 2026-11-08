@@ -105,7 +105,7 @@ describe('visual guided planning workflows',()=>{
   fireEvent.change(screen.getByLabelText('Точная дата начала периода'),{target:{value:'2027-07-05'}});
   fireEvent.change(screen.getByLabelText('Точная дата окончания периода'),{target:{value:'2027-07-18'}});
   fireEvent.click(screen.getByRole('button',{name:'Рассчитать изменения'}));
-  expect(screen.getByText(/2027-07-05 — 2027-07-18/)).toBeTruthy();
+  expect(screen.getAllByText(/2027-07-05 — 2027-07-18/).length).toBeGreaterThan(0);
   fireEvent.click(screen.getByRole('button',{name:'Подтвердить и сохранить'}));
   expect(screen.getByText(/Сохранено: 12 групп/)).toBeTruthy();
  },20000);

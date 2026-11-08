@@ -320,7 +320,7 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    </div>
    {preview&&<div className="kug-preview" role="status">
     <strong>Предварительный просмотр</strong>
-    <p>Период «{title||phaseName}» для {selectedGroups.length} групп; {from} — {to} ({end-start+1} недель).</p>
+    <p>Период «{title||phaseName}» для {selectedGroups.length} групп; {from} — {to} ({Math.round((Date.parse(to+'T00:00:00Z')-Date.parse(from+'T00:00:00Z'))/86400000)+1} календарных дней).</p>
     <p>Занятий в этом периоде: <b>{impact?.affected.length||0}</b>.
      Новых конфликтов после изменения: <b>{impact?.newlyBlocked.length||0}</b>.
      Ранее проблемных занятий: <b>{impact?.alreadyBlocked.length||0}</b>.
