@@ -43,13 +43,16 @@ describe('Academic vacations and college calendar integration',()=>{
   expect(result.lessons.filter(x=>x.groups.includes('П-22'))).toHaveLength(1);
   expect(result.unplaced.some(x=>x.group==='П-21')).toBe(true);
  });
- it('leaves multi-week practice unplaced on group vacation days rather than scheduling it anyway',()=>{
-  const cfg=defaultAnnualConfig();cfg.weeks=30;cfg.days=5;cfg.slotsPerDay=2;
-  cfg.practiceBlocks=[{id:'practice-spring',group:'П-21',kind:'college',title:'Учебная практика',
-   teacher:TEACHERS[0],startWeek:29,durationWeeks:1,days:[0,1,2,3,4],fromSlot:1,toSlot:1,room:'109'}];
-  const result=solveAnnualVariant([],cfg,[v(['П-21'])],0);
+ it('allows vacations to override overlapping KUG practice without fictitious lessons',()=>{
+  const cfg=defaultAnnualConfig();cfg.weeks=30;cfg.days=5;
+  const practice:CalendarEvent={id:'spring-practice',kind:'practice',periodCode:'training',
+   title:'Учебная практика',from:'2027-03-22',to:'2027-03-28',groups:['П-21']};
+  const result=solveAnnualVariant([],cfg,[practice,v(['П-21'])],0);
   expect(result.practicePairs).toBe(0);
-  expect(result.practiceIssues.some(x=>x.reason.includes('каникулами'))).toBe(true);
+  expect(result.practiceIssues).toHaveLength(0);
+  expect(result.lessons).toHaveLength(0);
+ });
+
  });
 
 });

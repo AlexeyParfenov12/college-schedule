@@ -2,8 +2,9 @@ import { describe,it,expect } from 'vitest';
 import { classifyCalendarDay, holidayMonth, transfersConfirmed } from './productionCalendar';
 import { calendarIssues, previewTemplate } from './plannerDomain';
 import { defaultAnnualConfig, solveAnnualVariant } from './yearSolver';
+import { practicePeriodsFromKug } from './kugPractice';
 import { TEACHERS } from './data';
-import type { Lesson } from './data';
+import type { Lesson, CalendarEvent } from './data';
 
 const lesson=(week:number,day:number,subject='Математика'):Lesson=>({
  id:'holiday-test',week,day,slot:1,teacher:TEACHERS[0],groups:['П-21'],
@@ -82,12 +83,16 @@ describe('federal rest days are constraints for every scheduling workflow',()=>{
   const result=solveAnnualVariant(demands,cfg,[],0);
   for(const l of result.lessons)expect(calendarIssues(l,[],5)).toHaveLength(0);
  });
- it('does not reserve classrooms for continuous practice on government closed days',()=>{
-  const cfg=defaultAnnualConfig();cfg.weeks=18;cfg.days=5;cfg.slotsPerDay=2;
-  cfg.practiceBlocks=[{id:'practice',group:'П-21',kind:'college',title:'Учебная практика',
-    teacher:TEACHERS[0],startWeek:17,durationWeeks:1,days:[3,4],fromSlot:1,toSlot:1,room:'109'}];
-  const result=solveAnnualVariant([],cfg,[],0);
-  expect(result.lessons.filter(l=>l.practiceBlockId==='practice').some(l=>l.week===17&&l.day===3)).toBe(false);
-  expect(result.practiceIssues.some(i=>i.reason.includes('Практика пересекается'))).toBe(true);
+ it('ignores federal rest days inside KUG-defined practice',()=>{
+  const cfg=defaultAnnualConfig();cfg.weeks=18;cfg.days=5;
+  const event:CalendarEvent={id:'pr',kind:'practice',periodCode:'training',title:'Учебная практика',
+   from:'2026-12-30',to:'2026-12-31',groups:['П-21']};
+  const periods=practicePeriodsFromKug([event],18,5);
+  expect(periods.some(p=>p.group==='П-21'&&p.days.includes(2))).toBe(true);
+  expect(periods.some(p=>p.group==='П-21'&&p.days.includes(3))).toBe(false);
+  const result=solveAnnualVariant([],cfg,[event],0);
+  expect(result.lessons).toHaveLength(0);
+  expect(result.practiceIssues).toHaveLength(1);
  });
+
 });

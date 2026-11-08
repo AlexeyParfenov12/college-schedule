@@ -58,14 +58,20 @@ describe('Annual solver enforces configured group and teacher scope',()=>{
   expect(result.lessons.filter(l=>l.groups.includes('П-21'))).toHaveLength(1);
   expect(result.unplaced).toHaveLength(1);
  });
- it('preserves restrictions for continuously reserved practice blocks',()=>{
-  const cfg=defaultAnnualConfig();cfg.weeks=2;cfg.days=5;
-  cfg.groupRules={'П-21':{daysOff:[0]}};
-  cfg.practiceBlocks=[{id:'practice',group:'П-21',kind:'college',title:'Учебная практика',teacher:TEACHERS[0],
-    startWeek:1,durationWeeks:1,days:[0,1],fromSlot:1,toSlot:1,room:'109'}];
-  const result=solveAnnualVariant([],cfg,[],0);
-  expect(result.lessons.filter(l=>l.practiceBlockId==='practice')).toHaveLength(1);
-  expect(result.lessons.some(l=>l.practiceBlockId==='practice'&&l.day===0)).toBe(false);
-  expect(result.practiceIssues.some(i=>i.reason.includes('Группа:'))).toBe(true);
+ it('respects group constraints and KUG practice dates during normal scheduling',()=>{
+  const cfg=defaultAnnualConfig();cfg.weeks=2;cfg.days=5;cfg.defaultOnlinePct=0;
+  cfg.groupRules={'П-21':{daysOff:[0,1]}};
+  const calendar=[
+   {id:'s',kind:'study' as const,periodCode:'study' as const,title:'Теория',
+    from:'2026-09-08',to:'2026-09-12',groups:['П-21']},
+   {id:'pr',kind:'practice' as const,periodCode:'training' as const,title:'Учебная практика',
+    from:'2026-09-09',to:'2026-09-09',groups:['П-21']}
+  ];
+  const d={id:'math',group:'П-21',subject:'Математика',teacher:TEACHERS[0],pairsPerWeek:1,requiredPairs:1,availableWeeks:[1]};
+  const result=solveAnnualVariant([d],cfg,calendar,0);
+  expect(result.lessons).toHaveLength(1);
+  expect(result.lessons[0].day).toBeGreaterThan(2);
+  expect(result.practiceIssues).toHaveLength(1);
  });
+
 });

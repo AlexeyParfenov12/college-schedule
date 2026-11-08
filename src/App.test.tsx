@@ -318,7 +318,8 @@ describe('React interface smoke checks',()=>{
   expect(document.querySelector('.timetable-scroll.move-active.dragging')).toBeTruthy();
   expect(screen.queryByTestId('selected-schedule-cell')).toBeNull();
   fireEvent.dragEnd(lesson,{dataTransfer:transfer});
-  expect(screen.getByTestId('selected-schedule-cell')).toBeTruthy();
+  expect(screen.queryByTestId('selected-schedule-cell')).toBeNull();
+  expect(screen.queryByTestId('lesson-assistant')).toBeNull();
  },20000);
 
  it('navigates from a workflow to the exact shared lesson and highlights it by stable ID',()=>{
