@@ -11,6 +11,7 @@ let state:ProductionState={revision:0,status:'baseline',checkedAt:'',years:[],me
 const subscribers=new Set<()=>void>();
 const emit=()=>{for(const subscriber of subscribers)subscriber()};
 export const getProductionState=()=>state;
+export const getProductionSnapshot=()=>snapshot;
 export const subscribeProductionCalendar=(listener:()=>void)=>{subscribers.add(listener);return ()=>{subscribers.delete(listener)}};
 export function useProductionCalendarState(){return useSyncExternalStore(subscribeProductionCalendar,getProductionState,getProductionState)}
 const isLeap=(year:number)=>new Date(Date.UTC(year,1,29)).getUTCMonth()===1;
