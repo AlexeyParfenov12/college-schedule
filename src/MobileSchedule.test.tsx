@@ -5,13 +5,13 @@ import MobileSchedule from './MobileSchedule';
 import type { Lesson } from './data';
 import type { MoveOption } from './scheduleAssist';
 const times=['08:30–10:00','10:10–11:40','12:00–13:30','13:40–15:10','15:20–16:50','17:00–18:30'];
-const math:Lesson={id:'mobile-math',week:0,day:0,slot:1,subject:'Математика',teacher:'Петров М. С.',
+const math:Lesson={id:'mobile-math',week:10,day:0,slot:1,subject:'Математика',teacher:'Петров М. С.',
  groups:['П-21'],room:'109',type:'regular',mode:'offline'};
 afterEach(()=>cleanup());
 describe('touch-first schedule agenda',()=>{
  it('switches days and opens existing linked lesson by one touch',()=>{
   const onDayChange=vi.fn(),onOpen=vi.fn(),onAdd=vi.fn();
-  const props={week:0,days:6 as const,times,day:0,selectedId:undefined,lessons:[math],
+  const props={week:10,days:6 as const,times,day:0,selectedId:undefined,lessons:[math],
    moveMode:false,targets:[] as MoveOption[],onDayChange,onOpen,onAdd,onTarget:vi.fn(),onCancelMove:vi.fn()};
   const {rerender}=render(<MobileSchedule {...props}/>);
   const agenda=within(screen.getByRole('region',{name:'Расписание на телефоне'}));
@@ -29,7 +29,7 @@ describe('touch-first schedule agenda',()=>{
   const targets:MoveOption[]=[{day:0,slot:1,kind:'current',reason:'Текущее время',label:'Пн · 1'},
     {day:0,slot:2,kind:'available',reason:'Свободно',label:'Пн · 2'},
     {day:0,slot:3,kind:'blocked',reason:'Аудитория занята',label:'Пн · 3'}];
-  const {container}=render(<MobileSchedule week={0} days={5} times={times} lessons={[math]} day={0}
+  const {container}=render(<MobileSchedule week={10} days={5} times={times} lessons={[math]} day={0}
    selectedId="mobile-math" moveMode targets={targets} onDayChange={vi.fn()} onOpen={vi.fn()}
    onAdd={vi.fn()} onTarget={onTarget} onCancelMove={onCancelMove}/>);
   expect(container.querySelectorAll('.mobile-move-target.available')).toHaveLength(1);
@@ -43,7 +43,7 @@ describe('touch-first schedule agenda',()=>{
  });
  it('changes days by horizontal swipe but does not hijack vertical scrolling',()=>{
   const onDayChange=vi.fn();
-  const {container}=render(<MobileSchedule week={0} days={6} times={times} lessons={[math]} day={2}
+  const {container}=render(<MobileSchedule week={10} days={6} times={times} lessons={[math]} day={2}
    moveMode={false} targets={[]} onDayChange={onDayChange} onOpen={vi.fn()}
    onAdd={vi.fn()} onTarget={vi.fn()} onCancelMove={vi.fn()}/>);
   const agenda=container.querySelector('.mobile-agenda')!;
@@ -55,14 +55,14 @@ describe('touch-first schedule agenda',()=>{
   expect(onDayChange).toHaveBeenCalledTimes(1);
  });
  it('never offers create actions for a federal transferred rest day',()=>{
-  const {container}=render(<MobileSchedule week={7} days={5} times={times} lessons={[]} day={3}
+  const {container}=render(<MobileSchedule week={17} days={5} times={times} lessons={[]} day={3}
    moveMode={false} targets={[]} onDayChange={vi.fn()} onOpen={vi.fn()} onAdd={vi.fn()}
    onTarget={vi.fn()} onCancelMove={vi.fn()}/>);
   expect(container.querySelectorAll('.mobile-add-lesson')).toHaveLength(0);
   expect(screen.getAllByText('Нерабочий день')).toHaveLength(6);
  });
  it('offers a regular Saturday in six-day mode, but excludes it for five-day mode',()=>{
-  const props={week:0,times,lessons:[] as Lesson[],day:5,moveMode:false,targets:[] as MoveOption[],
+  const props={week:10,times,lessons:[] as Lesson[],day:5,moveMode:false,targets:[] as MoveOption[],
    onDayChange:vi.fn(),onOpen:vi.fn(),onAdd:vi.fn(),onTarget:vi.fn(),onCancelMove:vi.fn()};
   const {rerender}=render(<MobileSchedule {...props} days={6}/>);
   expect(screen.getByRole('button',{name:'Добавить занятие: Сб, 1-я пара'})).toBeTruthy();
