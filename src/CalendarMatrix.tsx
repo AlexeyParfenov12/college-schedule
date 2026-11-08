@@ -258,7 +258,7 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
     })}
    </button></td>)}
  </tr>;
- return <section className="kug" data-testid="calendar-matrix">
+ return <section className={'kug kug-density-'+density+' kug-view-'+mode} data-testid="calendar-matrix">
   <header className="kug-top">
    <div><span className="kug-kicker">College Schedule · КУГ</span>
     <h2>Календарный учебный график</h2>
@@ -342,41 +342,51 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    <span className="kug-legend-day"><i className="kug-day-dot kug-day-college"/> Доп. выходной колледжа</span>
    <span className="kug-legend-day"><i className="kug-day-dot kug-day-college-work"/> Рабочий день колледжа</span>
   </div></details>
-  {mode==='all'?<>
-   <div className="kug-matrix-help">
-    <span>Отметь группы, затем выбери неделю. <b>Shift + нажатие</b> или протягивание выделит интервал.</span>
-    <div className="kug-row-actions">
-     <button type="button" onClick={()=>{setRows(old=>[...new Set([...old,...groups.map(g=>g.id)])]);setPreview(false)}}>Выбрать все видимые ({groups.length})</button>
-     <button type="button" onClick={()=>{setRows([]);setPreview(false)}}>Снять выбор</button>
-     <span>Выбрано групп: {selectedGroups.length}</span>
-    </div>
+  <div className="kug-workspace">
+   <div className="kug-workspace-main">
+    {mode!=='single'?<>
+     <div className="kug-matrix-help">
+      <span>Выбери группу и неделю. <b>Shift + нажатие</b> или протягивание выделит диапазон.</span>
+      <div className="kug-row-actions">
+       <button type="button" onClick={()=>{setRows(old=>[...new Set([...old,...groups.map(g=>g.id)])]);setPreview(false)}}>Выбрать все видимые ({groups.length})</button>
+       <button type="button" onClick={()=>{setRows([]);setPreview(false)}}>Снять выбор</button>
+       <span>Выбрано групп: {selectedGroups.length}</span>
+      </div>
+     </div>
+     <div className="kug-scroll" role="region" aria-label="Годовой график всех групп" tabIndex={0}>
+      <table className="kug-table"><thead><HeaderMonths weeks={visibleWeeks}/>
+       <tr className="kug-weekheads"><th className="kug-sticky-label">Группа · {visibleWeeks.length} нед.</th>
+        {visibleWeeks.map(w=><th key={w.index} title={w.start+' — '+w.end}>
+         <b>{w.index+1}</b><small>{dateText(w.start)}</small></th>)}
+       </tr>
+      </thead><tbody>{globalCalendarRow}{tableRows}</tbody></table>
+     </div>
+     {groups.length===0&&<p className="kug-empty" role="status">По заданным фильтрам группы не найдены. Сбрось фильтр или уточни поиск.</p>}
+    </>:<div className="kug-single">
+     <div className="kug-single-head"><label>Группа<select aria-label="Группа для подробного календаря" value={group}
+      onChange={e=>{setGroup(e.target.value);setRows([e.target.value]);setSelection(null)}}>
+      {GROUPS.map(g=><option key={g.id} value={g.id}>{g.id} · {g.specialty}</option>)}</select></label>
+      <span>Годовая линия группы: выбери неделю, чтобы увидеть её дни и назначить период.</span>
+     </div>
+     <div className="kug-single-timeline" role="group" aria-label={'Годовая линия группы '+group}>
+      <div className="kug-single-months"><HeaderMonths weeks={weeks}/></div>
+      <div className="kug-single-weeks">{groupWeeks.map(({week:w,cell})=><button key={w.index} type="button"
+       aria-label={group+', неделя '+(w.index+1)+': '+(cell.mixed?'Смешанная неделя':phaseInfo(cell.phase).name)}
+       title={'Неделя '+(w.index+1)+' · '+w.start+' — '+w.end+' · '+(cell.mixed?cell.parts.map(p=>phaseInfo(p).name).join(' / '):phaseInfo(cell.phase).name)}
+       className={'kug-single-week kug-'+phaseInfo(cell.phase).color+(cell.mixed?' kug-mixed':'')+
+        (selection&&w.index>=start&&w.index<=end?' kug-picked':'')}
+       onClick={e=>selectCell(group,w.index,e.shiftKey)}>
+        <b>{w.index+1}</b><span>{cell.mixed?'◐':phaseInfo(cell.phase).short}</span>
+       </button>)}</div>
+     </div>
+     <p className="kug-note">Цвет полосы — тип учебного периода. Детали и производственный календарь открываются в панели справа.</p>
+    </div>}
    </div>
-   <div className="kug-scroll" role="region" aria-label="Годовой график всех групп" tabIndex={0}>
-    <table className="kug-table"><thead><HeaderMonths weeks={weeks}/>
-     <tr className="kug-weekheads"><th className="kug-sticky-label">Группа · {weeks.length} недель</th>
-      {weeks.map(w=><th key={w.index} title={w.start+' — '+w.end}><b>{w.index+1}</b><small>{dateText(w.start)}</small></th>)}</tr>
-    </thead><tbody>
-    {tableRows}
-    </tbody></table>
-   </div>
-  </>:<div className="kug-single">
-   <div className="kug-single-head"><label>Группа<select aria-label="Группа для подробного календаря" value={group}
-    onChange={e=>{setGroup(e.target.value);setRows([e.target.value]);setSelection(null)}}>
-    {GROUPS.map(g=><option key={g.id} value={g.id}>{g.id} · {g.specialty}</option>)}</select></label>
-    <span>Нажми на неделю, чтобы увидеть все её дни и изменить период. Отметки снизу показывают выходные и праздники; ◐ — смешанная неделя.</span>
-   </div>
-   <div className="kug-single-weeks">{groupWeeks.map(({week:w,cell,days})=><button key={w.index} type="button"
-    className={'kug-single-week kug-'+phaseInfo(cell.phase).color+(cell.mixed?' kug-mixed':'')+(selection&&w.index>=start&&w.index<=end?' kug-picked':'')}
-    onClick={e=>selectCell(group,w.index,e.shiftKey)}>
-    <b>{w.index+1}-я неделя · {dateText(w.start)}—{dateText(w.end)}</b>
-    <span>{cell.mixed?cell.parts.map(p=>phaseInfo(p).name).join(' / '):phaseInfo(cell.phase).name}</span>
-    <span className="kug-day-strip kug-single-strip" aria-label="Отметки нерабочих дней">
-     {days.map(day=><i key={day.date} title={day.dayName+': '+day.label}
-      className={'kug-day-dot '+(day.withinYear?'kug-day-'+day.kind:'kug-day-outside')}/>)}
-    </span>
-    {cell.holidays>0&&<small>{cell.holidays} нерабочих дней</small>}
-   </button>)}</div>
-  </div>}
+   <aside className="kug-workspace-side" aria-label="Свойства учебного периода">
+    {!activeWeek&&<div className="kug-side-empty">
+     <b>Свойства периода</b>
+     <p>Выдели одну или несколько недель в таблице. Здесь появятся даты, календарные ограничения и действия.</p>
+    </div>}
   {activeWeek&&<section className="kug-week-detail" aria-label="Дни выбранной недели">
    <header><div><b>{group} · неделя {activeWeek.index+1}</b>
     <span>{activeWeek.start} — {activeWeek.end} · {calendarWorkweek}-дневная учебная неделя</span></div>
@@ -427,7 +437,7 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    </div>}
    {message&&<p className="kug-note" role="status">{message}</p>}
   </div>
-  <div className="kug-copy-panel">
+  <details className="kug-copy-details"><summary>Копировать график между группами</summary><div className="kug-copy-panel">
    <strong>Копирование графика группы</strong>
    <div className="kug-copy-controls">
     <label>Из группы <b>{group}</b></label>
@@ -443,13 +453,15 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
     <button onClick={()=>setCopyPending(null)}>Отмена</button>
    </div>}
   </div>
+  </details>
   {showCheck&&<div className="kug-check" role="region" aria-label="Проверка календарного графика">
    <h3>Проверка заполнения · {findings.filter(f=>f.level==='error').length} незаполненных, {findings.filter(f=>f.level==='warning').length} смешанных недель</h3>
-   {findings.slice(0,50).map((f,i)=><button key={i} onClick={()=>{setRows([f.group]);setGroup(f.group);setSelection({anchor:f.week,end:f.week,group:f.group});setMode('all')}}>
+   {findings.slice(0,50).map((f,i)=><button key={i} onClick={()=>{setRows([f.group]);setGroup(f.group);setSelection({anchor:f.week,end:f.week,group:f.group});setMode('year');setCollapsed([])}}>
     <b>{f.group} · неделя {f.week+1}</b><span>{f.message}</span></button>)}
    {findings.length>50&&<p>Показано первых 50 из {findings.length}. Используй фильтр отделения или группы для уточнения.</p>}
    {!findings.length&&<p>Для выбранных групп нет незаполненных или смешанных недель.</p>}
   </div>}
-  <footer className="kug-footer">Праздники и выходные видны внутри каждой недели и автоматически учитываются при назначении занятий; они не изменяют основной тип периода. Экспорт CSV открывается в Excel; JSON-копию можно восстановить после проверки содержимого. Прямой импорт XLSX и серверное утверждение пока не подключены. Матрица охватывает сентябрь–август, но деморасписание и текущий годовой решатель пока используют отдельную шкалу с 9 ноября 2026 года и ограниченный горизонт расчёта.</footer>
+  </aside></div>
+  <footer className="kug-footer">Праздники и выходные расположены в общей строке над группами и учитываются при назначении занятий. Локальные дни конкретной группы отмечаются отдельно. Импорт/экспорт CSV, восстановление JSON и проверка затронутых занятий сохранены. Этот стенд использует демонстрационные данные, а не серверное утверждение Academic Core.</footer>
  </section>;
 }
