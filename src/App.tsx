@@ -24,6 +24,9 @@ import { auditAnnualDraft } from './yearAudit';
 import { readCollegeWorkweek } from './productionCalendar';
 
 type Item = Lesson & {week?:number};
+type ScheduleContextMenu={x:number;y:number}&(
+ {kind:'lesson';lesson:Item}|{kind:'empty';day:number;slot:number;blockedReason?:string}
+);
 type View = 'group'|'teacher'|'room';
 type Screen = typeof NAV[number][0];
 const iconSet=[LayoutDashboard,CalendarDays,CalendarDays,Layers3,WandSparkles,School,ArrowLeftRight,Users,Network,GitFork,Building2,Monitor,BarChart3,Send,FileText,School,Settings2,BookOpen,BookOpen];
@@ -72,7 +75,7 @@ export default function App(){
  const [draggingId,setDraggingId]=useState<string|null>(null);
  const [preview,setPreview]=useState<MoveOption|null>(null);
  const [weekMoving,setWeekMoving]=useState<Item|null>(null);
- const [contextMenu,setContextMenu]=useState<{x:number;y:number;lesson:Item}|null>(null);
+ const [contextMenu,setContextMenu]=useState<ScheduleContextMenu|null>(null);
  const [lastChange,setLastChange]=useState<{before:Item[];changedIds:string[]}|null>(null);
  const [yearBackup,setYearBackup]=useState<{items:Item[];status:'draft'|'published'}|null>(null);
  const [hoverMove,setHoverMove]=useState<MoveOption|null>(null);
@@ -174,10 +177,19 @@ export default function App(){
   setItems([...remaining,first,second]);setStatus('draft');setSelected(null);setMoveMode(false);setPreview(null);setNotice('Занятия обменены местами · доступна отмена');
  };
  const closeSelected=()=>{setSelected(null);setMoveMode(false);setDraggingId(null);setPreview(null);setHoverMove(null);setContextMenu(null)};
+ const contextPosition=(event:MouseEvent<HTMLElement>)=>({
+  x:Math.max(8,Math.min(event.clientX,window.innerWidth-240)),
+  y:Math.max(8,Math.min(event.clientY,window.innerHeight-245))
+ });
+ // Right click is menu-only: never select a lesson or open its side panel.
  const rightClick=(event:MouseEvent<HTMLButtonElement>,lesson:Item)=>{
   event.preventDefault();event.stopPropagation();
-  setContextMenu({x:Math.min(event.clientX,Math.max(15,window.innerWidth-240)),y:Math.min(event.clientY,Math.max(15,window.innerHeight-235)),lesson});
-  setSelected(lesson);setSideMode('assistant');setMoveMode(false);setPreview(null);
+  setContextMenu({...contextPosition(event),kind:'lesson',lesson});
+ };
+ const rightClickEmpty=(event:MouseEvent<HTMLDivElement>,day:number,slot:number,blockedReason?:string)=>{
+  event.preventDefault();event.stopPropagation();
+  if(moveMode||draggingId)return; // Preserve the drag/transfer interaction.
+  setContextMenu({...contextPosition(event),kind:'empty',day,slot,blockedReason});
  };
  const moveAcrossWeeks=(next:Item)=>{
   const source=items.find(x=>x.id===next.id);
@@ -298,6 +310,7 @@ export default function App(){
     className={'slot-cell '+(federal.nonWorking?' federal-closed-cell':'')+' '+(moveMode&&selected&&target?'slot-'+target.kind:'')+
       (pickedCell?' selected-slot-cell':crosshairRow?' selected-slot-row':crosshairColumn?' selected-slot-column':'')}
     title={moveMode&&target?target.reason:federal.nonWorking?federal.label:pickedCell?'Выбрано: '+DAYS[day]+', '+(row+1)+'-я пара':undefined}
+    onContextMenu={e=>{if(cellLessons.length===0)rightClickEmpty(e,day,row+1,federal.nonWorking?federal.label:undefined)}}
     onDragEnter={()=>{if(draggingId&&target)setHoverMove(target)}}
     onDragOver={e=>{e.preventDefault();e.dataTransfer.dropEffect=target?.kind==='available'?'move':'none'}}
     onDrop={e=>{e.preventDefault();const key=e.dataTransfer.getData('lessonId')||draggingId;if(key)move(key,day,row+1)}}
@@ -327,6 +340,8 @@ export default function App(){
  </div>)}
  </div></div>;
  const legend=<div className="legend"><span><i className="swatch regular"/>Обычное</span><span><i className="swatch subgroup"/>Подгруппы</span><span><i className="swatch stream"/>Поток</span><span><i className="swatch parallel"/>Параллель</span><span><i className="swatch online"/>Онлайн/гибрид</span></div>;
+ const lessonContext=contextMenu?.kind==='lesson'?contextMenu:null;
+ const emptyContext=contextMenu?.kind==='empty'?contextMenu:null;
  const schedule=<>
  <div className="schedule-production-strip" role="status" aria-label="Производственный календарь недели">
   <div className="schedule-production-heading"><strong>Производственный календарь</strong>
@@ -392,16 +407,38 @@ export default function App(){
     : <SmartLessonEditor key={selected.id} item={selected} save={save} remove={askRemove} cancel={closeSelected} all={current} catalog={items} view={view} contextGroup={view==='group'?group:undefined} contextTeacher={view==='teacher'?teacher:undefined} contextRoom={view==='room'?room:undefined} existing={items.some(x=>x.id===selected.id)}/>}
  </div>}
  </div>
- {contextMenu&&<div role="menu" aria-label="Действия с занятием" className="lesson-context-menu" style={{left:contextMenu.x,top:contextMenu.y}} onClick={e=>e.stopPropagation()}>
-    <div className="lesson-context-title">{contextMenu.lesson.subject}<small>{contextMenu.lesson.groups.join(' + ')} · {DAYS[contextMenu.lesson.day]}, {contextMenu.lesson.slot}-я</small></div>
-    <button role="menuitem" onClick={()=>{
-      choose(contextMenu.lesson);setSideMode('assistant');setContextMenu(null);
-     }}><Eye size={14}/> Открыть свойства</button>
-    <button role="menuitem" onClick={()=>{setSelected(contextMenu.lesson);setSideMode('edit');setContextMenu(null)}}><Pencil size={14}/> Изменить занятие</button>
-    <button role="menuitem" disabled={contextMenu.lesson.status==='held'} onClick={()=>{choose(contextMenu.lesson);setMoveMode(true)}}><ArrowLeftRight size={14}/> Перенести в этой неделе</button>
-    <button role="menuitem" disabled={contextMenu.lesson.status==='held'} onClick={()=>{setWeekMoving(contextMenu.lesson);setContextMenu(null)}}><CalendarDays size={14}/> Перенести на другую неделю</button>
+ {lessonContext&&<div role="menu" aria-label="Действия с занятием" className="lesson-context-menu"
+   style={{left:lessonContext.x,top:lessonContext.y}} onClick={e=>e.stopPropagation()}>
+    <div className="lesson-context-title">{lessonContext.lesson.subject}
+     <small>{lessonContext.lesson.groups.join(' + ')} · {DAYS[lessonContext.lesson.day]}, {lessonContext.lesson.slot}-я пара</small></div>
+    <button role="menuitem" onClick={()=>choose(lessonContext.lesson)}><Eye size={14}/> Открыть свойства</button>
+    <button role="menuitem" onClick={()=>{choose(lessonContext.lesson);setSideMode('edit')}}>
+     <Pencil size={14}/> Изменить занятие</button>
+    <button role="menuitem" disabled={lessonContext.lesson.status==='held'}
+     onClick={()=>{choose(lessonContext.lesson);setMoveMode(true)}}>
+     <ArrowLeftRight size={14}/> Перенести в этой неделе</button>
+    <button role="menuitem" disabled={lessonContext.lesson.status==='held'}
+     onClick={()=>{setWeekMoving(lessonContext.lesson);setContextMenu(null)}}>
+     <CalendarDays size={14}/> Перенести на другую неделю</button>
     <div className="lesson-context-separator"/>
-    <button role="menuitem" className="danger" disabled={contextMenu.lesson.status==='held'} onClick={()=>{setContextMenu(null);askRemove(contextMenu.lesson.id)}}><Trash2 size={14}/> Удалить занятие</button>
+    <button role="menuitem" className="danger" disabled={lessonContext.lesson.status==='held'}
+     onClick={()=>{setContextMenu(null);askRemove(lessonContext.lesson.id)}}>
+     <Trash2 size={14}/> Удалить занятие</button>
+   </div>}
+  {emptyContext&&<div role="menu" aria-label="Действия с пустой ячейкой" className="lesson-context-menu"
+   style={{left:emptyContext.x,top:emptyContext.y}} onClick={e=>e.stopPropagation()}>
+    <div className="lesson-context-title">Свободная ячейка
+     <small>{DAYS[emptyContext.day]}, {emptyContext.slot}-я пара · {lessonDate(week,emptyContext.day)}</small>
+    </div>
+    {emptyContext.blockedReason&&<p className="lesson-context-note">
+     Нельзя назначить занятие: {emptyContext.blockedReason}
+    </p>}
+    <button role="menuitem" disabled={Boolean(emptyContext.blockedReason)}
+     onClick={()=>{const {day,slot}=emptyContext;setContextMenu(null);make(day,slot)}}>
+     <Plus size={14}/> Создать занятие</button>
+    {emptyContext.blockedReason&&<button role="menuitem" onClick={()=>show('calendar')}>
+     <CalendarDays size={14}/> Открыть учебный календарь
+    </button>}
    </div>}
   {weekMoving&&<LessonWeekMove key={weekMoving.id} lesson={weekMoving} lessons={items} blockedRooms={blockedRooms} onCancel={()=>setWeekMoving(null)} onMove={moveAcrossWeeks}/>}
   {preview&&selected&&<div className="move-preview" role="dialog" aria-label="Подтверждение переноса">
