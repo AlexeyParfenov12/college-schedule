@@ -7,7 +7,9 @@ export type Lesson = {
  id:string; day:number; slot:number; subject:string; teacher:string; groups:string[]; room:string;
  type:Type; mode:Mode; notes?:string; week?:number; participants?:Participant[]; hours?:number;
  computerShare?:1|2|3; requiresIndividualComputer?:boolean; requiresComputers?:boolean; practiceBlockId?:string;
- status?:'scheduled'|'cancelled'|'held'; replacementFor?:string; originalDay?:number; originalSlot?:number;
+ status?:'scheduled'|'cancelled'|'held'; replacementFor?:string; replacementKind?:'teacher'|'subject'|'online';
+ replacementOriginal?:{subject:string;teacher:string;room:string;mode:Mode;type:Type;notes?:string;participants?:Participant[]};
+ originalDay?:number; originalSlot?:number;
 };
 export const DAYS=['Пн','Вт','Ср','Чт','Пт','Сб'];
 export const TIMES=['08:30–10:00','10:10–11:40','12:00–13:30','13:40–15:10','15:20–16:50','17:00–18:30'];

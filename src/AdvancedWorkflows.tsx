@@ -12,16 +12,18 @@ import { WEEK_COUNT, calendarIssues } from './plannerDomain';
 import { LEGACY_WEEK_OFFSET, shiftLegacyWeek } from './weekTimeline';
 import RoomManager from './RoomManager';
 import { demoAcademicDemands, demoAcademicHorizon } from './academicPlanning';
+import { DEFAULT_SUBSTITUTION_POLICY, suggestSubstitutions, applySubstitutionOption, revertSubstitution } from './substitutionPlanner';
+import type { SubstitutionPolicy, SubstitutionOption } from './substitutionPlanner';
 
 type Screen=typeof NAV[number][0];
 type Snapshot={id:string;label:string;at:string;week:number;lessons:Lesson[];notice:string};
 type Template={id:string;name:string;week:number;group:string;weeks:number;locked:boolean};
 type Roster=Record<string,{id:string;name:string;subgroup:number}[]>;
 type RoomsMap=Record<string,{blocked:boolean;reason:string}>;
-type Store={calendar:CalendarEvent[];roster:Roster;absences:Absence[];rooms:RoomsMap;rules:Rule[];snapshots:Snapshot[];templates:Template[];times:string[];notifications:string[]};
+type Store={calendar:CalendarEvent[];roster:Roster;absences:Absence[];rooms:RoomsMap;rules:Rule[];snapshots:Snapshot[];templates:Template[];times:string[];notifications:string[];substitutionPolicy:SubstitutionPolicy};
 const key='college-schedule-extras-v2';
 const legacyKey='college-schedule-extras-v1';
-const defaults=():Store=>({calendar:CALENDAR,roster:ROSTERS,absences:ABSENCES.map(x=>({...x,from:x.from+LEGACY_WEEK_OFFSET,to:x.to+LEGACY_WEEK_OFFSET})),rooms:{},rules:RULES,snapshots:[],templates:[{id:'template-a',name:'Двухнедельный цикл ИТ',week:LEGACY_WEEK_OFFSET,group:'П-21',weeks:2,locked:true},{id:'template-b',name:'Основной цикл радиотехники',week:LEGACY_WEEK_OFFSET,group:'Р-21',weeks:4,locked:false}],times:[...TIMES],notifications:[]});
+const defaults=():Store=>({calendar:CALENDAR,roster:ROSTERS,absences:ABSENCES.map(x=>({...x,from:x.from+LEGACY_WEEK_OFFSET,to:x.to+LEGACY_WEEK_OFFSET})),rooms:{},rules:RULES,snapshots:[],templates:[{id:'template-a',name:'Двухнедельный цикл ИТ',week:LEGACY_WEEK_OFFSET,group:'П-21',weeks:2,locked:true},{id:'template-b',name:'Основной цикл радиотехники',week:LEGACY_WEEK_OFFSET,group:'Р-21',weeks:4,locked:false}],times:[...TIMES],notifications:[],substitutionPolicy:{...DEFAULT_SUBSTITUTION_POLICY}});
 /** Read v1 once in memory. Its week numbers are November-based; the v1 key stays untouched. */
 const saved=():Store=>{try{
  const modern=localStorage.getItem(key);
@@ -107,7 +109,6 @@ export default function AdvancedWorkflows(p:Props){
  const [reason,setReason]=useState('Больничный');
  const [fromDay,setFromDay]=useState(0);
  const [toDay,setToDay]=useState(2);
- const [subTeacher,setSubTeacher]=useState(TEACHERS[3]);
  const [absenceId,setAbsenceId]=useState('abs-1');
  const [mode,setMode]=useState<Mode>('online');
  const [formatGroup,setFormatGroup]=useState('П-21');
@@ -133,6 +134,8 @@ export default function AdvancedWorkflows(p:Props){
  const [distanceStart,setDistanceStart]=useState(0);
  const [distanceEnd,setDistanceEnd]=useState(4);
  const selectedAbsence=db.absences.find(x=>x.id===absenceId)||db.absences[0];
+ const substitutionPolicy={...DEFAULT_SUBSTITUTION_POLICY,...db.substitutionPolicy};
+ const updateSubstitutionPolicy=(patch:Partial<SubstitutionPolicy>)=>put(s=>({...s,substitutionPolicy:{...DEFAULT_SUBSTITUTION_POLICY,...s.substitutionPolicy,...patch}}));
  const onGroup=(g:string)=>setGroups(v=>v.includes(g)?v.filter(x=>x!==g):[...v,g]);
  const groupButtons=<div className="group-picker">
   <div className="selected-groups">{groups.map(g=><button key={g} onClick={()=>onGroup(g)} title="Убрать группу">{g} <X size={11}/></button>)}</div>
@@ -145,7 +148,7 @@ export default function AdvancedWorkflows(p:Props){
    ...calendarIssues(x,db.calendar,p.days===5?5:6).map(message=>({kind:'calendar' as const,hard:true,message}))].map(issue=>({lesson:x,issue}))
  ).filter((v,i,a)=>a.findIndex(z=>z.lesson.id===v.lesson.id&&z.issue.message===v.issue.message)===i),[curr,db.calendar,p.days]);
  const softWarnings=useMemo(()=>curr.flatMap(x=>validate(x,curr).filter(issue=>!issue.hard).map(issue=>({lesson:x,issue}))),[curr]);
- const involved=useMemo(()=>selectedAbsence?curr.filter(x=>x.teacher===selectedAbsence.teacher&&x.day>=selectedAbsence.from&&x.day<=selectedAbsence.to&&x.status!=='cancelled'):[],[curr,selectedAbsence]);
+ const involved=useMemo(()=>selectedAbsence?curr.filter(x=>x.teacher===selectedAbsence.teacher&&x.day>=selectedAbsence.from&&x.day<=selectedAbsence.to&&x.status!=='cancelled'&&x.status!=='held'):[],[curr,selectedAbsence]);
  const selectedRoster=db.roster[groupDetails]||[];
  const byTeacher=curr.filter(x=>x.teacher===teacherHours&&x.status!=='cancelled');
  const roomUsages=curr.filter(x=>occupiedRooms(x).includes(selectedRoom));
@@ -269,37 +272,94 @@ export default function AdvancedWorkflows(p:Props){
 
  const makeSubstitutions=()=>{
   const teacherlessons=selectedAbsence?involved:[];
+  const offer=(x:Lesson)=>suggestSubstitutions(x,p.items,db.calendar,db.absences,substitutionPolicy,p.days===5?5:6,
+    Object.keys(db.rooms).filter(room=>db.rooms[room].blocked));
+  const useOption=(source:Lesson,selected:SubstitutionOption)=>{
+   const live=p.items.find(x=>x.id===source.id);
+   if(!live||live.status==='held'||!selectedAbsence||live.teacher!==selectedAbsence.teacher){
+    p.notify('Замена недоступна: занятие уже изменено или проведено');return;
+   }
+   // Revalidate at the moment of confirmation in case another class was edited.
+   const valid=offer(live).find(v=>v.key===selected.key);
+   if(!valid){p.notify('Этот вариант больше недоступен. Обновите предложения.');return}
+   if(!window.confirm('Заменить «'+live.subject+'» на «'+valid.lesson.subject+'» ('+valid.lesson.teacher+')?\n'+
+      'Исходная дисциплина останется с нераспределёнными часами.'))return;
+   const next=applySubstitutionOption(live,valid,selectedAbsence.reason);
+   const updated=p.items.map(l=>l.id===live.id?next:l);
+   editData(()=>updated,'Замена сохранена: '+live.subject+' → '+next.subject);
+   const left=updated.some(l=>(l.week||0)===p.week&&l.status!=='cancelled'&&l.teacher===selectedAbsence.teacher&&
+     l.day>=selectedAbsence.from&&l.day<=selectedAbsence.to);
+   if(!left)put(d=>({...d,absences:d.absences.map(a=>a.id===selectedAbsence.id?{...a,status:'resolved'}:a)}));
+  };
+  const undo=(x:Lesson)=>{
+   if(x.status==='held'){p.notify('Проведённую замену нельзя отменить обычным редактированием');return}
+   const restored=revertSubstitution(x);
+   editData(old=>old.map(y=>y.id===x.id?restored:y),'Замена отменена, исходное занятие восстановлено');
+   put(d=>({...d,absences:d.absences.map(a=>a.teacher===restored.teacher&&restored.day>=a.from&&restored.day<=a.to?
+    {...a,status:'open'}:a)}));
+  };
+  const stateLabel=(kind:Lesson['replacementKind'])=>kind==='subject'?'Другой предмет':kind==='online'?'Дистант':kind==='teacher'?'Другой преподаватель':'Замена';
   return <div className="studio-stack"><div className="studio-columns">
    <Panel title="Отсутствия преподавателей" aside={<Pill color="amber">{db.absences.filter(x=>x.status==='open').length} открыто</Pill>}>
-   <div className="studio-form">
-    <Field title="Преподаватель"><Select value={teacher} onChange={setTeacher} items={opts(TEACHERS)}/></Field>
-    <div className="studio-duo"><Field title="С какого дня"><Select value={fromDay} onChange={v=>setFromDay(Number(v))} items={DAYS.map((x,i)=>({id:i,label:x}))}/></Field><Field title="По какой день"><Select value={toDay} onChange={v=>setToDay(Number(v))} items={DAYS.map((x,i)=>({id:i,label:x}))}/></Field></div>
-    <Field title="Причина"><Select value={reason} onChange={setReason} items={opts(['Больничный','Командировка','Отпуск','Повышение квалификации','Другое'])}/></Field>
-    <Button disabled={fromDay>toDay} onClick={()=>{const abs:Absence={id:'abs-'+newId(),teacher,from:fromDay,to:toDay,reason,status:'open'};put(d=>({...d,absences:[...d.absences,abs]}));setAbsenceId(abs.id);p.notify('Отсутствие зарегистрировано')}}><Plus size={14}/> Зарегистрировать отсутствие</Button>
-   </div>
-   <div className="studio-list">{db.absences.map(a=><button className={'studio-candidate '+(selectedAbsence?.id===a.id?'selected':'')} onClick={()=>setAbsenceId(a.id)} key={a.id}><b>{a.teacher}</b><span>{DAYS[a.from]} — {DAYS[a.to]} · {a.reason} · {a.status==='open'?'Требует решения':'Решено'}</span></button>)}</div>
-   </Panel><Panel title="Подбор замен"><div className="studio-form">
-    <p className="muted">Затронутых занятий на неделе: <b>{teacherlessons.length}</b></p>
-    <Field title="Замещающий преподаватель"><Select value={subTeacher} onChange={setSubTeacher} items={opts(TEACHERS.filter(t=>t!==selectedAbsence?.teacher))}/></Field>
-    <Button primary disabled={!selectedAbsence||!teacherlessons.length} onClick={()=>{
-     if(!selectedAbsence)return;
-     let count=0;
-     editData(old=>{let next=[...old];for(const x of teacherlessons){
-      const replacement={...x,teacher:subTeacher,replacementFor:x.replacementFor||x.teacher,notes:((x.notes||'')+'; Замена: '+selectedAbsence.reason).trim()};
-      if(validate(replacement,next).some(i=>i.hard))continue;
-      next=next.map(y=>y.id===x.id?replacement:y);count++;
-     }return next},'Замены оформлены');
-     if(count)put(d=>({...d,absences:d.absences.map(a=>a.id===absenceId?{...a,status:'resolved'}:a)}));
-     p.notify('Успешно заменено '+count+' из '+teacherlessons.length+' занятий');
-    }}><ArrowLeftRight size={15}/> Подобрать и назначить замену</Button>
-    <Notice>При замене выполняется проверка нового преподавателя на занятость. В реальной системе необходима дополнительная проверка его квалификации и полномочий.</Notice>
-   </div>
+    <div className="studio-form">
+     <Field title="Преподаватель"><Select value={teacher} onChange={setTeacher} items={opts(TEACHERS)}/></Field>
+     <div className="studio-duo"><Field title="С какого дня"><Select value={fromDay} onChange={v=>setFromDay(Number(v))} items={DAYS.map((x,i)=>({id:i,label:x}))}/></Field><Field title="По какой день"><Select value={toDay} onChange={v=>setToDay(Number(v))} items={DAYS.map((x,i)=>({id:i,label:x}))}/></Field></div>
+     <Field title="Причина"><Select value={reason} onChange={setReason} items={opts(['Больничный','Командировка','Отпуск','Повышение квалификации','Другое'])}/></Field>
+     <Button disabled={fromDay>toDay} onClick={()=>{const abs:Absence={id:'abs-'+newId(),teacher,from:fromDay,to:toDay,reason,status:'open'};
+      put(d=>({...d,absences:[...d.absences,abs]}));setAbsenceId(abs.id);p.notify('Отсутствие зарегистрировано')}}><Plus size={14}/> Зарегистрировать отсутствие</Button>
+    </div>
+    <div className="studio-list">{db.absences.map(a=><button className={'studio-candidate '+(selectedAbsence?.id===a.id?'selected':'')} onClick={()=>setAbsenceId(a.id)} key={a.id}><b>{a.teacher}</b><span>{DAYS[a.from]} — {DAYS[a.to]} · {a.reason} · {a.status==='open'?'Требует решения':'Решено'}</span></button>)}</div>
+   </Panel>
+   <Panel title="Правила замены колледжа">
+    <div className="studio-form">
+     <Field title="Основной способ замены"><Select value={substitutionPolicy.strategy}
+      onChange={v=>updateSubstitutionPolicy({strategy:v as SubstitutionPolicy['strategy']})} items={[
+       {id:'subject-first',label:'Другим предметом (без обязательной замены преподавателя)'},
+       {id:'mixed',label:'Предметом или другим преподавателем'},
+       {id:'teacher-only',label:'Только другим преподавателем'}
+      ]}/></Field>
+     <label className="studio-checkbox"><input type="checkbox" checked={substitutionPolicy.allowOnline}
+      onChange={e=>updateSubstitutionPolicy({allowOnline:e.target.checked})}/> Предлагать дистант при допустимых ограничениях</label>
+     <Field title="Максимальная доля дистанта за неделю"><Select value={substitutionPolicy.maxOnlinePercent}
+      onChange={v=>updateSubstitutionPolicy({maxOnlinePercent:Number(v)})} items={[5,10,15,20,25,30].map(n=>({id:n,label:n+'%'}))}/></Field>
+     <Field title="Максимум дистанционных пар в день"><Select value={substitutionPolicy.maxOnlinePairsPerDay}
+      onChange={v=>updateSubstitutionPolicy({maxOnlinePairsPerDay:Number(v)})} items={[1,2].map(n=>({id:n,label:String(n)}))}/></Field>
+     <Field title="Свободных пар на дорогу"><Select value={substitutionPolicy.commuteGap}
+      onChange={v=>updateSubstitutionPolicy({commuteGap:Number(v) as 1|2})} items={[1,2].map(n=>({id:n,label:String(n)}))}/></Field>
+     <Notice>Дистант предлагается только в начале или конце расписания группы и преподавателя, не между очными парами. Учитываются лимиты дистанта за неделю и время на дорогу. Правила сохраняются для этого демостенда в браузере.</Notice>
+    </div>
    </Panel></div>
-   <Panel title="Занятия отсутствующего преподавателя">
-    <Rows heads={['День','Пара','Группа','Дисциплина','Преподаватель','']} rows={teacherlessons.slice(0,70).map(x=>[DAYS[x.day],x.slot,x.groups.join(', '),x.subject,x.teacher,<MiniButton onClick={()=>ifOpen(x)}>Открыть</MiniButton>])}/>
+   <Panel title="Подбор замен на текущую неделю" aside={<Pill color="amber">{teacherlessons.length} не решено</Pill>}>
+    <Notice>По умолчанию система подбирает другой предмет с подтверждённым демо-назначением преподавателя на группу. Если по правилам нельзя предложить дистанционную пару или отсутствуют свободные ресурсы, система не назначает её принудительно. Учебные планы в этом стенде демонстрационные.</Notice>
+    <div className="studio-list">
+     {!teacherlessons.length&&<p className="muted">Нет незакрытых занятий выбранного отсутствующего преподавателя на этой неделе.</p>}
+     {teacherlessons.slice(0,30).map(x=>{
+      const candidates=offer(x);
+      return <div className="studio-list-row" key={x.id}>
+       <b>{DAYS[x.day]}, {x.slot}-я пара · {x.groups.join(' + ')} · {x.subject}</b>
+       <small>Исходный преподаватель: {x.teacher}. {x.groups.length!==1||x.type!=='regular'?
+        'Для общего потока, подгрупп и параллелей требуется ручное согласование всех участников.':
+        candidates.length?'Доступные варианты проверены по КУГ, расписанию, нагрузке и ресурсам.':
+         'Нет безопасных вариантов: проверь занятость преподавателей, учебный план, кабинеты, долю дистанта и положение пары.'}</small>
+       {candidates.slice(0,5).map(candidate=><button key={candidate.key} className="studio-candidate"
+         aria-label={'Применить замену: '+candidate.label+' для '+x.subject+' '+DAYS[x.day]+' '+x.slot}
+         onClick={()=>useOption(x,candidate)}>
+         <b>{candidate.label}</b><span>{candidate.explanation}</span>
+        </button>)}
+       <MiniButton onClick={()=>ifOpen(x)}>Открыть исходное занятие</MiniButton>
+      </div>;
+     })}
+    </div>
    </Panel>
    <Panel title="Журнал замен — текущая неделя">
-    <Rows heads={['День','Пара','Группы','Было','Стало','']} rows={curr.filter(x=>x.replacementFor).map(x=>[DAYS[x.day],x.slot,x.groups.join(', '),x.replacementFor,x.teacher,<Button onClick={()=>editData(old=>old.map(y=>y.id===x.id?{...y,teacher:x.replacementFor!,replacementFor:undefined}:y),'Замена отменена')}>Вернуть</Button>])}/>
+    <Rows heads={['День','Пара','Группы','Было: дисциплина / преподаватель','Стало: дисциплина / преподаватель','Способ','']}
+     rows={curr.filter(x=>x.replacementFor).map(x=>[
+      DAYS[x.day],x.slot,x.groups.join(', '),
+      (x.replacementOriginal?.subject||x.subject)+' · '+(x.replacementOriginal?.teacher||x.replacementFor),
+      x.subject+' · '+x.teacher+' ('+MODES[x.mode]+')',<Pill color={x.replacementKind==='online'?'blue':'green'}>{stateLabel(x.replacementKind)}</Pill>,
+      <Button disabled={x.status==='held'} onClick={()=>undo(x)}>Вернуть</Button>
+     ])}/>
+    <Notice>При замене другим предметом исходные часы не списываются как проведённые. Требуется перепланировать исходную дисциплину через Academic Core; в демостенде автоматическое перераспределение часов не реализовано.</Notice>
    </Panel>
   </div>;
  };

@@ -88,6 +88,9 @@ export function reportRows(kind:string,all:Lesson[],week:number):(string|number)
  if(kind==='Параллели')source=source.filter(x=>x.type==='parallel');
  if(kind==='Подгруппы')source=source.filter(x=>x.type==='subgroup');
  if(kind==='Замены')source=source.filter(x=>Boolean(x.replacementFor));
+ if(kind==='Замены')return [['Неделя','День','Пара','Группа','Было: предмет','Было: преподаватель','Стало: предмет','Стало: преподаватель','Формат','Способ'],...source.map(l=>[
+  (l.week||0)+1,DAYS[l.day],l.slot,l.groups.join(', '),l.replacementOriginal?.subject||l.subject,
+  l.replacementOriginal?.teacher||l.replacementFor||'',l.subject,l.teacher,l.mode,l.replacementKind||'teacher'])];
  return [titles,...source.map(x=>[Number(x.week||0)+1,DAYS[x.day],x.slot,x.subject,x.teacher,x.groups.join(', '),x.room,x.type,x.mode,x.status||'scheduled'])];
 }
 export const QUALIFICATIONS:Record<string,string[]> = Object.fromEntries(TEACHERS.map((x,i)=>[x,[SUBJECTS[i%SUBJECTS.length],SUBJECTS[(i+5)%SUBJECTS.length],SUBJECTS[(i+11)%SUBJECTS.length]]]));
