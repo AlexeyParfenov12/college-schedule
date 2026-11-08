@@ -5,7 +5,9 @@ import type { CalendarEvent, Lesson } from './data';
 import { assignPeriod, calendarChangeImpact, CALENDAR_PHASES, calendarWeeks, checkCalendar, copyGroupCalendar, importMatrixCSV, kugWeekDays, matrixCSV, parseCalendarBackup, phaseInfo, weekCell } from './calendarMatrixDomain';
 import type { MatrixImport } from './calendarMatrixDomain';
 import type { CalendarPhase, Week } from './calendarMatrixDomain';
-import { classifyCalendarDay, readCollegeWorkweek } from './productionCalendar';
+import { classifyCalendarDay, readCollegeWorkweek, productionDiffersFromBaseline } from './productionCalendar';
+import { useProductionCalendarState } from './productionCalendarSync';
+import { lessonDate } from './plannerDomain';
 import type { CalendarDay } from './productionCalendar';
 import { plusDays } from './calendarMatrixDomain';
 import './calendar-matrix.css';
@@ -13,7 +15,7 @@ import './calendar-matrix.css';
 type Props={events:CalendarEvent[];lessons:Lesson[];group:string;setGroup:(group:string)=>void;replace:(events:CalendarEvent[])=>void};
 type Selected={anchor:number;end:number;group:string};
 const MONTHS=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
-const statusName:Record<string,string>={work:'Рабочий день',weekend:'Выходной',holiday:'Государственный праздник',transfer:'Перенесённый выходной','working-weekend':'Рабочая суббота',college:'Нерабочий день колледжа'};
+const statusName:Record<string,string>={shortened:'Сокращённый день',work:'Рабочий день',weekend:'Выходной',holiday:'Государственный праздник',transfer:'Перенесённый выходной','working-weekend':'Рабочая суббота',college:'Нерабочий день колледжа'};
 const dateText=(iso:string)=>iso.slice(8)+'.'+iso.slice(5,7);
 const csvDownload=(name:string,source:string,type:string)=>{
  const blob=new Blob([source],{type}),url=URL.createObjectURL(blob);
@@ -31,6 +33,7 @@ function HeaderMonths({weeks}:{weeks:Week[]}){
   {segments.map((m,i)=><th key={i} colSpan={m.length}>{MONTHS[m.month]} {m.year}</th>)}</tr>;
 }
 export default function CalendarMatrix({events,lessons,group,setGroup,replace}:Props){
+ const production=useProductionCalendarState();
  const [year,setYear]=useState(2026);
  const [mode,setMode]=useState<'all'|'single'>('all');
  const [query,setQuery]=useState('');
@@ -67,9 +70,11 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    if(!dates.has(date))dates.set(date,classifyCalendarDay(date,workweek));
   }
   return dates;
- },[weeks]);
+ },[weeks,production.revision]);
  const closedDays=useMemo(()=>new Map([...officialDays].map(([date,day])=>[date,day.nonWorking])),[officialDays]);
  const calendarWorkweek=readCollegeWorkweek();
+ const affectedLessons=useMemo(()=>lessons.filter(l=>l.status!=='cancelled'&&
+   productionDiffersFromBaseline(lessonDate(l.week||0,l.day),calendarWorkweek)),[lessons,calendarWorkweek,production.revision]);
  const cells=useMemo(()=>{
   const result=new Map<string,ReturnType<typeof weekCell>>();
   for(const g of groups)for(const w of weeks){
@@ -246,6 +251,14 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    <button onClick={()=>setImportPending(null)}>Отмена</button>
   </div>}
   {year!==2026&&<p className="kug-note">Выбран другой учебный год для просмотра и разметки. Расписание демонстрационного стенда пока привязано к датам с 9 ноября 2026 года; перенос дат его занятий на новый год не выполняется.</p>}
+  <div className="kug-production-status" role="status">
+   <div><strong>Производственный календарь · {calendarWorkweek}-дневная неделя</strong>
+    <span>{production.status==='updated'
+      ?'Сверено со справочным источником '+production.checkedAt.slice(0,10)
+      :production.message}. Данные будущих лет до утверждения постановления предварительные.</span></div>
+   <a href="https://www.consultant.ru/law/ref/calendar/proizvodstvennye/" target="_blank" rel="noreferrer">Сверить с нормативным календарём</a>
+   {affectedLessons.length>0&&<b className="kug-production-affected">Проверьте {affectedLessons.length} занятий после обновления</b>}
+  </div>
   <div className="kug-legend" aria-label="Обозначения периодов">
    {CALENDAR_PHASES.filter(x=>x.id!=='unassigned').map(p=><span key={p.id}><i className={'kug-fill kug-'+p.color}/><b>{p.short}</b> {p.name}</span>)}
    <span><i className="kug-fill kug-unassigned"/>— Не заполнено</span>
@@ -253,6 +266,7 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    <span className="kug-legend-day"><i className="kug-day-dot kug-day-holiday"/> Праздник</span>
    <span className="kug-legend-day"><i className="kug-day-dot kug-day-transfer"/> Перенос выходного</span>
    <span className="kug-legend-day"><i className="kug-day-dot kug-day-working-weekend"/> Рабочая суббота</span>
+   <span className="kug-legend-day"><i className="kug-day-dot kug-day-shortened"/> Сокращённый день</span>
    <span className="kug-legend-day"><i className="kug-day-dot kug-day-college"/> Доп. выходной колледжа</span>
   </div>
   {mode==='all'?<>
