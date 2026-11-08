@@ -2,16 +2,18 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Check, ClipboardCopy, Download, RotateCcw, Search, Table2, Users } from 'lucide-react';
 import { GROUPS } from './data';
 import type { CalendarEvent, Lesson } from './data';
-import { assignPeriod, calendarChangeImpact, CALENDAR_PHASES, calendarWeeks, checkCalendar, copyGroupCalendar, importMatrixCSV, matrixCSV, parseCalendarBackup, phaseInfo, weekCell } from './calendarMatrixDomain';
+import { assignPeriod, calendarChangeImpact, CALENDAR_PHASES, calendarWeeks, checkCalendar, copyGroupCalendar, importMatrixCSV, kugWeekDays, matrixCSV, parseCalendarBackup, phaseInfo, weekCell } from './calendarMatrixDomain';
 import type { MatrixImport } from './calendarMatrixDomain';
 import type { CalendarPhase, Week } from './calendarMatrixDomain';
 import { classifyCalendarDay, readCollegeWorkweek } from './productionCalendar';
+import type { CalendarDay } from './productionCalendar';
 import { plusDays } from './calendarMatrixDomain';
 import './calendar-matrix.css';
 
 type Props={events:CalendarEvent[];lessons:Lesson[];group:string;setGroup:(group:string)=>void;replace:(events:CalendarEvent[])=>void};
 type Selected={anchor:number;end:number;group:string};
 const MONTHS=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+const statusName:Record<string,string>={work:'Рабочий день',weekend:'Выходной',holiday:'Государственный праздник',transfer:'Перенесённый выходной','working-weekend':'Рабочая суббота',college:'Нерабочий день колледжа'};
 const dateText=(iso:string)=>iso.slice(8)+'.'+iso.slice(5,7);
 const csvDownload=(name:string,source:string,type:string)=>{
  const blob=new Blob([source],{type}),url=URL.createObjectURL(blob);
@@ -59,13 +61,15 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
   (g.id+' '+g.specialty+' '+g.department).toLowerCase().includes(query.toLowerCase())
  ),[department,course,query]);
  // Cache official non-working days once per displayed year, not per group and cell.
- const closedDays=useMemo(()=>{
-  const dates=new Map<string,boolean>(),workweek=readCollegeWorkweek();
-  for(const w of weeks)for(let day=w.start;day<=w.end;day=plusDays(day,1)){
-   if(!dates.has(day))dates.set(day,classifyCalendarDay(day,workweek).nonWorking);
+ const officialDays=useMemo(()=>{
+  const dates=new Map<string,CalendarDay>(),workweek=readCollegeWorkweek();
+  for(const week of weeks)for(let date=week.from;date<=week.to;date=plusDays(date,1)){
+   if(!dates.has(date))dates.set(date,classifyCalendarDay(date,workweek));
   }
   return dates;
  },[weeks]);
+ const closedDays=useMemo(()=>new Map([...officialDays].map(([date,day])=>[date,day.nonWorking])),[officialDays]);
+ const calendarWorkweek=readCollegeWorkweek();
  const cells=useMemo(()=>{
   const result=new Map<string,ReturnType<typeof weekCell>>();
   for(const g of groups)for(const w of weeks){
@@ -158,7 +162,11 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
   setPrevious(events);replace(copyPending);setCopyPending(null);
   setMessage('График группы '+group+' скопирован в '+copyReceiver+'. Проверь связанные занятия.');
  };
- const groupWeeks=useMemo(()=>weeks.map(w=>({week:w,cell:weekCell(events,group,w,closedDays)})),[weeks,events,group,closedDays]);
+ const groupWeeks=useMemo(()=>weeks.map(w=>({week:w,cell:weekCell(events,group,w,closedDays),
+  days:kugWeekDays(events,group,w,officialDays,calendarWorkweek)})),[weeks,events,group,closedDays,officialDays,calendarWorkweek]);
+ const activeWeek=selection?weeks[selection.anchor]:null;
+ const detailDays=useMemo(()=>activeWeek?kugWeekDays(events,group,activeWeek,officialDays,calendarWorkweek):[],
+  [events,group,activeWeek,officialDays,calendarWorkweek]);
  const tableRows=useMemo(()=>groups.map((g,i)=>{
      const sectionStart=i===0||groups[i-1].department!==g.department||groups[i-1].specialty!==g.specialty;
      return [sectionStart?<tr key={'s-'+g.id} className="kug-section"><th colSpan={weeks.length+1}>{g.department} · {g.specialty}</th></tr>:null,
@@ -169,6 +177,7 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
         const cell=cells.get(g.id+':'+w.index)!;
         const highlighted=rows.includes(g.id)&&selection&&w.index>=start&&w.index<=end;
         const chosen=phaseInfo(cell.phase);
+        const days=kugWeekDays(events,g.id,w,officialDays,calendarWorkweek);
         return <td key={w.index}><button type="button" aria-label={g.id+', неделя '+(w.index+1)+': '+(cell.mixed?'Смешанная неделя':chosen.name)}
          title={g.id+' · '+w.start+' — '+w.end+'\n'+(cell.mixed?cell.parts.map(p=>phaseInfo(p).name).join(' / '):chosen.name)+(cell.holidays?'\nПраздничных/неучебных дней: '+cell.holidays:'')}
          className={'kug-cell kug-'+chosen.color+(cell.mixed?' kug-mixed':'')+(highlighted?' kug-picked':'')+(cell.holidays?' kug-has-holiday':'')}
@@ -176,7 +185,10 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
          onMouseDown={()=>{dragging.current=true}}
          onMouseEnter={e=>{if(e.buttons===1)markRange(g.id,w.index)}}
          onMouseUp={()=>dragging.current=false}>
-         <span>{cell.mixed?'◐':chosen.short}</span>{cell.holidays>0&&<i aria-hidden="true"/>}
+         <span>{cell.mixed?'◐':chosen.short}</span>
+         <span className="kug-day-strip" aria-hidden="true">
+          {days.map(day=><i key={day.date} className={'kug-day-dot '+(day.withinYear?'kug-day-'+day.kind:'kug-day-outside')}/>)}
+         </span>
         </button></td>
        })}
       </tr>];
@@ -229,7 +241,11 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
   <div className="kug-legend" aria-label="Обозначения периодов">
    {CALENDAR_PHASES.filter(x=>x.id!=='unassigned').map(p=><span key={p.id}><i className={'kug-fill kug-'+p.color}/><b>{p.short}</b> {p.name}</span>)}
    <span><i className="kug-fill kug-unassigned"/>— Не заполнено</span>
-   <span><i className="kug-holiday"/> Праздник или выходной</span>
+   <span className="kug-legend-day"><i className="kug-day-dot kug-day-weekend"/> Выходной</span>
+   <span className="kug-legend-day"><i className="kug-day-dot kug-day-holiday"/> Праздник</span>
+   <span className="kug-legend-day"><i className="kug-day-dot kug-day-transfer"/> Перенос выходного</span>
+   <span className="kug-legend-day"><i className="kug-day-dot kug-day-working-weekend"/> Рабочая суббота</span>
+   <span className="kug-legend-day"><i className="kug-day-dot kug-day-college"/> Доп. выходной колледжа</span>
   </div>
   {mode==='all'?<>
    <div className="kug-matrix-help">
@@ -252,16 +268,37 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    <div className="kug-single-head"><label>Группа<select aria-label="Группа для подробного календаря" value={group}
     onChange={e=>{setGroup(e.target.value);setRows([e.target.value]);setSelection(null)}}>
     {GROUPS.map(g=><option key={g.id} value={g.id}>{g.id} · {g.specialty}</option>)}</select></label>
-    <span>Нажми на неделю, чтобы изменить период. Смешанные недели обозначены символом ◐.</span>
+    <span>Нажми на неделю, чтобы увидеть все её дни и изменить период. Отметки снизу показывают выходные и праздники; ◐ — смешанная неделя.</span>
    </div>
-   <div className="kug-single-weeks">{groupWeeks.map(({week:w,cell})=><button key={w.index} type="button"
+   <div className="kug-single-weeks">{groupWeeks.map(({week:w,cell,days})=><button key={w.index} type="button"
     className={'kug-single-week kug-'+phaseInfo(cell.phase).color+(cell.mixed?' kug-mixed':'')+(selection&&w.index>=start&&w.index<=end?' kug-picked':'')}
     onClick={e=>selectCell(group,w.index,e.shiftKey)}>
     <b>{w.index+1}-я неделя · {dateText(w.start)}—{dateText(w.end)}</b>
     <span>{cell.mixed?cell.parts.map(p=>phaseInfo(p).name).join(' / '):phaseInfo(cell.phase).name}</span>
-    {cell.holidays>0&&<small>{cell.holidays} вых./праздн.</small>}
+    <span className="kug-day-strip kug-single-strip" aria-label="Отметки нерабочих дней">
+     {days.map(day=><i key={day.date} title={day.dayName+': '+day.label}
+      className={'kug-day-dot '+(day.withinYear?'kug-day-'+day.kind:'kug-day-outside')}/>)}
+    </span>
+    {cell.holidays>0&&<small>{cell.holidays} нерабочих дней</small>}
    </button>)}</div>
   </div>}
+  {activeWeek&&<section className="kug-week-detail" aria-label="Дни выбранной недели">
+   <header><div><b>{group} · неделя {activeWeek.index+1}</b>
+    <span>{activeWeek.start} — {activeWeek.end} · {calendarWorkweek}-дневная учебная неделя</span></div>
+    <span>{detailDays.filter(day=>day.withinYear&&day.nonWorking).length} нерабочих дней</span>
+   </header>
+   <div className="kug-detail-days">
+    {detailDays.map(day=><article key={day.date} className={'kug-detail-day kug-detail-'+day.kind+(day.withinYear?'':' kug-detail-outside')}>
+     <b>{day.dayName} · {dateText(day.date)}</b>
+     <span>{day.withinYear?(statusName[day.kind]||'День'):'За пределами учебного года'}</span>
+     <small>{day.withinYear?day.label:'—'}</small>
+     {day.withinYear&&<em>{day.nonWorking?'Занятия не назначать':day.canScheduleTheory?'Теория разрешена':'По графику: '+phaseInfo(day.phase).name}</em>}
+    </article>)}
+   </div>
+   {detailDays.some(day=>day.withinYear&&!day.confirmedTransfers)&&
+    <p className="kug-day-pending">Переносы выходных для этого года ещё не подтверждены. Показаны известные федеральные праздники и обычные выходные; переносы требуют проверки.</p>}
+   <p className="kug-day-note">Праздники и выходные не меняют вид учебного периода группы. Пяти- и шестидневная неделя учитывается по настройкам колледжа.</p>
+  </section>}
   <div className="kug-editor" aria-label="Быстрое заполнение учебных недель">
    <div className="kug-editor-title"><b>Быстрое заполнение</b><span>{selectedGroups.length} групп · {selection?'Недели '+(start+1)+'–'+(end+1):'Выбери неделю'} · {selection?from+' — '+to:''}</span></div>
    <div className="kug-editor-fields">
@@ -318,6 +355,6 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    {findings.length>50&&<p>Показано первых 50 из {findings.length}. Используй фильтр отделения или группы для уточнения.</p>}
    {!findings.length&&<p>Для выбранных групп нет незаполненных или смешанных недель.</p>}
   </div>}
-  <footer className="kug-footer">Праздники и официальные нерабочие дни рассчитываются отдельно и не изменяют основной тип периода. Экспорт CSV открывается в Excel; JSON-копию можно восстановить после проверки содержимого. Прямой импорт XLSX и серверное утверждение пока не подключены. Матрица охватывает сентябрь–август, но деморасписание и текущий годовой решатель пока используют отдельную шкалу с 9 ноября 2026 года и ограниченный горизонт расчёта.</footer>
+  <footer className="kug-footer">Праздники и выходные видны внутри каждой недели и автоматически учитываются при назначении занятий; они не изменяют основной тип периода. Экспорт CSV открывается в Excel; JSON-копию можно восстановить после проверки содержимого. Прямой импорт XLSX и серверное утверждение пока не подключены. Матрица охватывает сентябрь–август, но деморасписание и текущий годовой решатель пока используют отдельную шкалу с 9 ноября 2026 года и ограниченный горизонт расчёта.</footer>
  </section>;
 }
