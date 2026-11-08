@@ -3,11 +3,11 @@ import { useSyncExternalStore } from 'react';
 /** Snapshot is downloaded by a scheduled GitHub Action, never from a browser-to-API secret. */
 export type ProductionYear={five:string;six:string};
 export type ProductionSnapshot={
- version:1;provider:'isdayoff.ru';checkedAt:string;years:Record<string,ProductionYear>;
+ version:1;provider:'isdayoff.ru';checkedAt:string;years:Record<string,ProductionYear>;warnings?:string[];
 };
-export type ProductionState={revision:number;status:'baseline'|'updated'|'unavailable';checkedAt:string;years:number[];message:string};
+export type ProductionState={revision:number;status:'baseline'|'updated'|'unavailable';checkedAt:string;years:number[];message:string;warnings:string[]};
 let snapshot:ProductionSnapshot|null=null;
-let state:ProductionState={revision:0,status:'baseline',checkedAt:'',years:[],message:'Используются встроенные календарные правила'};
+let state:ProductionState={revision:0,status:'baseline',checkedAt:'',years:[],message:'Используются встроенные календарные правила',warnings:[]};
 const subscribers=new Set<()=>void>();
 const emit=()=>{for(const subscriber of subscribers)subscriber()};
 export const getProductionState=()=>state;
@@ -39,13 +39,13 @@ export function acceptProductionSnapshot(raw:unknown):boolean{
  const data=raw as Partial<ProductionSnapshot>;
  if(data.version!==1||data.provider!=='isdayoff.ru'||typeof data.checkedAt!=='string'||
     !/^\d{4}-\d{2}-\d{2}T/.test(data.checkedAt)||!Number.isFinite(Date.parse(data.checkedAt))||
-    !data.years||typeof data.years!=='object')return false;
+    !data.years||typeof data.years!=='object'||(data.warnings!==undefined&&(!Array.isArray(data.warnings)||data.warnings.length>64||data.warnings.some(w=>typeof w!=='string'||w.length>240))))return false;
  const entries=Object.entries(data.years);
  if(!entries.length||entries.length>8||entries.some(([key,value])=>!/^20\d\d$/.test(key)||!validateYear(Number(key),value)))return false;
  const previous=JSON.stringify(snapshot?.years);
  snapshot=data as ProductionSnapshot;
  state={revision:state.revision+1,status:'updated',checkedAt:data.checkedAt,years:entries.map(([k])=>Number(k)).sort(),
-  message:previous&&previous!==JSON.stringify(data.years)?'Производственный календарь обновлён. Проверьте существующие занятия.':'Данные производственного календаря загружены'};
+  message:previous&&previous!==JSON.stringify(data.years)?'Производственный календарь обновлён. Проверьте существующие занятия.':'Данные производственного календаря загружены',warnings:data.warnings??[]};
  emit();return true;
 }
 export function externalDayCode(iso:string,week:5|6):'0'|'1'|'2'|null{
