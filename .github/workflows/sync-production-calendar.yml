@@ -8,6 +8,7 @@ on:
       - 'scripts/sync-production-calendar.py'
       - 'scripts/monitor-official-calendar.py'
       - 'scripts/notify-calendar-admin.py'
+      - 'scripts/test_calendar_monitor.py'
       - '.github/workflows/sync-production-calendar.yml'
 permissions:
   contents: write
@@ -26,6 +27,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: true
+      - name: Check official monitor and alert logic without network access
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
       - name: Monitor official publications for new calendar decrees
         run: python3 scripts/monitor-official-calendar.py
       - name: Fetch and validate 5- and 6-day calendars
