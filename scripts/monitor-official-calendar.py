@@ -73,14 +73,34 @@ def monitor(today:dt.date|None=None)->dict:
   url=BASE+"/documents?"+urllib.parse.urlencode({"date":date_str,"periodType":"day","pageSize":200,"index":1})
   try:
    req=urllib.request.Request(url,headers={"User-Agent":"College-Schedule-legal-monitor/1.0","Accept":"text/html"})
-   with urllib.request.urlopen(req,timeout=12) as response:
+   with urllib.request.urlopen(req,timeout=7) as response:
     if response.status!=200:raise ValueError("HTTP "+str(response.status))
     page=response.read(1_500_000).decode("utf-8","replace")
    if "ОФИЦИАЛЬНОЕ ОПУБЛИКОВАНИЕ" not in page.upper() and "Номер опубликования" not in page:
     raise ValueError("Не удалось проверить структуру страницы официального портала")
    for candidate in extract_candidates(page,date.isoformat()):known[candidate["id"]]=candidate
    completed+=1
-  except Exception as exc:failures.append(date.isoformat()+": "+str(exc)[:150])
+   flattened=PageText();flattened.feed(page)
+   total=re.search(r"Показаны на странице\s*:\s*с\s+\d+\s+по\s+\d+\s+из\s+(\d+)",flattened.text(),re.I)
+   if total and int(total.group(1))>200:
+    total_pages=(int(total.group(1))+199)//200
+    for page_index in range(2,min(10,total_pages)+1):
+     page_url=BASE+"/documents?"+urllib.parse.urlencode({"date":date_str,"periodType":"day","pageSize":200,"index":page_index})
+     try:
+      request=urllib.request.Request(page_url,headers={"User-Agent":"College-Schedule-legal-monitor/1.0","Accept":"text/html"})
+      with urllib.request.urlopen(request,timeout=7) as response:
+       if response.status!=200:raise ValueError("HTTP "+str(response.status))
+       extra_page=response.read(1_500_000).decode("utf-8","replace")
+      for candidate in extract_candidates(extra_page,date.isoformat()):known[candidate["id"]]=candidate
+     except Exception as exc:
+      failures.append(date.isoformat()+", страница "+str(page_index)+": "+str(exc)[:90])
+      break
+    if total_pages>10:failures.append(date.isoformat()+": не все страницы официального перечня проверены")
+  except Exception as exc:
+   failures.append(date.isoformat()+": "+str(exc)[:150])
+   if completed==0 and len(failures)>=3:
+    failures.append("Официальный портал недоступен три проверки подряд; остальные даты не подтверждены")
+    break
  # A candidate is never automatically interpreted as an approved transfer.
  status="ok" if not failures else "partial" if completed else "unavailable"
  output={"version":1,"source":"publication.pravo.gov.ru","checkedAt":dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00","Z"),
