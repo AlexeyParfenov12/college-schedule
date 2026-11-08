@@ -280,21 +280,21 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    <label>Курс<select aria-label="Курс КУГ" value={course} onChange={e=>setCourse(e.target.value)}><option value="all">Все курсы</option>
     {[1,2,3,4].map(x=><option key={x} value={x}>{x} курс</option>)}</select></label>
    <label className="kug-search"><span>Поиск групп</span><span><Search size={15}/><input aria-label="Поиск группы КУГ" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Группа, специальность..."/></span></label>
-   <label>Показать<select aria-label="Фильтр проблем КУГ" value={issueFilter} onChange={e=>setIssueFilter(e.target.value as IssueFilter)}>
+   <label>Показать<select aria-label="Фильтр проблем КУГ" value={issueFilter} onChange={e=>{setIssueFilter(e.target.value as IssueFilter);setSelection(null);setPreview(false)}}>
     <option value="all">Все группы</option><option value="unassigned">С незаполненными днями</option>
     <option value="conflicts">С конфликтами</option><option value="practice">С практикой</option>
    </select></label>
    <div className="kug-modes" role="group" aria-label="Режим календаря">
-    <button className={mode==='year'?'active':''} aria-pressed={mode==='year'} onClick={()=>setMode('year')}><Table2 size={15}/> Весь год</button>
-    <button className={mode==='quarter'?'active':''} aria-pressed={mode==='quarter'} onClick={()=>setMode('quarter')}><Table2 size={15}/> 4 месяца</button>
-    <button className={mode==='single'?'active':''} aria-pressed={mode==='single'} onClick={()=>setMode('single')}><Users size={15}/> Группа</button>
+    <button className={mode==='year'?'active':''} aria-pressed={mode==='year'} onClick={()=>{setMode('year');setSelection(null);setPreview(false)}}><Table2 size={15}/> Весь год</button>
+    <button className={mode==='quarter'?'active':''} aria-pressed={mode==='quarter'} onClick={()=>{setMode('quarter');setSelection(null);setPreview(false)}}><Table2 size={15}/> 4 месяца</button>
+    <button className={mode==='single'?'active':''} aria-pressed={mode==='single'} onClick={()=>{setMode('single');setSelection(null);setPreview(false)}}><Users size={15}/> Группа</button>
    </div>
   </div>
   <div className="kug-display-options">
    {mode==='quarter'&&<div className="kug-term-switch" role="group" aria-label="Период четырёх месяцев">
     {([{start:0,label:'Сентябрь — декабрь'},{start:4,label:'Январь — апрель'},{start:8,label:'Май — август'}] as const)
      .map(t=><button type="button" key={t.start} className={quarter===t.start?'active':''} aria-pressed={quarter===t.start}
-     onClick={()=>setQuarter(t.start)}>{t.label}</button>)}
+     onClick={()=>{setQuarter(t.start);setSelection(null);setPreview(false)}}>{t.label}</button>)}
    </div>}
    <label>Плотность<select aria-label="Плотность календаря" value={density} onChange={e=>setDensity(e.target.value as Density)}>
     <option value="compact">Компактная</option><option value="standard">Стандартная</option>
@@ -369,7 +369,7 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
       <span>Годовая линия группы: выбери неделю, чтобы увидеть её дни и назначить период.</span>
      </div>
      <div className="kug-single-timeline" role="group" aria-label={'Годовая линия группы '+group}>
-      <div className="kug-single-months"><HeaderMonths weeks={weeks}/></div>
+      <div className="kug-single-months"><span>Сентябрь · {year}</span><span>Январь · {year+1}</span><span>Май · {year+1}</span></div>
       <div className="kug-single-weeks">{groupWeeks.map(({week:w,cell})=><button key={w.index} type="button"
        aria-label={group+', неделя '+(w.index+1)+': '+(cell.mixed?'Смешанная неделя':phaseInfo(cell.phase).name)}
        title={'Неделя '+(w.index+1)+' · '+w.start+' — '+w.end+' · '+(cell.mixed?cell.parts.map(p=>phaseInfo(p).name).join(' / '):phaseInfo(cell.phase).name)}
