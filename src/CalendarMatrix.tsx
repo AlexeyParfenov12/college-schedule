@@ -248,7 +248,7 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
   {visibleWeeks.map(w=><td key={w.index}><button type="button" className="kug-calendar-week"
     aria-label={'Производственный календарь, неделя '+(w.index+1)}
     title={Array.from({length:7},(_,i)=>officialDays.get(plusDays(w.from,i)))
-     .filter((d):d is CalendarDay=>Boolean(d)&&d.nonWorking)
+     .filter((d):d is CalendarDay=>d!==undefined&&d.nonWorking)
      .map(d=>dateText(d.date)+': '+d.label).join('\n')||'Нерабочих дней нет'}
     onClick={()=>selectCell(group,w.index)}>
     {Array.from({length:7},(_,i)=>{
