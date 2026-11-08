@@ -53,6 +53,4 @@ describe('Academic vacations and college calendar integration',()=>{
   expect(result.lessons).toHaveLength(0);
  });
 
- });
-
 });
