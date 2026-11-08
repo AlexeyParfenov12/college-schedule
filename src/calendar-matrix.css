@@ -333,3 +333,22 @@
  .kug .kug-single-weeks{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));max-height:50vh}
 }
 @media print{.kug-table-controls{display:none!important}.kug .kug-single-weeks{max-height:none;overflow:visible}}
+
+
+/* Download > fill in Excel > inspect > import: one consistent KUG CSV workflow. */
+.kug-tools[open]{width:100%;max-width:100%}
+.kug-template-guide{background:#f5faf7;border:1px solid #d7e8df;border-radius:9px;padding:11px 13px;
+ margin:9px 0;color:#3b675c;font-size:12px;line-height:1.5}
+.kug-template-guide strong{display:block;font-size:13px;color:#205c50;margin-bottom:4px}
+.kug-template-guide ol{display:grid;gap:4px;margin:6px 0 10px;padding-left:21px}
+.kug-template-guide p{margin:8px 0 5px;line-height:1.55}
+.kug-template-guide b{color:#124d43}
+.kug-template-codes{display:flex;gap:5px 12px;flex-wrap:wrap;padding:8px 0}
+.kug-template-codes>span{font-size:11px;white-space:nowrap;color:#50786d}
+.kug-template-codes b{display:inline-block;padding:2px 5px;background:#e3f1e9;
+ border-radius:4px;min-width:21px;text-align:center}
+.kug-tools[open]>.kug-actions{display:flex;justify-content:flex-start;flex-wrap:wrap;gap:7px;margin-top:9px}
+.kug-tools .kug-actions>.kug-primary{background:#216e60;color:#fff;border-color:#216e60}
+.kug-tools .kug-actions>.kug-primary:hover{background:#15584d}
+@media(max-width:780px){.kug-template-guide{padding:9px}.kug-template-codes>span{white-space:normal}}
+@media print{.kug-template-guide{display:none!important}}
