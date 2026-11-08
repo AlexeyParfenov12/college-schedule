@@ -17,7 +17,7 @@ import { useCollegeOverrideRevision } from './collegeDayOverrides';
 type Props={events:CalendarEvent[];lessons:Lesson[];group:string;setGroup:(group:string)=>void;replace:(events:CalendarEvent[])=>void};
 type Selected={anchor:number;end:number;group:string};
 const MONTHS=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
-const statusName:Record<string,string>={shortened:'Сокращённый день',work:'Рабочий день',weekend:'Выходной',holiday:'Государственный праздник',transfer:'Перенесённый выходной','working-weekend':'Рабочая суббота',college:'Нерабочий день колледжа'};
+const statusName:Record<string,string>={shortened:'Сокращённый день', 'college-off':'Дополнительный выходной колледжа','college-work':'Рабочий день колледжа','college-shortened':'Сокращённый день колледжа',work:'Рабочий день',weekend:'Выходной',holiday:'Государственный праздник',transfer:'Перенесённый выходной','working-weekend':'Рабочая суббота',college:'Нерабочий день колледжа'};
 const dateText=(iso:string)=>iso.slice(8)+'.'+iso.slice(5,7);
 const csvDownload=(name:string,source:string,type:string)=>{
  const blob=new Blob([source],{type}),url=URL.createObjectURL(blob);
@@ -275,6 +275,7 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    <span className="kug-legend-day"><i className="kug-day-dot kug-day-working-weekend"/> Рабочая суббота</span>
    <span className="kug-legend-day"><i className="kug-day-dot kug-day-shortened"/> Сокращённый день</span>
    <span className="kug-legend-day"><i className="kug-day-dot kug-day-college"/> Доп. выходной колледжа</span>
+   <span className="kug-legend-day"><i className="kug-day-dot kug-day-college-work"/> Рабочий день колледжа</span>
   </div>
   {mode==='all'?<>
    <div className="kug-matrix-help">

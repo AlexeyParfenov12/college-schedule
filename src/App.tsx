@@ -329,7 +329,7 @@ export default function App(){
      title={day.date+' · '+day.label} aria-label={DAYS[i]+', '+day.date+': '+day.label}>
       <b>{DAYS[i]}</b> {day.date.slice(8,10)} · {day.kind==='holiday'?'Праздник':
        day.kind==='transfer'?'Перенос':day.kind==='weekend'?'Выходной':
-       day.kind==='shortened'?'Сокращённый':day.kind==='working-weekend'?'Рабочая суббота':'Рабочий'}
+       day.kind==='shortened'||day.kind==='college-shortened'?'Сокращённый':day.kind==='college-off'?'Выходной колледжа':day.kind==='college-work'?'Рабочий колледжа':day.kind==='working-weekend'?'Рабочая суббота':'Рабочий'}
     </span>)}
   </div>
   <CalendarAdminCenter mode="summary" lessons={items} onOpen={()=>show('calendar')}/>

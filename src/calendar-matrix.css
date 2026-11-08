@@ -137,3 +137,10 @@
 .kug-detail-shortened{background:#fff9e5;border-color:#ead89e}
 @media(max-width:700px){.kug-production-status{align-items:flex-start;flex-direction:column}}
 @media print{.kug-production-status a{display:none!important}}
+
+.kug-day-college-off{background:#ae547e}
+.kug-day-college-work{background:#36a98b}
+.kug-day-college-shortened{background:#c2a23c}
+.kug-detail-college-off{background:#fff1f4;border-color:#eebdcc}
+.kug-detail-college-work{background:#e6faf0;border-color:#b3e2c9}
+.kug-detail-college-shortened{background:#fff8e1;border-color:#e5ce9b}

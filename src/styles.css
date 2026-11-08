@@ -17,3 +17,7 @@
 @media(max-width:760px){.schedule-production-days{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:480px){.schedule-production-days{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media print{.schedule-production-warning{display:none}}
+
+.schedule-production-college-off{background:#fff0f3;color:#96516e}
+.schedule-production-college-work{background:#e6f9ef;color:#227557}
+.schedule-production-college-shortened{background:#fff7df;color:#93712d}
