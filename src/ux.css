@@ -288,3 +288,6 @@ input[type="checkbox"]{appearance:auto;width:15px!important;height:15px!importan
 .timetable .lesson.jump-focused::after{content:"";position:absolute;right:5px;bottom:4px;width:5px;height:5px;border-radius:50%;background:#C4D95F;box-shadow:0 0 0 2px rgba(255,255,255,.93);pointer-events:none}
 
 .lesson-context-note{padding:8px 9px;margin:3px 0 4px;font-size:11px;line-height:1.5;color:#906c39;background:#fff8e8;border-radius:6px}
+
+/* Right-click blocked/holiday cells on the parent surface even when the placeholder is disabled. */
+.slot-cell .empty-slot:disabled{pointer-events:none}
