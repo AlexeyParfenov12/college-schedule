@@ -2,12 +2,20 @@ import { useSyncExternalStore } from 'react';
 
 /** Snapshot is downloaded by a scheduled GitHub Action, never from a browser-to-API secret. */
 export type ProductionYear={five:string;six:string};
+export type CalendarDiscrepancy={id:string;date:string;workweek:5|6;apiCode:'0'|'1'|'2';legalCode:'0'|'1'|'2';
+ explanation:string;documentTitle:string;officialUrl:string;publicationUrl:string;status:'review_required';scope:'federal'};
+export type OfficialCandidate={id:string;title:string;date:string;url:string;status:'requires_review';explanation:string};
+export type OfficialMonitor={version:1;source:string;checkedAt:string;status:'ok'|'partial'|'unavailable';
+ daysChecked:number;daysFailed:number;lastSuccessfulDate?:string|null;
+ officialDocuments:{id:string;name:string;year:number;url:string}[];
+ candidates:OfficialCandidate[];failures:string[]};
 export type ProductionSnapshot={
  version:1;provider:'isdayoff.ru';checkedAt:string;years:Record<string,ProductionYear>;warnings?:string[];
+ discrepancies?:CalendarDiscrepancy[];officialMonitor?:OfficialMonitor|null;
 };
-export type ProductionState={revision:number;status:'baseline'|'updated'|'unavailable';checkedAt:string;years:number[];message:string;warnings:string[]};
+export type ProductionState={revision:number;status:'baseline'|'updated'|'unavailable';checkedAt:string;years:number[];message:string;warnings:string[];discrepancies:CalendarDiscrepancy[];officialMonitor:OfficialMonitor|null};
 let snapshot:ProductionSnapshot|null=null;
-let state:ProductionState={revision:0,status:'baseline',checkedAt:'',years:[],message:'Используются встроенные календарные правила',warnings:[]};
+let state:ProductionState={revision:0,status:'baseline',checkedAt:'',years:[],message:'Используются встроенные календарные правила',warnings:[],discrepancies:[],officialMonitor:null};
 const subscribers=new Set<()=>void>();
 const emit=()=>{for(const subscriber of subscribers)subscriber()};
 export const getProductionState=()=>state;
@@ -34,18 +42,41 @@ const validateYear=(year:number,entry:ProductionYear):boolean=>{
  }
  return sundays>=52&&off5>=95&&off6>=55&&off5<=145&&off6<=125;
 };
+const acceptableUrl=(value:unknown)=>typeof value==='string'&&/^https:\/\/(?:publication\.pravo\.gov\.ru|mintrud\.gov\.ru|static\.government\.ru)\//.test(value);
+const checkDiscrepancy=(value:unknown):value is CalendarDiscrepancy=>{
+ if(!value||typeof value!=='object')return false;
+ const x=value as Partial<CalendarDiscrepancy>;
+ return typeof x.id==='string'&&/^\d{4}-\d\d-\d\d$/.test(x.date??'')
+ &&(x.workweek===5||x.workweek===6)&&['0','1','2'].includes(x.apiCode??'')
+ &&['0','1','2'].includes(x.legalCode??'')&&typeof x.explanation==='string'
+ &&x.explanation.length<1200&&typeof x.documentTitle==='string'&&x.documentTitle.length<220
+ &&acceptableUrl(x.officialUrl)&&acceptableUrl(x.publicationUrl);
+};
+const checkOfficialMonitor=(value:unknown):value is OfficialMonitor=>{
+ if(!value||typeof value!=='object')return false;
+ const x=value as Partial<OfficialMonitor>;
+ return x.version===1&&['ok','partial','unavailable'].includes(x.status??'')
+ &&Array.isArray(x.candidates)&&x.candidates.length<=100
+ &&x.candidates.every(c=>typeof c.id==='string'&&typeof c.title==='string'&&acceptableUrl(c.url))
+ &&Array.isArray(x.officialDocuments)&&x.officialDocuments.length<=20
+ &&x.officialDocuments.every(d=>typeof d.id==='string'&&acceptableUrl(d.url))
+ &&Array.isArray(x.failures)&&x.failures.length<=10;
+};
 export function acceptProductionSnapshot(raw:unknown):boolean{
  if(!raw||typeof raw!=='object')return false;
  const data=raw as Partial<ProductionSnapshot>;
  if(data.version!==1||data.provider!=='isdayoff.ru'||typeof data.checkedAt!=='string'||
     !/^\d{4}-\d{2}-\d{2}T/.test(data.checkedAt)||!Number.isFinite(Date.parse(data.checkedAt))||
-    !data.years||typeof data.years!=='object'||(data.warnings!==undefined&&(!Array.isArray(data.warnings)||data.warnings.length>64||data.warnings.some(w=>typeof w!=='string'||w.length>240))))return false;
+    !data.years||typeof data.years!=='object'
+    ||(data.warnings!==undefined&&(!Array.isArray(data.warnings)||data.warnings.length>64||data.warnings.some(w=>typeof w!=='string'||w.length>240)))
+    ||(data.discrepancies!==undefined&&(!Array.isArray(data.discrepancies)||data.discrepancies.length>100||data.discrepancies.some(x=>!checkDiscrepancy(x))))
+    ||(data.officialMonitor!=null&&!checkOfficialMonitor(data.officialMonitor)))return false;
  const entries=Object.entries(data.years);
  if(!entries.length||entries.length>8||entries.some(([key,value])=>!/^20\d\d$/.test(key)||!validateYear(Number(key),value)))return false;
  const previous=JSON.stringify(snapshot?.years);
  snapshot=data as ProductionSnapshot;
  state={revision:state.revision+1,status:'updated',checkedAt:data.checkedAt,years:entries.map(([k])=>Number(k)).sort(),
-  message:previous&&previous!==JSON.stringify(data.years)?'Производственный календарь обновлён. Проверьте существующие занятия.':'Данные производственного календаря загружены',warnings:data.warnings??[]};
+  message:previous&&previous!==JSON.stringify(data.years)?'Производственный календарь обновлён. Проверьте существующие занятия.':'Данные производственного календаря загружены',warnings:data.warnings??[],discrepancies:data.discrepancies??[],officialMonitor:data.officialMonitor??null};
  emit();return true;
 }
 export function externalDayCode(iso:string,week:5|6):'0'|'1'|'2'|null{
