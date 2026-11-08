@@ -1,5 +1,6 @@
 import { DAYS, GROUPS, ROOMS, TEACHERS, SUBJECTS, CALENDAR } from './data';
 import type { Lesson, CalendarEvent } from './data';
+import { migrateDemoWinterPeriod } from './demoCalendarMigration';
 import { phaseAt } from './calendarMatrixDomain';
 import { occupiedRooms, validate } from './demoLogic';
 import { assessRoomFit, needsComputers } from './roomPolicy';
@@ -180,7 +181,7 @@ export function planningProgress(lessons:Lesson[],group:string,week:number):numb
 export function currentDemoCalendar():CalendarEvent[]{
  try{
   const raw=localStorage.getItem('college-schedule-extras-v2')||localStorage.getItem('college-schedule-extras-v1');
-  if(raw){const value=JSON.parse(raw);if(Array.isArray(value.calendar))return value.calendar as CalendarEvent[]}
+  if(raw){const value=JSON.parse(raw);if(Array.isArray(value.calendar))return migrateDemoWinterPeriod(value.calendar as CalendarEvent[])}
  }catch{}
  return CALENDAR;
 }

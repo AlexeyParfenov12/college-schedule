@@ -4,6 +4,7 @@ import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import { AlertTriangle, ArrowLeftRight, BarChart3, Bell, BookOpen, CalendarDays, Check, CheckCircle2, ChevronRight, Clock, Copy, Download, FileSpreadsheet, Filter, GitFork, GraduationCap, History, Laptop, Network, Plus, Printer, RotateCcw, Search, Send, Settings2, ShieldCheck, SlidersHorizontal, Trash2, Users, WandSparkles, X } from 'lucide-react';
 import { GROUPS, TEACHERS, SUBJECTS, ROOMS, ROSTERS, CALENDAR, RULES, ABSENCES, DAYS, TIMES, TYPES, MODES, NAV } from './data';
 import type { Lesson, Absence, CalendarEvent, Rule, Mode, Participant } from './data';
+import { migrateDemoWinterPeriod } from './demoCalendarMigration';
 import { exportCSV, exportJSON, findFree, validate, groupCount, workload, reportRows, QUALIFICATIONS, occupiedRooms } from './demoLogic';
 import { CalendarStudio, TemplateStudio, GeneratorStudio } from './PlanningTools';
 import { MiniSchedule, LoadBars, PeriodTimeline } from './ScheduleVisuals';
@@ -24,11 +25,11 @@ const defaults=():Store=>({calendar:CALENDAR,roster:ROSTERS,absences:ABSENCES.ma
 /** Read v1 once in memory. Its week numbers are November-based; the v1 key stays untouched. */
 const saved=():Store=>{try{
  const modern=localStorage.getItem(key);
- if(modern)return {...defaults(),...JSON.parse(modern)};
+ if(modern){const current=JSON.parse(modern) as Partial<Store>;return {...defaults(),...current,calendar:migrateDemoWinterPeriod(current.calendar??CALENDAR)}};
  const legacy=localStorage.getItem(legacyKey);
  if(legacy){
   const old=JSON.parse(legacy) as Partial<Store>;
-  return {...defaults(),...old,
+  return {...defaults(),...old,calendar:migrateDemoWinterPeriod(old.calendar??CALENDAR),
    templates:old.templates?.map(t=>({...t,week:t.week+LEGACY_WEEK_OFFSET}))??defaults().templates,
    absences:old.absences?.map(a=>({...a,from:a.from+LEGACY_WEEK_OFFSET,to:a.to+LEGACY_WEEK_OFFSET}))??defaults().absences,
    snapshots:old.snapshots?.map(v=>({...v,week:v.week+LEGACY_WEEK_OFFSET,

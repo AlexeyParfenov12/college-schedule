@@ -53,11 +53,11 @@ export const INITIAL:Lesson[]=[
 export const ROSTERS: Record<string,{id:string;name:string;subgroup:number}[]> = Object.fromEntries(GROUPS.map((g,i)=>[g.id,Array.from({length:g.count},(_,j)=>({id:g.id+'-'+String(j+1).padStart(2,'0'),name:['Иванов','Петров','Сидоров','Смирнов','Кузнецов','Попов','Орлов','Волков','Соколов','Крылов','Егоров','Сергеев'][j%12]+' '+['Александр','Максим','Мария','Екатерина','Дмитрий','Артём','Анна','Никита','Полина','Иван','София','Павел'][(j+i)%12]+' '+(j%2?'В.':'А.'),subgroup:j<Math.ceil(g.count/2)?1:2}))]));
 export type CalendarEvent={id:string;title:string;kind:'study'|'exam'|'vacation'|'practice'|'holiday';from:string;to:string;groups:string[];periodCode?:import('./calendarMatrixDomain').CalendarPhase};
 export const CALENDAR:CalendarEvent[]=[
- {id:'cal-1',title:'Учебные недели',kind:'study',from:'2026-09-01',to:'2026-12-28',groups:[]},
- {id:'cal-2',title:'Экзаменационная сессия',kind:'exam',from:'2027-01-11',to:'2027-01-25',groups:[]},
- {id:'cal-6',title:'Теоретическое обучение · весна',kind:'study',from:'2027-02-09',to:'2027-06-25',groups:[]},
+ {id:'cal-1',title:'Учебные недели',kind:'study',from:'2026-09-01',to:'2026-12-20',groups:[]},
+ {id:'cal-2',title:'Экзаменационная сессия',kind:'exam',from:'2026-12-21',to:'2026-12-30',groups:[]},
+ {id:'cal-6',title:'Теоретическое обучение · весна',kind:'study',from:'2027-01-25',to:'2027-06-25',groups:[]},
  {id:'cal-3',title:'Производственная практика',kind:'practice',from:'2026-12-01',to:'2026-12-20',groups:['П-31','П-32']},
- {id:'cal-4',title:'Зимний межсеместровый перерыв',kind:'vacation',from:'2027-01-26',to:'2027-02-08',groups:[]},
+ {id:'cal-4',title:'Зимний межсеместровый перерыв',kind:'vacation',from:'2027-01-01',to:'2027-01-24',groups:[]},
  {id:'cal-5',title:'Нерабочий праздничный день',kind:'holiday',from:'2026-11-04',to:'2026-11-04',groups:[]}
 ];
 export type Absence={id:string;teacher:string;from:number;to:number;reason:string;status:'open'|'resolved'};
