@@ -356,34 +356,54 @@ export default function AdvancedWorkflows(p:Props){
      setSubstitutionAudit({week:p.week,absenceId:selectedAbsence?.id||'',total:teacherlessons.length,withOptions:teacherlessons.filter(x=>offer(x).length>0).length});
     }}><Search size={15}/> Проверить замены ({teacherlessons.length})</Button>
     {substitutionAudit?.week===p.week&&substitutionAudit.absenceId===selectedAbsence?.id&&
-     <Notice kind={substitutionAudit.withOptions?'info':'warning'}>Проверено занятий: {substitutionAudit.total}. Есть допустимые варианты: {substitutionAudit.withOptions}. Без допустимых вариантов: {substitutionAudit.total-substitutionAudit.withOptions}. Автоматические изменения не выполнялись.</Notice>}
-    <div className="studio-list">
+     <div className="substitution-audit" role="status">
+      <div><strong>Результаты проверки</strong><p>Проверено занятий: {substitutionAudit.total}. Есть допустимые варианты: {substitutionAudit.withOptions}. Без вариантов: {substitutionAudit.total-substitutionAudit.withOptions}. Расписание не менялось.</p></div>
+      <button type="button" className="substitution-dismiss" onClick={()=>{setSubstitutionAudit(null);setCheckedSubstitution(null)}} aria-label="Скрыть результаты проверки" title="Закрыть результаты"><X size={16}/></button>
+     </div>}
+    <div className="substitution-lesson-list">
      {!teacherlessons.length&&<p className="muted">Нет незакрытых занятий выбранного отсутствующего преподавателя на этой неделе.</p>}
      {teacherlessons.slice(0,30).map(x=>{
       const candidates=offer(x);
-      return <div className="studio-list-row" key={x.id}>
-       <b>{DAYS[x.day]}, {x.slot}-я пара · {x.groups.join(' + ')} · {x.subject}</b>
-       <small>Исходный преподаватель: {x.teacher}. {x.groups.length!==1||x.type!=='regular'?
-        'Для общего потока, подгрупп и параллелей требуется ручное согласование всех участников.':
-        candidates.length?'Доступные варианты проверены по КУГ, расписанию, нагрузке и ресурсам.':
-         'Нет безопасных вариантов: проверь занятость преподавателей, учебный план, кабинеты, долю дистанта и положение пары.'}</small>
-       {candidates.slice(0,5).map(candidate=>{
-        const verified=checkedSubstitution?.lessonId===x.id&&checkedSubstitution.optionKey===candidate.key&&checkedSubstitution.week===p.week&&checkedSubstitution.absenceId===selectedAbsence?.id;
-        return <div key={candidate.key}>
-         <div className="studio-candidate"><b>{candidate.label}</b><span>{candidate.explanation}</span></div>
-         <Button onClick={()=>{
-          const fresh=offer(x).find(v=>v.key===candidate.key);
-          if(!fresh){setCheckedSubstitution(null);p.notify('Вариант больше не соответствует правилам');return}
-          setCheckedSubstitution({lessonId:x.id,optionKey:candidate.key,week:p.week,absenceId:selectedAbsence?.id||''});
-         }}><Search size={14}/> Проверить замену</Button>
-         {verified&&<div role="status" className="studio-note">
-          <CheckCircle2 size={15}/> Проверка пройдена: КУГ, учебный план, квалификация/назначение, занятость, кабинеты, новые окна, положение и лимиты дистанта. Часы исходной дисциплины требуют последующего размещения.
-          <Button primary onClick={()=>useOption(x,candidate)}><Check size={14}/> Подтвердить замену</Button>
-         </div>}
-        </div>;
-       })}
-       <MiniButton onClick={()=>ifOpen(x)}>Открыть исходное занятие</MiniButton>
-      </div>;
+      return <section className="substitution-lesson" key={x.id}>
+       <header className="substitution-lesson-header">
+        <div className="substitution-lesson-meta">
+         <strong>{DAYS[x.day]}, {x.slot}-я пара · {x.groups.join(' + ')} · {x.subject}</strong>
+         <small>Исходный преподаватель: {x.teacher}. {x.groups.length!==1||x.type!=='regular'?
+          'Для общего потока, подгрупп и параллелей нужно согласовать всех участников.':
+          candidates.length?'Варианты подобраны с учётом КУГ, расписания, нагрузки и ресурсов.':
+           'Нет безопасных вариантов: проверь занятость, учебный план, кабинеты и ограничения.'}</small>
+        </div>
+        <MiniButton onClick={()=>ifOpen(x)}>Открыть занятие</MiniButton>
+       </header>
+       {!!candidates.length&&<div className="substitution-options" role="list" aria-label={'Варианты замены: '+x.subject+', '+DAYS[x.day]+', '+x.slot+'-я пара'}>
+        {candidates.slice(0,5).map(candidate=>{
+         const verified=checkedSubstitution?.lessonId===x.id&&checkedSubstitution.optionKey===candidate.key&&checkedSubstitution.week===p.week&&checkedSubstitution.absenceId===selectedAbsence?.id;
+         return <div className={'substitution-option'+(verified?' substitution-option-verified':'')} role="listitem" key={candidate.key}>
+          <div className="substitution-option-info">
+           <strong>{candidate.label}</strong><p>{candidate.explanation}</p>
+          </div>
+          {!verified&&<div className="substitution-option-actions">
+           <Button onClick={()=>{
+            const fresh=offer(x).find(v=>v.key===candidate.key);
+            if(!fresh){setCheckedSubstitution(null);p.notify('Вариант больше не соответствует правилам');return}
+            setCheckedSubstitution({lessonId:x.id,optionKey:candidate.key,week:p.week,absenceId:selectedAbsence?.id||''});
+           }}><Search size={14}/> Проверить замену</Button>
+          </div>}
+          {verified&&<div className="substitution-verification" role="status">
+           <div className="substitution-verification-head">
+            <strong><CheckCircle2 size={16}/> Проверка пройдена</strong>
+            <button type="button" className="substitution-dismiss" onClick={()=>setCheckedSubstitution(null)} title="Закрыть проверку" aria-label="Скрыть проверку"><X size={16}/></button>
+           </div>
+           <p>Проверены учебное назначение, КУГ, занятость, кабинеты, новые окна и ограничения дистанта по данным демостенда. Исходные часы ещё нужно распределить.</p>
+           <div className="substitution-option-actions">
+            <Button primary onClick={()=>useOption(x,candidate)}><Check size={14}/> Подтвердить замену</Button>
+            <Button onClick={()=>setCheckedSubstitution(null)}>Отмена</Button>
+           </div>
+          </div>}
+         </div>;
+        })}
+       </div>}
+      </section>;
      })}
     </div>
    </Panel>

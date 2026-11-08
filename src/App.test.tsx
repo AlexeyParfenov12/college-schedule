@@ -406,4 +406,20 @@ describe('React interface smoke checks',()=>{
   expect(screen.getByText('Все группы колледжа')).toBeTruthy();
  },20000);
 
+ it('displays replacement options as independent cards and lets the user close verification',()=>{
+  render(<App/>);
+  openScreen('substitutions');
+  const verify=screen.getAllByRole('button',{name:'Проверить замену'});
+  expect(verify.length).toBeGreaterThan(0);
+  const cards=document.querySelector('.substitution-lesson-list .substitution-options');
+  expect(cards).toBeTruthy();
+  expect(cards?.querySelectorAll('.substitution-option').length).toBeGreaterThan(0);
+  fireEvent.click(verify[0]);
+  expect(screen.getByRole('button',{name:'Скрыть проверку'})).toBeTruthy();
+  expect(screen.getByRole('button',{name:'Подтвердить замену'})).toBeTruthy();
+  fireEvent.click(screen.getByRole('button',{name:'Скрыть проверку'}));
+  expect(screen.queryByRole('button',{name:'Подтвердить замену'})).toBeNull();
+  expect(screen.queryByRole('button',{name:'Скрыть проверку'})).toBeNull();
+ },20000);
+
 });

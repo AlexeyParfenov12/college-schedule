@@ -464,7 +464,7 @@ export default function App(){
  const month=<div className="calendar-grid">{['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(v=><b key={v}>{v}</b>)}{Array.from({length:6},(_,i)=><span key={'o'+i}/>)}{Array.from({length:30},(_,i)=><button className={i+1>=9&&i+1<=14?'week-day':''} key={i}>{i+1}</button>)}</div>;
  const render=()=>screen==='schedule'
   ? <>{weekHeader}{schedule}</>
-  : screen==='year'?<AnnualPlanner lessons={items} calendar={(()=>{
+  : screen==='year'?<AnnualPlanner lessons={items} days={days} calendar={(()=>{
       try{const v=JSON.parse((localStorage.getItem('college-schedule-extras-v2')||localStorage.getItem('college-schedule-extras-v1'))||'{}');return Array.isArray(v.calendar)?v.calendar:CALENDAR}
       catch{return CALENDAR}
     })()} notify={setNotice} onApply={(variant,weeks,workweek)=>{

@@ -54,4 +54,19 @@ describe('Annual scheduler navigation and KUG practice',()=>{
   expect(screen.getByText(/Лимит группы: 2 пар\/день/)).toBeTruthy();
  },20000);
 
+ it('honors the six-day college setting even if a previous annual draft saved five days',()=>{
+  localStorage.setItem('college-schedule-workweek-v1','6');
+  localStorage.setItem('college-year-preferences-v3',JSON.stringify({days:5}));
+  open();
+  expect(screen.getByText('Пн–Сб · шестидневка')).toBeTruthy();
+  fireEvent.click(screen.getByRole('tab',{name:'Преподаватели'}));
+  const choices=document.querySelectorAll('.year-card .year-day-choices');
+  expect(choices.length).toBe(2);
+  expect(choices[0].querySelectorAll('label')).toHaveLength(6);
+  expect(choices[0].textContent).toContain('Сб');
+  expect(choices[1].querySelectorAll('label')).toHaveLength(6);
+  fireEvent.click(screen.getByRole('tab',{name:'Правила групп'}));
+  expect(document.querySelectorAll('.year-card .year-day-choices label')).toHaveLength(6);
+ },20000);
+
 });

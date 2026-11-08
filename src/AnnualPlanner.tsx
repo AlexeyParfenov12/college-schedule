@@ -16,7 +16,7 @@ import { effectiveGroupRules } from './scheduleConstraints';
 import { practicePeriodsFromKug } from './kugPractice';
 import type { ScopeOverride } from './scheduleConstraints';
 
-type Props={lessons:Lesson[];calendar:CalendarEvent[];onApply:(variant:AnnualVariant,weeks:number,workweek:5|6)=>void;notify:(s:string)=>void};
+type Props={lessons:Lesson[];calendar:CalendarEvent[];days:5|6;onApply:(variant:AnnualVariant,weeks:number,workweek:5|6)=>void;notify:(s:string)=>void};
 type Tab='load'|'teachers'|'scope'|'rooms'|'groups'|'distance'|'results';
 const tabs:{id:Tab;name:string}[]=[
  {id:'load',name:'Нагрузка'},{id:'teachers',name:'Преподаватели'},{id:'scope',name:'Правила групп'},{id:'rooms',name:'Кабинеты'},
@@ -37,11 +37,11 @@ const read=():AnnualConfig=>{try{
 }catch{}return defaultAnnualConfig()};
 const key=(name:string,subject:string)=>streamKey(name,subject);
 const periodOptions=(weeks:number)=>Array.from({length:weeks},(_,w)=><option key={w} value={w}>{w+1}-я · {w===0?ACADEMIC_START:lessonDate(w,0)}</option>);
-export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
+export default function AnnualPlanner({lessons,calendar,days,onApply,notify}:Props){
  const production=useProductionCalendarState();
  const collegeRevision=useCollegeOverrideRevision();
  const horizon=useMemo(()=>demoAcademicHorizon(calendar),[calendar]);
- const [cfg,setCfg]=useState<AnnualConfig>(()=>({...read(),weeks:demoAcademicHorizon(calendar)}));
+ const [cfg,setCfg]=useState<AnnualConfig>(()=>({...read(),days,weeks:demoAcademicHorizon(calendar)}));
  const backlog=useMemo(()=>{
   try{
    const current=localStorage.getItem('college-year-unplaced-v2');
@@ -86,6 +86,10 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
  useEffect(()=>{
   if(cfg.weeks!==horizon)change(current=>({...current,weeks:horizon}));
  },[cfg.weeks,horizon]);
+ // The college settings are authoritative even when an older yearly draft saved 5 days.
+ useEffect(()=>{
+  if(cfg.days!==days)change(current=>({...current,days}));
+ },[cfg.days,days]);
  const rule=teacherRule(cfg,teacher);
  const ruleTarget:ScopeOverride=scopeType==='college'?cfg.collegeRules||{}:
   scopeType==='department'?cfg.departmentRules?.[scopeDepartment]||{}:cfg.groupRules?.[scopeGroup]||{};
@@ -191,7 +195,7 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
    </tr>)}</tbody></table></div>
    <div className="year-note">Часы не редактируются в расписании: изменения утверждённого учебного плана выполняются в Academic Core. Демонстрационные назначения охватывают {DEMO_SEMESTERS.length} учебных периода; периоды можно настроить в учебном календаре.</div>
    </section><section className="year-card"><h3><Clock3 size={16}/> Общие ограничения</h3><div className="year-fields">
-    <F name="Учебных дней"><PolishedSelect value={cfg.days} onChange={e=>change(c=>({...c,days:Number(e.target.value) as 5|6}))}><option value={5}>Пн–Пт</option><option value={6}>Пн–Сб</option></PolishedSelect></F>
+    <F name="Учебная неделя колледжа"><div className="year-workweek-source" role="status"><strong>{days===6?"Пн–Сб · шестидневка":"Пн–Пт · пятидневка"}</strong><small>Из общих настроек колледжа. Действует для годового расчёта и правил преподавателей.</small></div></F>
     <F name="Пар в день"><PolishedSelect value={cfg.slotsPerDay} onChange={e=>change(c=>({...c,slotsPerDay:Number(e.target.value)}))}>{[3,4,5,6].map(x=><option key={x} value={x}>{x}</option>)}</PolishedSelect></F></div>
     <div className="year-rules"><span><Check size={14}/> Группа и преподаватель не дублируются во времени</span><span><Check size={14}/> Кабинет проверяется по занятости и местам</span><span><Check size={14}/> Учебные периоды исключают запрещённые даты</span><span><Check size={14}/> Периоды практики автоматически учитываются из КУГ</span></div><button className="year-next" onClick={nextTab}>Настроить преподавателей <ArrowRight size={14}/></button></section></div>}
   {tab==='teachers'&&<div className="year-cols"><section className="year-card"><h3><Users size={16}/> Преподаватели</h3>

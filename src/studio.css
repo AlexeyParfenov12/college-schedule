@@ -98,3 +98,32 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 @media(max-width:850px){.studio-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.studio-group-select{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:540px){.studio-inline-filters .studio-field{min-width:115px;flex:1}.studio-columns{gap:8px}.studio-panel>header{padding:8px}.studio-inner{padding:8px}.studio-group-select,.studio-panel .studio-group-select{grid-template-columns:repeat(2,minmax(0,1fr))}.studio-stat{padding:9px}.studio-stat strong{font-size:20px}.studio-duo{grid-template-columns:1fr}.studio-headbar{flex-wrap:wrap}}
 @media print{.nav,.main-head,.app-foot,.studio-btn,.studio-link,.studio-ghost,.head-actions,.reset-button{display:none!important}.workspace{padding:0}.studio-panel{break-inside:avoid;border:none}.studio-table-scroll{max-height:none;overflow:visible}.studio-table th{position:static}}
+
+/* Substitutions: one lesson is a vertical section, options are cards, not flex-row cells. */
+.substitution-lesson-list{display:flex;flex-direction:column;gap:14px;margin-top:13px;min-width:0}
+.substitution-lesson{min-width:0;padding:13px;border:1px solid #dce9e4;border-radius:10px;background:#f8fbfa}
+.substitution-lesson-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px;min-width:0}
+.substitution-lesson-meta{min-width:0;display:flex;flex:1;flex-direction:column;gap:6px;overflow-wrap:anywhere}
+.substitution-lesson-meta strong{font-size:12px;color:#244f4b}
+.substitution-lesson-meta small{font-size:10.5px;line-height:1.6;color:#688380}
+.substitution-lesson-header .studio-link{flex:none;align-self:flex-start}
+.substitution-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:10px;min-width:0}
+.substitution-option{display:flex;flex-direction:column;gap:10px;padding:12px;min-width:0;max-width:100%;border:1px solid #dae7e1;border-radius:9px;background:#fff;box-shadow:0 2px 5px rgba(20,70,60,.035);overflow-wrap:anywhere}
+.substitution-option-verified{border-color:#78b49e;background:#f9fcfa}
+.substitution-option-info{min-width:0}
+.substitution-option-info strong{display:block;font-size:11.5px;line-height:1.45;color:#244f4b}
+.substitution-option-info p{font-size:10.5px;line-height:1.55;color:#688480;margin:6px 0 0;overflow-wrap:anywhere}
+.substitution-option-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.substitution-option-actions .studio-btn{max-width:100%;white-space:normal;min-height:34px}
+.substitution-verification{min-width:0;border-radius:8px;border:1px solid #bedfcd;background:#eff8f3;padding:10px;display:flex;flex-direction:column;gap:9px;color:#315f50}
+.substitution-verification-head{display:flex;justify-content:space-between;align-items:flex-start;gap:9px}
+.substitution-verification-head strong{display:inline-flex;align-items:center;gap:6px;font-size:11px}
+.substitution-verification p{font-size:10.5px;line-height:1.6;margin:0;overflow-wrap:anywhere}
+.substitution-dismiss{display:inline-flex;align-items:center;justify-content:center;flex:none;min-width:30px;min-height:30px;border:1px solid #d5e5dd;border-radius:6px;background:white;color:#54766b;cursor:pointer}
+.substitution-dismiss:hover{background:#e6f3eb;color:#24584b}
+.substitution-audit{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:12px;margin-top:9px;border:1px solid #c9e4d5;border-radius:9px;background:#f2faf5;color:#3b7861;min-width:0}
+.substitution-audit>div{min-width:0;flex:1}
+.substitution-audit strong{font-size:11.5px}
+.substitution-audit p{font-size:10.5px;line-height:1.5;margin:5px 0 0;overflow-wrap:anywhere}
+@media(max-width:1050px){.substitution-options{grid-template-columns:1fr}}
+@media(max-width:580px){.substitution-lesson{padding:10px}.substitution-lesson-header{flex-direction:column;gap:8px}.substitution-option{padding:10px}}
