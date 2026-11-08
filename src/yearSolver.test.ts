@@ -39,7 +39,7 @@ describe('KUG-driven practice periods',()=>{
   const pdp:CalendarEvent={id:'pdp',title:'ПДП',kind:'practice',periodCode:'prediploma',from:'2026-09-03',to:'2026-09-04',groups:['П-21']};
   expect(practicePeriodsFromKug([pp,pdp],1,5).map(p=>p.phase)).toEqual(['industrial','prediploma']);
   const result=solveAnnualVariant([],defaultAnnualConfig(),[pp,pdp],0);
-  expect(result.practiceIssues.some(x=>x.reason.includes('места прохождения'))).toBe(true);
+  expect(result.practiceIssues.some(x=>x.reason.includes('Нет подтверждённого назначения практики'))).toBe(true);
  });
  it('excludes holiday dates and never transfers a group-specific period to another group',()=>{
   const holiday:CalendarEvent={id:'holiday',title:'Выходной',kind:'holiday',from:'2026-09-03',to:'2026-09-03',groups:[]};
