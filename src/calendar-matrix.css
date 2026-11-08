@@ -84,12 +84,45 @@
 .kug-copy-controls .kug-copy-overwrite{flex-direction:row;align-items:center;gap:6px}
 .kug-copy-controls input{accent-color:#1f7b70}
 .kug-copy-controls>button{min-height:35px;border:1px solid #d5e3dd;color:#1a5650;background:white;border-radius:8px;padding:7px 10px;display:flex;gap:6px;align-items:center;font-weight:700}
-.kug-legacy{background:#fff;border:1px solid #dbe8e3;border-radius:10px;padding:8px 12px}
-.kug-legacy summary{cursor:pointer;padding:7px 0;font-size:13px;color:#336e61;font-weight:800}
-.kug-legacy[open]{display:block}.kug-legacy[open] summary{border-bottom:1px solid #e0eee8;margin-bottom:14px}
 
 .kug-row-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
 .kug-row-actions button{border:1px solid #d5e3dd;border-radius:7px;background:white;color:#245d55;padding:5px 9px;font-size:11px;min-height:30px}
 .kug-row-actions>span{color:#426a5e;font-size:11px;font-weight:700}
 .kug-editor-fields input[type=date]{width:100%;min-width:0}
 .kug-editor .kug-alert{margin:0;background:#fff5ed;padding:8px 10px;border-radius:7px}
+
+/* Weekday-level production calendar, embedded in the academic-year matrix. */
+.kug .kug-cell{flex-direction:column;gap:2px;min-height:35px;height:35px;padding:3px 1px}
+.kug-day-strip{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:1px;width:100%;padding:0 2px}
+.kug-day-dot{display:block;min-width:0;height:5px;border-radius:1px;background:#cbe6da}
+.kug-day-work{background:#d8e7dd}
+.kug-day-weekend{background:#8c9baa}
+.kug-day-holiday{background:#dc5959}
+.kug-day-transfer{background:#e59540}
+.kug-day-working-weekend{background:#3b9f83;border:1px solid #1a6c59}
+.kug-day-college{background:#ad547e}
+.kug-day-outside{background:transparent}
+.kug-legend-day .kug-day-dot{width:13px;height:9px;display:inline-block}
+.kug .kug-cell.kug-has-holiday>i{display:none}
+.kug-week-detail{border:1px solid #d7e8e1;background:#fff;border-radius:11px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.kug-week-detail>header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;color:#37685d}
+.kug-week-detail>header>div{display:flex;flex-direction:column;gap:3px}
+.kug-week-detail>header b{font-size:14px;color:#154b43}
+.kug-detail-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.kug-detail-day{display:flex;flex-direction:column;align-items:flex-start;min-width:0;gap:5px;border-radius:7px;padding:8px 7px;border:1px solid #d5e4dc;background:#f5faf6;font-size:10px}
+.kug-detail-day>b{font-size:11px;color:#21594f}
+.kug-detail-day>span{font-weight:700;line-height:1.25}
+.kug-detail-day>small{line-height:1.25;overflow-wrap:anywhere;color:#506d65}
+.kug-detail-day>em{font-style:normal;font-size:10px;color:#356f57;line-height:1.3;margin-top:auto}
+.kug-detail-weekend{background:#f0f3f5;border-color:#d6e0e5}
+.kug-detail-holiday,.kug-detail-college{background:#fff1f0;border-color:#f0c6c2}
+.kug-detail-transfer{background:#fff6e9;border-color:#f2d6af}
+.kug-detail-working-weekend{background:#eaf9f0;border-color:#b1dbbf}
+.kug-detail-outside{opacity:.5;background:#f7f7f7}
+.kug-detail-day.kug-detail-holiday>em,.kug-detail-day.kug-detail-weekend>em,.kug-detail-day.kug-detail-transfer>em,.kug-detail-day.kug-detail-college>em{color:#a84b44}
+.kug-day-note,.kug-day-pending{font-size:11px;line-height:1.45;color:#577269;margin:0}
+.kug-day-pending{color:#8b6025;background:#fff6e4;border-radius:6px;padding:8px}
+.kug-single-strip{margin-top:5px}
+@media(max-width:1050px){.kug-detail-days{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:550px){.kug-detail-days{grid-template-columns:repeat(2,minmax(0,1fr))}.kug-week-detail{padding:9px}}
+@media print{.kug-week-detail{display:none!important}}

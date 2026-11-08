@@ -193,7 +193,7 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
        })}
       </tr>];
 
- }),[groups,weeks,events,rows,selection,start,end,cells]);
+ }),[groups,weeks,events,rows,selection,start,end,cells,officialDays,calendarWorkweek]);
  return <section className="kug" data-testid="calendar-matrix">
   <header className="kug-top">
    <div><span className="kug-kicker">College Schedule · КУГ</span>
