@@ -216,6 +216,32 @@ describe('React interface smoke checks',()=>{
   expect(screen.getByTestId('lesson-assistant')).toBeTruthy();
   expect(document.querySelector('.timetable-scroll.move-active')).toBeNull();
  },20000);
+ it('keeps properties closed after drag end but allows a new intentional click',()=>{
+  render(<App/>);
+  const button=document.querySelector<HTMLButtonElement>('.lesson')!;
+  const transfer={setData:()=>{},getData:()=>'',effectAllowed:'',dropEffect:''};
+  fireEvent.dragStart(button,{dataTransfer:transfer});
+  expect(screen.queryByTestId('lesson-assistant')).toBeNull();
+  fireEvent.dragEnd(button,{dataTransfer:transfer});
+  fireEvent.click(button);
+  expect(screen.queryByTestId('lesson-assistant')).toBeNull();
+  fireEvent.mouseDown(button,{button:0});
+  fireEvent.click(button);
+  expect(screen.getByTestId('lesson-assistant')).toBeTruthy();
+ },20000);
+ it('shows only transfer confirmation after drop, never lesson properties',()=>{
+  render(<App/>);
+  const button=document.querySelector<HTMLButtonElement>('.lesson')!;
+  let id='';
+  const transfer={setData:(_type:string,value:string)=>{id=value},getData:()=>id,effectAllowed:'',dropEffect:''};
+  fireEvent.dragStart(button,{dataTransfer:transfer});
+  const target=document.querySelector<HTMLButtonElement>('.target-overlay.available')!.closest('.slot-cell')!;
+  fireEvent.drop(target,{dataTransfer:transfer});
+  fireEvent.dragEnd(button,{dataTransfer:transfer});
+  fireEvent.click(button);
+  expect(screen.getByRole('dialog',{name:'Подтверждение переноса'})).toBeTruthy();
+  expect(screen.queryByTestId('lesson-assistant')).toBeNull();
+ },20000);
  it('starts availability heatmap on dragStart and clears it when a drag is cancelled',()=>{
   render(<App/>);
   const first=document.querySelector<HTMLButtonElement>('.lesson');

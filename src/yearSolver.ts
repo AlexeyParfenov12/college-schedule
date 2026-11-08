@@ -6,16 +6,12 @@ import { readCollegeWorkweek } from './productionCalendar';
 import { isTeachingDate } from './academicPlanning';
 import { checkGroupSlot, checkTeacherSlot, effectiveGroupRules, effectiveTeacherRule } from './scheduleConstraints';
 import type { ScopeOverride } from './scheduleConstraints';
+import { practicePeriodsFromKug, practicePhaseLabel } from './kugPractice';
 
 export type TeacherPreference={
  daysOff:number[]; fromSlot:number; toSlot:number;
  forbidden:{day:number;from:number;to:number}[];
  preferDays:number[]; maxOnlinePct:number; maxPairsPerDay?:number;
-};
-export type PracticeBlock={
- id:string;group:string;kind:'college'|'company';title:string;teacher:string;
- startWeek:number;durationWeeks:number;days:number[];fromSlot:number;toSlot:number;
- room:string;requiresComputers?:boolean;requiresIndividualComputer?:boolean;computerShare?:1|2|3;
 };
 export type PracticeAudit={blockId:string;group:string;week:number;reason:string};
 export type AnnualConfig={
@@ -26,7 +22,6 @@ export type AnnualConfig={
  collegeRules?:ScopeOverride;
  departmentRules?:Record<string,ScopeOverride>;
  groupRules?:Record<string,ScopeOverride>;
- practiceBlocks:PracticeBlock[];
 };
 export type YearDemand={id:string;group:string;teacher:string;subject:string;pairsPerWeek:number;requiredPairs:number;
  availableWeeks?:number[];
@@ -36,14 +31,14 @@ export type Unplaced={id:string;week:number;group:string;subject:string;teacher:
 export type AnnualVariant={id:string;name:string;lessons:Lesson[];unplaced:Unplaced[];
  totalPairs:number;placedPairs:number;coveredHours:number;requiredHours:number;
  groupWindows:number;teacherWindows:number;onlinePercent:number;score:number;streamCount:number;subgroupCount:number;
- practicePairs:number;practiceIssues:PracticeAudit[];practiceBlocks:PracticeBlock[]};
+ practicePairs:number;practiceIssues:PracticeAudit[]};
 export const ANNUAL_WEEK_LIMIT=53;
 export function defaultAnnualConfig():AnnualConfig{
  return {
   weeks:ANNUAL_WEEK_LIMIT,days:readCollegeWorkweek(),slotsPerDay:6,commuteGap:1,
   defaultOnlinePct:20,groupGapWeight:90,teacherGapWeight:65,
   activeRooms:ROOMS.filter(r=>r.active).map(r=>r.id),allowStreams:[],
-  allowSubgroups:[],assistedSubgroups:[],teacherPreferences:{},collegeRules:{},departmentRules:{},groupRules:{},practiceBlocks:[]
+  allowSubgroups:[],assistedSubgroups:[],teacherPreferences:{},collegeRules:{},departmentRules:{},groupRules:{}
  };
 }
 export const teacherRule=(cfg:AnnualConfig,name:string):TeacherPreference=>effectiveTeacherRule(cfg,name);
@@ -91,7 +86,6 @@ type WeekState={
  groupBusy:Set<string>;teacherBusy:Set<string>;roomBusy:Set<string>;
 };
 const createWeek=():WeekState=>({lessons:[],groupByDay:new Map(),teacherByDay:new Map(),groupBusy:new Set(),teacherBusy:new Set(),roomBusy:new Set()});
-export const practiceWeekActive=(p:PracticeBlock,w:number)=>w>=p.startWeek&&w<p.startWeek+p.durationWeeks;
 const k=(value:string,day:number)=>value+'|'+day;
 const busyKey=(value:string,day:number,slot:number)=>value+'|'+day+'|'+slot;
 const get=(m:Map<string,Lesson[]>,key:string)=>m.get(key)||[];
@@ -110,46 +104,6 @@ export const hasSlotConflict=(state:WeekState,l:Lesson):boolean=>
  l.groups.some(g=>state.groupBusy.has(busyKey(g,l.day,l.slot)))||
  state.teacherBusy.has(busyKey(l.teacher,l.day,l.slot))||
  (l.mode!=='online'&&(l.room.match(/\b\d{3}\b/g)||[]).some(room=>state.roomBusy.has(busyKey(room,l.day,l.slot))));
-export function practiceReservations(cfg:AnnualConfig,events:CalendarEvent[],week:number,state:WeekState){
- const created:Lesson[]=[],issues:PracticeAudit[]=[];
- const active=(cfg.practiceBlocks||[]).filter(p=>practiceWeekActive(p,week));
- const activeGroups=new Set(active.map(p=>p.group));
- for(const block of active){
-  const group=GROUPS.find(g=>g.id===block.group);
-  if(!group){issues.push({blockId:block.id,group:block.group,week,reason:'Группа не найдена'});continue}
-  const room=ROOMS.find(r=>r.id===block.room);
-  if(block.kind==='college'){
-   if(!room||!cfg.activeRooms.includes(block.room)||!room.active){
-    issues.push({blockId:block.id,group:block.group,week,reason:'Закреплённый кабинет практики закрыт или не существует'});continue;
-   }
-   if(!suited(block.title,room,group.count,block.requiresComputers,block.requiresIndividualComputer,block.computerShare)){
-    const fit=assessRoomFit({id:'practice-test',week,day:0,slot:1,groups:[block.group],teacher:block.teacher,subject:block.title,room:room.id,type:'regular',mode:'offline',requiresComputers:block.requiresComputers,requiresIndividualComputer:block.requiresIndividualComputer,computerShare:block.computerShare},room,group.count);
-    issues.push({blockId:block.id,group:block.group,week,reason:fit.reason});continue;
-   }
-  }
-  for(const day of block.days){
-   if(day>=cfg.days)continue;
-   for(let slot=block.fromSlot;slot<=Math.min(block.toSlot,cfg.slotsPerDay);slot++){
-    const lesson:Lesson={id:'practice-'+block.id+'-'+week+'-'+day+'-'+slot,
-     week,day,slot,groups:[block.group],subject:block.title||'Учебная практика',
-     teacher:block.teacher||'Руководитель практики',room:block.kind==='college'?block.room:'Предприятие',
-     mode:'offline',type:'regular',hours:2,practiceBlockId:block.id,requiresComputers:block.requiresComputers,requiresIndividualComputer:block.requiresIndividualComputer,computerShare:block.computerShare,notes:'Непрерывный блок практики · '+(block.kind==='college'?'Закреплённый кабинет':'Внешняя организация')};
-    const conflicts=hasSlotConflict(state,lesson);
-    const unavailable=!checkTeacherSlot(cfg,block.teacher,day,slot,get(state.teacherByDay,k(block.teacher,day)).length).allowed;
-    const groupRestriction=checkGroupSlot(cfg,block.group,day,slot,get(state.groupByDay,k(block.group,day)).length);
-    // A matching practice period is not a prohibition; vacations and holidays are.
-    const vacation=calendarIssues(lesson,events,cfg.days).length>0;
-    if(vacation||conflicts||unavailable||!groupRestriction.allowed){
-     issues.push({blockId:block.id,group:block.group,week,reason:vacation?'Практика пересекается с каникулами или выходным':!groupRestriction.allowed?'Группа: '+groupRestriction.reason+' ('+groupRestriction.origin.join(' → ')+')':unavailable?'Руководитель практики недоступен в заданный день или пару':'Группа, руководитель или кабинет заняты другой практикой/фиксированным занятием'});
-     continue;
-    }
-    append(state,lesson);created.push(lesson);
-   }
-  }
- }
- return {created,issues,activeGroups};
-}
-
 type Task={demand:YearDemand;group:string;teacher:string;subject:string;week:number;periodId?:string;members?:Task[]};
 function hardReason(task:Task,state:WeekState,cfg:AnnualConfig,calendar:CalendarEvent[],roomCandidates:typeof ROOMS,teacherOnline:number,onlineQuota:number,variant:number){
  const rule=teacherRule(cfg,task.teacher);
@@ -218,19 +172,21 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
  for(const [teacher,total] of quota)quota.set(teacher,Math.floor(total*Math.max(0,Math.min(100,teacherRule(cfg,teacher).maxOnlinePct))/100));
  const covered=new Map<string,number>();
  const coveredByPeriod=new Map<string,number>();
- const practiceIssues:PracticeAudit[]=[];
- let practicePairs=0;
+ const practiceIssues:PracticeAudit[]=practicePeriodsFromKug(events,cfg.weeks,cfg.days).map(p=>({
+   blockId:p.id,group:p.group,week:p.week,
+   reason:practicePhaseLabel(p.phase)+' ('+p.from+' — '+p.to+'): период получен из КУГ. '+
+    (p.phase==='training'?'Нет утверждённого руководителя и кабинета в Academic Core.':
+     'Нет утверждённого руководителя и места прохождения в Academic Core.')+
+    ' Фиктивные занятия и учебные часы не создаются.'
+  }));
+  const practicePairs=0;
  let streamCount=0,subgroupCount=0;
  for(let week=0;week<cfg.weeks;week++){
   const state=createWeek();
   for(const l of locked.filter(l=>(l.week||0)===week&&l.status==='held'))append(state,l);
-  const reservations=practiceReservations(cfg,events,week,state);
-  practicePairs+=reservations.created.length;
-  practiceIssues.push(...reservations.issues);
-  placed.push(...reservations.created);
+
   const tasks:Task[]=[];
   for(const d of regularDemands){
-   if(reservations.activeGroups.has(d.group))continue;
    if(d.availableWeeks&&!d.availableWeeks.includes(week))continue;
    const done=covered.get(d.id)||0;
    let due=0;
@@ -352,18 +308,6 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
    }
   }
  }
- // Calendar-defined practice must have an explicit room/company reservation.
- for(const event of events.filter(e=>e.kind==='practice')){
-  for(const group of event.groups){
-   const affectedWeeks=Array.from({length:cfg.weeks},(_,w)=>w).filter(w=>
-    event.from<=lessonDate(w,6)&&event.to>=lessonDate(w,0));
-   for(const w of affectedWeeks){
-    const reserved=(cfg.practiceBlocks||[]).some(p=>p.group===group&&practiceWeekActive(p,w));
-    if(!reserved)practiceIssues.push({blockId:'calendar-'+event.id,group,week:w,
-     reason:'Практика «'+event.title+'» есть в учебном календаре, но для недели '+(w+1)+' не закреплены кабинет или предприятие и руководитель'});
-   }
-  }
- }
  let groupWindows=0,teacherWindows=0;
  const groupMap=new Map<string,Lesson[]>(),teacherMap=new Map<string,Lesson[]>();
  for(const l of placed){
@@ -372,15 +316,11 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
  }
  for(const entries of groupMap.values())groupWindows+=avoidableWindows(entries,cfg.commuteGap);
  for(const entries of teacherMap.values())teacherWindows+=avoidableWindows(entries,cfg.commuteGap);
- const totalPracticePairs=(cfg.practiceBlocks||[]).reduce((n,p)=>
-  n+Math.max(0,Math.min(cfg.weeks,p.startWeek+p.durationWeeks)-p.startWeek)*
-  p.days.filter(day=>day<cfg.days).length*
-  Math.max(0,Math.min(p.toSlot,cfg.slotsPerDay)-p.fromSlot+1),0);
- const totalPairs=regularDemands.reduce((sum,d)=>sum+d.requiredPairs,0)+totalPracticePairs;
+ const totalPairs=regularDemands.reduce((sum,d)=>sum+d.requiredPairs,0);
  const placedPairs=placed.reduce((sum,l)=>sum+l.groups.length,0);
  const online=placed.filter(l=>l.mode==='online').length;
  const score=Math.round((placedPairs/Math.max(1,totalPairs))*10000-groupWindows*cfg.groupGapWeight*.22-teacherWindows*cfg.teacherGapWeight*.12);
  return {id:'variant-'+variant,name:label,lessons:placed,unplaced,
   totalPairs,placedPairs,requiredHours:totalPairs*2,coveredHours:placedPairs*2,
-  groupWindows,teacherWindows,onlinePercent:Math.round(online/Math.max(1,placed.length)*100),score,streamCount,subgroupCount,practicePairs,practiceIssues,practiceBlocks:cfg.practiceBlocks||[]};
+  groupWindows,teacherWindows,onlinePercent:Math.round(online/Math.max(1,placed.length)*100),score,streamCount,subgroupCount,practicePairs,practiceIssues};
 }

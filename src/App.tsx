@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode, DragEvent, MouseEvent } from 'react';
 import { CalendarDays, LayoutDashboard, ArrowLeftRight, Users, Building2, Settings2, FileText, Clock3, Plus, Download, Check, AlertTriangle, ChevronLeft, ChevronRight, ChevronDown, Menu, BookOpen, Monitor, Network, GitFork, WandSparkles, Save, X, Pencil, Trash2, Copy, Bell, Layers3, BarChart3, RotateCcw, Eye, SlidersHorizontal, Send, School, Filter } from 'lucide-react';
 import { DAYS, TIMES, GROUPS, TEACHERS, SUBJECTS, ROOMS, TYPES, MODES, INITIAL, NAV, CALENDAR, buildSeed } from './data';
@@ -73,6 +73,9 @@ export default function App(){
  const [sideMode,setSideMode]=useState<'assistant'|'edit'>('assistant');
  const [moveMode,setMoveMode]=useState(false);
  const [draggingId,setDraggingId]=useState<string|null>(null);
+ const [dragOnly,setDragOnly]=useState(false);
+ const suppressDragClick=useRef(false);
+ const droppedDuringDrag=useRef(false);
  const [preview,setPreview]=useState<MoveOption|null>(null);
  const [weekMoving,setWeekMoving]=useState<Item|null>(null);
  const [contextMenu,setContextMenu]=useState<ScheduleContextMenu|null>(null);
@@ -114,15 +117,20 @@ export default function App(){
  const weekProductionDays=Array.from({length:days},(_,i)=>classifyCalendarDay(lessonDate(week,i),days));
  const closedWithLessons=current.filter(x=>x.status!=='cancelled'&&weekProductionDays[x.day]?.nonWorking);
  const displayName=NAV.find(x=>x[0]===screen)?.[1]||'Расписание';
- const choose=(x:Item)=>{setMobileDay(x.day);setFocusId(null);setContextMenu(null);setSelected(x);setSideMode('assistant');setMoveMode(false);setDraggingId(null);setPreview(null);setHoverMove(null)};
+ const choose=(x:Item)=>{setDragOnly(false);setMobileDay(x.day);setFocusId(null);setContextMenu(null);setSelected(x);setSideMode('assistant');setMoveMode(false);setDraggingId(null);setPreview(null);setHoverMove(null)};
  const beginDrag=(event:DragEvent<HTMLButtonElement>,lesson:Item)=>{
   if(lesson.status==='held'){event.preventDefault();setNotice('Проведённое занятие заблокировано для переноса');return}
+  suppressDragClick.current=true;droppedDuringDrag.current=false;setDragOnly(true);
   event.dataTransfer.effectAllowed='move';
   event.dataTransfer.setData('lessonId',lesson.id);
   setContextMenu(null);setSelected(lesson);setSideMode('assistant');
   setMoveMode(true);setDraggingId(lesson.id);setPreview(null);setHoverMove(null);
  };
- const finishDrag=()=>{setDraggingId(null);setMoveMode(false);setHoverMove(null)};
+ const finishDrag=()=>{
+  const dropped=droppedDuringDrag.current;droppedDuringDrag.current=false;
+  setDraggingId(null);setMoveMode(dropped);setHoverMove(null);
+  if(!dropped){setSelected(null);setDragOnly(false)}
+ };
  const make=(day=0,slot=1)=>{setMobileDay(day);const created:Item={id:id(),day,slot,week,subject:'',teacher:view==='teacher'?teacher:'',groups:view==='group'?[group]:[],room:view==='room'?room:'',type:'regular',mode:'offline'};setSelected(created);setSideMode('edit');setMoveMode(false);setPreview(null)};
 
  const save=(x:Item)=>{
@@ -176,7 +184,7 @@ export default function App(){
   setLastChange({before:[selected,other],changedIds:[selected.id,other.id]});
   setItems([...remaining,first,second]);setStatus('draft');setSelected(null);setMoveMode(false);setPreview(null);setNotice('Занятия обменены местами · доступна отмена');
  };
- const closeSelected=()=>{setSelected(null);setMoveMode(false);setDraggingId(null);setPreview(null);setHoverMove(null);setContextMenu(null)};
+ const closeSelected=()=>{setDragOnly(false);setSelected(null);setMoveMode(false);setDraggingId(null);setPreview(null);setHoverMove(null);setContextMenu(null)};
  const contextPosition=(event:MouseEvent<HTMLElement>)=>({
   x:Math.max(8,Math.min(event.clientX,window.innerWidth-240)),
   y:Math.max(8,Math.min(event.clientY,window.innerHeight-245))
@@ -211,7 +219,7 @@ export default function App(){
  const move=(key:string,day:number,slot:number)=>{
   const source=items.find(x=>x.id===key);
   if(!source)return;
-  choose(source);
+  setSelected(source);setSideMode('assistant');setContextMenu(null);setHoverMove(null);
   const dest=moveOptions(source,current,readBlockedRooms(),days,6).find(t=>t.day===day&&t.slot===slot);
   if(!dest||dest.kind==='current')return;
   if(dest.kind==='blocked'){setNotice('Перенос невозможен: '+dest.reason);return}
@@ -313,13 +321,14 @@ export default function App(){
     onContextMenu={e=>{if(cellLessons.length===0)rightClickEmpty(e,day,row+1,federal.nonWorking?federal.label:undefined)}}
     onDragEnter={()=>{if(draggingId&&target)setHoverMove(target)}}
     onDragOver={e=>{e.preventDefault();e.dataTransfer.dropEffect=target?.kind==='available'?'move':'none'}}
-    onDrop={e=>{e.preventDefault();const key=e.dataTransfer.getData('lessonId')||draggingId;if(key)move(key,day,row+1)}}
+    onDrop={e=>{e.preventDefault();const key=e.dataTransfer.getData('lessonId')||draggingId;if(key){droppedDuringDrag.current=true;move(key,day,row+1)}}}
     onMouseEnter={()=>{if(moveMode&&target)setHoverMove(target)}}
     onMouseLeave={()=>setHoverMove(null)}>
     {cellLessons.map(x=><button draggable={!preview&&x.status!=='held'} key={x.id} data-lesson-id={x.id}
       className={'lesson '+x.type+(selected?.id===x.id?' picked':'')+(focusId===x.id?' jump-focused':'')}
       onDragStart={(e:DragEvent<HTMLButtonElement>)=>beginDrag(e,x)} onDragEnd={finishDrag}
-      onClick={()=>choose(x)} onContextMenu={e=>rightClick(e,x)} aria-label={'Открыть занятие: '+x.subject+', '+x.groups.join(' + ')}>{lessonLabel(x)}</button>)}
+      onMouseDown={e=>{if(e.button===0)suppressDragClick.current=false}}
+      onClick={()=>{if(suppressDragClick.current){suppressDragClick.current=false;return}choose(x)}} onContextMenu={e=>rightClick(e,x)} aria-label={'Открыть занятие: '+x.subject+', '+x.groups.join(' + ')}>{lessonLabel(x)}</button>)}
     {moveMode&&selected&&target&&cellLessons.length===0
      ? <button type="button" className={'target-overlay '+target.kind} data-testid={'target-'+day+'-'+(row+1)}
        onClick={()=>inspectTarget(day,row+1)} title={target.reason}
@@ -362,7 +371,7 @@ export default function App(){
      :'Изменились календарные статусы дней. Проверьте занятия: '+productionChangedLessons.length+'.'}
   </div>}
  </div>
- {moveMode&&selected&&!draggingId&&<div className="move-toolbar"><div><ArrowLeftRight size={16}/><b>{draggingId?'Перетаскивание занятия':'Режим переноса'}</b><span>Выбрано: {selected.subject} · {selected.groups.join(' + ')}</span></div><div className="move-summary"><span className="marker available"/>{availableTargetCount} доступно <span className="marker blocked"/>{targets.filter(t=>t.kind==='blocked').length} недоступно</div><span className="move-hover-reason" role="status">{hoverMove?hoverMove.reason:draggingId?'Наведи на ячейку: зелёная — можно, красная — нельзя':'Выбери доступную ячейку'}</span><button onClick={()=>{setMoveMode(false);setDraggingId(null);setPreview(null)}}>Закрыть режим <X size={13}/></button></div>}
+ {moveMode&&selected&&!draggingId&&<div className="move-toolbar"><div><ArrowLeftRight size={16}/><b>{draggingId?'Перетаскивание занятия':'Режим переноса'}</b><span>Выбрано: {selected.subject} · {selected.groups.join(' + ')}</span></div><div className="move-summary"><span className="marker available"/>{availableTargetCount} доступно <span className="marker blocked"/>{targets.filter(t=>t.kind==='blocked').length} недоступно</div><span className="move-hover-reason" role="status">{hoverMove?hoverMove.reason:draggingId?'Наведи на ячейку: зелёная — можно, красная — нельзя':'Выбери доступную ячейку'}</span><button onClick={()=>{setMoveMode(false);setDraggingId(null);setPreview(null);setDragOnly(false);setSelected(null)}}>Закрыть режим <X size={13}/></button></div>}
  {draggingId&&selected&&<div className="drag-floating-feedback" role="status" data-testid="drag-guide">
    <strong>Перемещаем: {selected.subject}</strong>
    <span><Check size={13}/> {availableTargetCount} доступно <X size={13}/> {targets.filter(t=>t.kind==='blocked').length} запрещено</span>
@@ -394,8 +403,8 @@ export default function App(){
   {legend}
   <div className="bottom-line"><span>Потоки и параллели переносятся целиком с участниками</span><span className="push-right">{hoverMove&&moveMode?hoverMove.reason:'Нажми на занятие — увидишь доступные варианты'}</span></div>
  </section>
- {selected&&!moveMode&&<button type="button" className="mobile-editor-backdrop" aria-label="Закрыть карточку занятия" onClick={closeSelected}/>}
- {selected&&<div className={'right-editor'+(moveMode?' mobile-move-collapsed':'')}>
+ {selected&&!moveMode&&!dragOnly&&<button type="button" className="mobile-editor-backdrop" aria-label="Закрыть карточку занятия" onClick={closeSelected}/>}
+ {selected&&!dragOnly&&<div className={'right-editor'+(moveMode?' mobile-move-collapsed':'')}>
    {sideMode==='assistant'&&items.some(x=>x.id===selected.id)
     ?<LessonQuickActions lesson={selected} current={current} blocked={blockedRooms} isMoveMode={moveMode}
       onMoveMode={()=>{setMoveMode(v=>!v);setPreview(null)}}
