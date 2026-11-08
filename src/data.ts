@@ -1,4 +1,5 @@
 import { classifyCalendarDay, readCollegeWorkweek } from './productionCalendar';
+import { LEGACY_WEEK_OFFSET } from './weekTimeline';
 export type Type = 'regular' | 'subgroup' | 'stream' | 'parallel';
 export type Mode = 'offline' | 'online' | 'hybrid' | 'async';
 export type Participant = {group:string;subgroup?:number;teacher?:string;room:string;mode:Mode;count?:number};
@@ -111,5 +112,6 @@ export function buildSeed(weeks=16):Lesson[]{
     }
    }
  }
- return base;
+ // Demo fixture dates remain in November 2026; expose their week numbers in the new September-based grid.
+ return base.map(item=>({...item,week:(item.week??0)+LEGACY_WEEK_OFFSET}));
 }
