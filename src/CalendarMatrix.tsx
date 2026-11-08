@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Check, ClipboardCopy, Download, RotateCcw, Search, Table2, Users } from 'lucide-react';
 import { GROUPS } from './data';
 import type { CalendarEvent, Lesson } from './data';
-import { assignPeriod, calendarChangeImpact, CALENDAR_PHASES, calendarWeeks, checkCalendar, copyGroupCalendar, importMatrixCSV, matrixCSV, phaseInfo, weekCell } from './calendarMatrixDomain';
+import { assignPeriod, calendarChangeImpact, CALENDAR_PHASES, calendarWeeks, checkCalendar, copyGroupCalendar, importMatrixCSV, matrixCSV, parseCalendarBackup, phaseInfo, weekCell } from './calendarMatrixDomain';
 import type { MatrixImport } from './calendarMatrixDomain';
 import type { CalendarPhase, Week } from './calendarMatrixDomain';
 import { classifyCalendarDay, readCollegeWorkweek } from './productionCalendar';
@@ -44,6 +44,8 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
  const [message,setMessage]=useState('');
  const [importPending,setImportPending]=useState<MatrixImport|null>(null);
  const [importError,setImportError]=useState('');
+ const [backupPending,setBackupPending]=useState<CalendarEvent[]|null>(null);
+ const [backupError,setBackupError]=useState('');
  const [copyTarget,setCopyTarget]=useState('П-22');
  const [copyOverwrite,setCopyOverwrite]=useState(false);
  const [copyPending,setCopyPending]=useState<CalendarEvent[]|null>(null);
@@ -113,15 +115,30 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
  const handleExport=()=>csvDownload('KUG-'+year+'-'+(year+1)+'.csv',
   matrixCSV(events,groups.map(g=>g.id),weeks),'text/csv;charset=utf-8');
  const handleJSON=()=>csvDownload('KUG-'+year+'-'+(year+1)+'.json',
-  JSON.stringify({academicYear:year,periods:events},null,2),'application/json;charset=utf-8');
+  JSON.stringify({version:1,academicYear:year,periods:events},null,2),'application/json;charset=utf-8');
  const readCSV=async(file?:File)=>{
   if(!file)return;
-  setImportError('');setImportPending(null);
+  setImportError('');setImportPending(null);setBackupPending(null);
   if(file.size>2_000_000){setImportError('CSV превышает 2 МБ. Проверь размер файла.');return}
   try{
    const parsed=importMatrixCSV(await file.text(),events,year,GROUPS.map(g=>g.id));
    setImportPending(parsed);
   }catch(error){setImportError(error instanceof Error?error.message:'Не удалось проверить CSV')}
+ };
+ const readBackup=async(file?:File)=>{
+  if(!file)return;
+  setBackupError('');setBackupPending(null);setImportPending(null);
+  if(file.size>4_000_000){setBackupError('Размер JSON превышает 4 МБ');return}
+  try{
+   const restored=parseCalendarBackup(await file.text(),year,GROUPS.map(g=>g.id));
+   setBackupPending(restored);
+  }catch(error){setBackupError(error instanceof Error?error.message:'Ошибка проверки резервной копии')}
+ };
+ const confirmBackup=()=>{
+  if(!backupPending)return;
+  setPrevious(events);replace(backupPending);setBackupPending(null);
+  setImportPending(null);setPreview(false);setShowCheck(false);
+  setMessage('Календарь восстановлен из JSON: '+backupPending.length+' периодов. Проверь учебные графики и расписание.');
  };
  const confirmImport=()=>{
   if(!importPending)return;
@@ -175,11 +192,12 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
     <button onClick={handleExport}><Download size={15}/> CSV для Excel</button>
     <button onClick={handleJSON}><Download size={15}/> Резервная копия JSON</button>
     <label className="kug-import-label"><span>Импорт CSV</span><input type="file" accept=".csv,text/csv" aria-label="Загрузить график из CSV" onChange={e=>{void readCSV(e.target.files?.[0]);e.target.value=''}}/></label>
+    <label className="kug-import-label"><span>Восстановить JSON</span><input type="file" accept=".json,application/json" aria-label="Восстановить календарь из JSON" onChange={e=>{void readBackup(e.target.files?.[0]);e.target.value=''}}/></label>
     <button onClick={()=>window.print()}>Печать</button>
    </div>
   </header>
   <div className="kug-filters">
-   <label>Учебный год<select aria-label="Учебный год КУГ" value={year} onChange={e=>{setYear(Number(e.target.value));setSelection(null);setPreview(false)}}>
+   <label>Учебный год<select aria-label="Учебный год КУГ" value={year} onChange={e=>{setYear(Number(e.target.value));setSelection(null);setPreview(false);setImportPending(null);setBackupPending(null);setCopyPending(null)}}>
     {[2025,2026,2027,2028].map(n=><option key={n} value={n}>{n}/{n+1}</option>)}</select></label>
    <label>Отделение<select aria-label="Отделение КУГ" value={department} onChange={e=>setDepartment(e.target.value)}><option value="all">Все отделения</option>
     {[...new Set(GROUPS.map(g=>g.department))].map(x=><option key={x} value={x}>{x}</option>)}</select></label>
@@ -192,6 +210,14 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    </div>
   </div>
   {importError&&<p className="kug-alert" role="alert">{importError}</p>}
+  {backupError&&<p className="kug-alert" role="alert">{backupError}</p>}
+  {backupPending&&<div className="kug-preview" role="status">
+   <strong>Восстановление резервной копии</strong>
+   <p>В файле {backupPending.length} учебных периодов. После подтверждения будет полностью заменён текущий локальный календарь, включая периоды других учебных лет. Расписание занятий не удаляется.</p>
+   <p className="kug-alert">Внимание: проверь источник файла перед подтверждением.</p>
+   <button className="kug-primary" onClick={confirmBackup}><Check size={15}/> Подтвердить замену всего календаря</button>
+   <button onClick={()=>setBackupPending(null)}>Отмена</button>
+  </div>}
   {importPending&&<div className="kug-preview" role="status">
    <strong>Предпросмотр импорта</strong>
    <p>{importPending.groups} групп, {importPending.cells} недельных ячеек, {importPending.ranges} периодов. Существующие периоды указанных групп на этот учебный год будут заменены; данные остальных групп и других учебных лет сохранятся.</p>
@@ -292,6 +318,6 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    {findings.length>50&&<p>Показано первых 50 из {findings.length}. Используй фильтр отделения или группы для уточнения.</p>}
    {!findings.length&&<p>Для выбранных групп нет незаполненных или смешанных недель.</p>}
   </div>}
-  <footer className="kug-footer">Праздники и официальные нерабочие дни рассчитываются отдельно и не изменяют основной тип периода. Экспорт CSV открывается в Excel; прямой импорт XLSX и серверное утверждение пока не подключены. Матрица охватывает сентябрь–август, но деморасписание и текущий годовой решатель пока используют отдельную шкалу с 9 ноября 2026 года и ограниченный горизонт расчёта.</footer>
+  <footer className="kug-footer">Праздники и официальные нерабочие дни рассчитываются отдельно и не изменяют основной тип периода. Экспорт CSV открывается в Excel; JSON-копию можно восстановить после проверки содержимого. Прямой импорт XLSX и серверное утверждение пока не подключены. Матрица охватывает сентябрь–август, но деморасписание и текущий годовой решатель пока используют отдельную шкалу с 9 ноября 2026 года и ограниченный горизонт расчёта.</footer>
  </section>;
 }

@@ -254,3 +254,41 @@ export function copyGroupCalendar(events:CalendarEvent[],source:string,target:st
  for(const item of edits)next=assignPeriod(next,[target],item.start,item.end,item.phase);
  return next;
 }
+
+/** Validate a locally exported whole-calendar backup before offering any destructive restore. */
+export function parseCalendarBackup(source:string,expectedYear:number,allowedGroups:string[]):CalendarEvent[]{
+ let parsed:unknown;
+ try{parsed=JSON.parse(source)}catch{throw new Error('Файл не является корректным JSON')}
+ if(!parsed||typeof parsed!=='object')throw new Error('Неверная структура резервной копии');
+ const document=parsed as Record<string,unknown>;
+ if(document.academicYear!==expectedYear)throw new Error('Резервная копия другого учебного года. Выбери учебный год из имени файла перед восстановлением.');
+ if(!Array.isArray(document.periods)||document.periods.length>10000)
+  throw new Error('В резервной копии отсутствует допустимый массив учебных периодов');
+ const codes=new Set(CALENDAR_PHASES.map(p=>p.id)),kinds=new Set(['study','exam','vacation','practice','holiday']);
+ const groupIds=new Set(allowedGroups),seen=new Set<string>();
+ const validDate=(value:unknown):value is string=>{
+  if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;
+  const date=new Date(value+'T00:00:00.000Z');
+  return Number.isFinite(date.valueOf())&&date.toISOString().slice(0,10)===value;
+ };
+ return document.periods.map((value:unknown,index:number)=>{
+  if(!value||typeof value!=='object')throw new Error('Неверный период №'+(index+1));
+  const e=value as Record<string,unknown>;
+  if(typeof e.id!=='string'||!e.id||e.id.length>120||seen.has(e.id))
+   throw new Error('Некорректный или повторяющийся идентификатор периода №'+(index+1));
+  seen.add(e.id);
+  if(typeof e.title!=='string'||!e.title.trim()||e.title.length>500)
+   throw new Error('Отсутствует название периода №'+(index+1));
+  if(!kinds.has(String(e.kind)))throw new Error('Неизвестный тип периода №'+(index+1));
+  if(!validDate(e.from)||!validDate(e.to)||e.from>e.to)
+   throw new Error('Некорректные даты периода №'+(index+1));
+  if(!Array.isArray(e.groups)||!e.groups.every((id:unknown)=>typeof id==='string'&&groupIds.has(id)))
+   throw new Error('Неизвестная группа в периоде №'+(index+1));
+  if(new Set(e.groups).size!==e.groups.length)throw new Error('Повтор группы в периоде №'+(index+1));
+  if(e.periodCode!==undefined&&(!codes.has(String(e.periodCode))||
+     phaseInfo(e.periodCode as CalendarPhase).kind!==e.kind))
+   throw new Error('Некорректный код учебного периода №'+(index+1));
+  return {id:e.id,title:e.title,kind:e.kind,from:e.from,to:e.to,
+   groups:[...e.groups],...(e.periodCode===undefined?{}:{periodCode:e.periodCode})} as CalendarEvent;
+ });
+}

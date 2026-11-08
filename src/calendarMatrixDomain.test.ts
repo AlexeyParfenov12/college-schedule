@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CALENDAR } from './data';
 import type { CalendarEvent } from './data';
-import { assignPeriod, calendarChangeImpact, calendarWeeks, checkCalendar, copyGroupCalendar, importMatrixCSV, matrixCSV, phaseAt, weekCell } from './calendarMatrixDomain';
+import { assignPeriod, calendarChangeImpact, calendarWeeks, checkCalendar, copyGroupCalendar, importMatrixCSV, matrixCSV, parseCalendarBackup, phaseAt, weekCell } from './calendarMatrixDomain';
 
 describe('college academic calendar matrix domain',()=>{
  it('covers the full academic year including partial boundary weeks',()=>{
@@ -111,5 +111,24 @@ describe('calendar validation and actual impact',()=>{
   expect(impact.affected.map(x=>x.id)).toEqual(['lesson-1']);
   expect(impact.newlyBlocked.map(x=>x.id)).toEqual(['lesson-1']);
   expect(impact.alreadyBlocked).toHaveLength(0);
+ });
+});
+
+describe('backup restoration safety',()=>{
+ const allowed=['П-21','П-22','П-31','П-32'];
+ it('round-trips a backup with exact periods and no schema changes',()=>{
+  const data=JSON.stringify({version:1,academicYear:2026,periods:CALENDAR});
+  expect(parseCalendarBackup(data,2026,allowed)).toEqual(CALENDAR);
+ });
+ it('rejects a backup of another year or invalid dates before any state changes',()=>{
+  const old=JSON.stringify({academicYear:2025,periods:CALENDAR});
+  expect(()=>parseCalendarBackup(old,2026,allowed)).toThrow(/другого учебного года/);
+  const bad=[{...CALENDAR[0],from:'2026-02-30'}];
+  expect(()=>parseCalendarBackup(JSON.stringify({academicYear:2026,periods:bad}),2026,allowed)).toThrow(/даты/);
+ });
+ it('rejects unknown groups and duplicate identifiers',()=>{
+  const a={...CALENDAR[0],groups:['НЕСУЩЕСТВУЮЩАЯ']};
+  expect(()=>parseCalendarBackup(JSON.stringify({academicYear:2026,periods:[a]}),2026,allowed)).toThrow(/Неизвестная группа/);
+  expect(()=>parseCalendarBackup(JSON.stringify({academicYear:2026,periods:[CALENDAR[0],CALENDAR[0]]}),2026,allowed)).toThrow(/идентификатор/);
  });
 });
