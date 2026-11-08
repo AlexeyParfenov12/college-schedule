@@ -14,9 +14,10 @@ import { ACADEMIC_START, ACADEMIC_END, LEGACY_WEEK_OFFSET } from './weekTimeline
 import { assessRoomFit } from './roomPolicy';
 import { effectiveGroupRules } from './scheduleConstraints';
 import { practicePeriodsFromKug } from './kugPractice';
+import type { AcademicPracticeAssignment } from './practiceAssignments';
 import type { ScopeOverride } from './scheduleConstraints';
 
-type Props={lessons:Lesson[];calendar:CalendarEvent[];days:5|6;onApply:(variant:AnnualVariant,weeks:number,workweek:5|6)=>void;notify:(s:string)=>void};
+type Props={lessons:Lesson[];calendar:CalendarEvent[];practiceAssignments?:AcademicPracticeAssignment[];days:5|6;onApply:(variant:AnnualVariant,weeks:number,workweek:5|6)=>void;notify:(s:string)=>void};
 type Tab='load'|'teachers'|'scope'|'rooms'|'groups'|'distance'|'results';
 const tabs:{id:Tab;name:string}[]=[
  {id:'load',name:'Нагрузка'},{id:'teachers',name:'Преподаватели'},{id:'scope',name:'Правила групп'},{id:'rooms',name:'Кабинеты'},
@@ -37,7 +38,7 @@ const read=():AnnualConfig=>{try{
 }catch{}return defaultAnnualConfig()};
 const key=(name:string,subject:string)=>streamKey(name,subject);
 const periodOptions=(weeks:number)=>Array.from({length:weeks},(_,w)=><option key={w} value={w}>{w+1}-я · {w===0?ACADEMIC_START:lessonDate(w,0)}</option>);
-export default function AnnualPlanner({lessons,calendar,days,onApply,notify}:Props){
+export default function AnnualPlanner({lessons,calendar,practiceAssignments=[],days,onApply,notify}:Props){
  const production=useProductionCalendarState();
  const collegeRevision=useCollegeOverrideRevision();
  const horizon=useMemo(()=>demoAcademicHorizon(calendar),[calendar]);
@@ -145,7 +146,7 @@ export default function AnnualPlanner({lessons,calendar,days,onApply,notify}:Pro
    if(e.data.type==='error'){setProgress(e.data.message||'Ошибка расчёта');setWorking(false);notify(e.data.message||'Ошибка расчёта');w.terminate();worker.current=null}
   };
   w.onerror=e=>{setWorking(false);setProgress('Ошибка запуска расчёта');notify(e.message);w.terminate();worker.current=null};
-  w.postMessage({demands,config:cfg,calendar,locked:lessons.filter(l=>l.status==='held'),production:getProductionSnapshot(),collegeOverrides:getCollegeDayOverrides()});
+  w.postMessage({demands,config:cfg,calendar,locked:lessons.filter(l=>l.status==='held'),assignments:practiceAssignments,production:getProductionSnapshot(),collegeOverrides:getCollegeDayOverrides()});
  };
  const stop=()=>{worker.current?.terminate();worker.current=null;setWorking(false);setProgress('Расчёт остановлен')};
  const exportVariant=()=>{
@@ -158,8 +159,8 @@ export default function AnnualPlanner({lessons,calendar,days,onApply,notify}:Pro
   if(calculationRevision!==production.revision+':'+collegeRevision)return notify('Производственный календарь изменился. Сначала пересчитайте 4 варианта.');
   const gaps=selected.unplaced.length,practice=selected.practiceIssues.length;
   const details=gaps||practice
-   ?'ВНИМАНИЕ: вариант неполный. Неразмещённых назначений: '+gaps+'. Проблем практики: '+practice+'. Они сохранятся для разбора учебной частью. '
-   :'По рассчитанной демонстрационной нагрузке неразмещённых назначений нет. ';
+   ?'ВНИМАНИЕ: вариант НЕ ПОЛНОСТЬЮ УКОМПЛЕКТОВАН. Не размещено теории: '+gaps+'; отсутствуют назначения практик: '+practice+'. Черновик не подтверждает полное покрытие учебного плана. '
+   :'Теория размещена; назначения практик укомплектованы, но факт их проведения требует электронного журнала. ';
   if(!window.confirm(details+'Применить расписание на '+cfg.weeks+' недель к черновику? Проведённые занятия сохраняются, предыдущий вариант можно восстановить.'))return;
   onApply(selected,cfg.weeks,cfg.days);
  };
@@ -171,7 +172,7 @@ export default function AnnualPlanner({lessons,calendar,days,onApply,notify}:Pro
    <div className="year-note" role="status"><strong>Остатки после последнего применения:</strong> {backlog.unplaced.length} назначений и {backlog.practiceIssues.length} проблем практики.
    Они сохранены в этом браузере и требуют решения учебной части. Пересчитай план после изменения ограничений.</div>}
   <div className="year-kpis"><div><b>{GROUPS.length}</b><small>групп</small></div><div><b>{demands.length}</b><small>дисциплин / назначений</small></div><div><b>{totalHours.toLocaleString('ru-RU')}</b><small>часов по демо-учебным назначениям</small></div><div><b>{activeRooms.length}</b><small>кабинетов</small></div><div><b>{kugPractice.length}</b><small>периодов практики из КУГ</small></div></div>
-  <div className="year-note" role="status"><strong>Практика из КУГ:</strong> {kugPractice.length} группо-недель УП, ПП и ПДП загружено автоматически. Изменение дат и типов — в учебном календаре. Руководители, места и кабинеты должны поступать из Academic Core; без назначений система покажет предупреждения, а не вымышленные занятия.</div>
+  <div className="year-note" role="status"><strong>Практика из КУГ:</strong> {kugPractice.length} группо-недель УП, ПП и ПДП. Периоды определяются только календарём; руководителей, места и часы назначайте в «Справочники → Academic Core» (демонстрационный адаптер). Без подтверждения ресурсов занятия практики не создаются.</div>
   <div className="year-tabs" role="tablist" aria-label="Настройка годового расписания">{tabs.map(x=><button role="tab" aria-selected={tab===x.id} className={tab===x.id?'active':''} key={x.id} onClick={()=>setTab(x.id)}>{x.name}</button>)}</div>
   {tab==='load'&&<div className="year-cols"><section className="year-card"><h3><BookOpen size={16}/> Требования к учебным часам</h3>
    <p>Демонстрационные учебные планы и назначения преподавателей заданы отдельно от готовых занятий. Часы берутся из тестовых записей учебных планов, а доступные недели — из учебного календаря каждой группы. Это <strong>не утверждённые часы реального колледжа</strong>: позже здесь будет подключён Academic Core.</p>
@@ -289,20 +290,21 @@ export default function AnnualPlanner({lessons,calendar,days,onApply,notify}:Pro
    </section></div>}
   {tab==='results'&&<div className="year-results">
    {working?<section className="year-card"><h3>Расчёт выполняется отдельно от интерфейса</h3><p>{progress}</p><button className="year-next" onClick={stop}>Остановить</button></section>:!variants.length?<section className="year-card"><h3>Сравни четыре варианта до применения</h3><p>Расчёт пока не выполнен. Измени настройки или запусти подбор вариантов.</p><button className="year-next" onClick={run}><Play size={14}/> Рассчитать</button></section>:<>
-    <div className="year-variants">{variants.map((v,i)=><button key={v.id} className={active===i?'chosen':''} onClick={()=>setActive(i)}><b>{v.name}</b><span>{Math.round(v.coveredHours/Math.max(1,v.requiredHours)*100)}% часов закрыто</span><small>{v.groupWindows} окон у групп · {v.teacherWindows} у преподавателей · {v.onlinePercent}% онлайн</small><small>{kugPractice.length} периодов практики из КУГ · {v.practiceIssues.length} требуют назначения</small><em>{v.unplaced.length||v.practiceIssues.length?'Требует доработки':'Нет неразмещённых назначений'}</em></button>)}</div>
+    <div className="year-variants">{variants.map((v,i)=><button key={v.id} className={active===i?'chosen':''} onClick={()=>setActive(i)}><b>{v.name}</b><span>Теория: {Math.round(v.coveredHours/Math.max(1,v.requiredHours)*100)}% размещено</span><small>{v.groupWindows} окон у групп · {v.teacherWindows} у преподавателей · {v.onlinePercent}% онлайн</small><small>Практика: {v.practiceAssignedPeriods}/{v.practicePeriodCount} назначений подтверждено · {v.practiceIssues.length} проблем · {v.practiceUnknownPeriods} без часов</small><em>{v.unplaced.length||v.practiceIssues.length?'Требует доработки':'Нет неразмещённых назначений'}</em></button>)}</div>
     <div className="year-cols"><section className="year-card">
      <h3>Выбранный вариант: {selected?.name}</h3>
-     <div className="year-result-kpis"><div><b>{selected?.coveredHours.toLocaleString('ru-RU')}</b><small>размещено часов</small></div><div><b>{selected?.requiredHours.toLocaleString('ru-RU')}</b><small>требуется</small></div><div><b>{selected?.unplaced.length}</b><small>неполных назначений</small></div><div><b>{selected?.practiceIssues.length}</b><small>назначений практик для проверки</small></div></div>
+     <div className="year-result-kpis"><div><b>{selected?.coveredHours.toLocaleString('ru-RU')}</b><small>размещено теории, ч</small></div><div><b>{selected?.requiredHours.toLocaleString('ru-RU')}</b><small>теория по демоплану</small></div><div><b>{selected?.unplaced.length}</b><small>неполных назначений</small></div><div><b>{selected?.practiceIssues.length}</b><small>проблем назначений практик</small></div></div>
+     <div className="year-note"><strong>Практика — отдельно от теоретической нагрузки:</strong> подтверждённые назначения: {selected?.practiceAssignedPeriods}/{selected?.practicePeriodCount} периодов. Академические часы практики по имеющимся назначениям: {selected?.practiceAssignedHours} из {selected?.practiceKnownHours}. Для {selected?.practiceUnknownPeriods} периодов часы ещё не переданы. Это плановые назначения, а не факт проведения занятий.</div>
      <div className="year-fields"><F name="Группа"><PolishedSelect value={viewGroup} onChange={e=>setViewGroup(e.target.value)}>{GROUPS.map(g=><option key={g.id} value={g.id}>{g.id}</option>)}</PolishedSelect></F><F name="Неделя"><PolishedSelect value={viewWeek} onChange={e=>setViewWeek(Number(e.target.value))}>{periodOptions(cfg.weeks)}</PolishedSelect></F></div>
      <MiniSchedule lessons={selected?.lessons||[]} week={viewWeek} group={viewGroup} title={'Предложенное расписание · '+viewGroup}/>
      <LoadBars lessons={selected?.lessons||[]} week={viewWeek} group={viewGroup}/>
      <button className="year-next" onClick={exportVariant}><Download size={14}/> Экспорт полного варианта в JSON</button>
-    </section><section className="year-card"><h3>Что не удалось распределить и почему</h3>
+    </section><section className="year-card"><h3>Что требует исправления: теоретическая нагрузка и практика</h3>
      <div className="year-search"><Search size={14}/><input aria-label="Поиск неразмещённых часов" value={issueSearch} placeholder="Группа, предмет, преподаватель..." onChange={e=>setIssueSearch(e.target.value)}/></div>
      <div className="year-list issues">{issues.slice(0,100).map(x=><div key={x.id}><b>{x.group} · {x.subject}</b><small>{x.teacher}</small><span>{x.reason}</span></div>)}
       {selected?.practiceIssues.slice(0,50).map((x,i)=><div key={i}><b>{x.group} · практика · неделя {x.week+1}</b><span>{x.reason}</span></div>)}
       {!issues.length&&!selected?.practiceIssues.length&&<div className="year-success"><CheckCircle2 size={16}/> Для рассчитанной демонстрационной нагрузки ошибок покрытия не обнаружено</div>}</div>
-     <div className="year-note">Исправь ограничения, оборудование, практики или часы в настройках и пересчитай. Это эвристические варианты, а не доказательство глобального оптимума.</div>
+     <div className="year-note">Дополни назначения практик в Academic Core, затем пересчитай. Теоретическая нагрузка и периоды КУГ имеют разные источники. Это эвристические варианты, а не доказательство глобального оптимума.</div>
      <button className="year-primary" disabled={!selected} onClick={applyVariant}><Check size={15}/> Применить весь вариант к демочерновику</button>
     </section></div>
    </>}

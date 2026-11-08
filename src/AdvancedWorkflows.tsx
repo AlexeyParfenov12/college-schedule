@@ -14,6 +14,9 @@ import RoomManager from './RoomManager';
 import { demoAcademicDemands, demoAcademicHorizon } from './academicPlanning';
 import { DEFAULT_SUBSTITUTION_POLICY, suggestSubstitutions, applySubstitutionOption, revertSubstitution } from './substitutionPlanner';
 import type { SubstitutionPolicy, SubstitutionOption } from './substitutionPlanner';
+import { practicePeriodsFromKug } from './kugPractice';
+import { practicePeriodStamp, practiceAssignmentProblems } from './practiceAssignments';
+import type { AcademicPracticeAssignment } from './practiceAssignments';
 import { previewBulkFormat } from './bulkFormatPlanning';
 import type { BulkFormatPreview } from './bulkFormatPlanning';
 
@@ -22,7 +25,7 @@ type Snapshot={id:string;label:string;at:string;week:number;lessons:Lesson[];not
 type Template={id:string;name:string;week:number;group:string;weeks:number;locked:boolean};
 type Roster=Record<string,{id:string;name:string;subgroup:number}[]>;
 type RoomsMap=Record<string,{blocked:boolean;reason:string}>;
-type Store={calendar:CalendarEvent[];roster:Roster;absences:Absence[];rooms:RoomsMap;rules:Rule[];snapshots:Snapshot[];templates:Template[];times:string[];notifications:string[];substitutionPolicy:SubstitutionPolicy};
+type Store={calendar:CalendarEvent[];roster:Roster;absences:Absence[];rooms:RoomsMap;rules:Rule[];snapshots:Snapshot[];templates:Template[];times:string[];notifications:string[];substitutionPolicy:SubstitutionPolicy;practiceAssignments:AcademicPracticeAssignment[]};
 /** Earlier demo builds incorrectly shifted absence weekday indexes by the academic-week offset. */
 export const normalizeAbsenceDays=(a:Absence):Absence=>({
  ...a,from:a.from>=LEGACY_WEEK_OFFSET&&a.from<LEGACY_WEEK_OFFSET+6?a.from-LEGACY_WEEK_OFFSET:a.from,
@@ -31,7 +34,7 @@ export const normalizeAbsenceDays=(a:Absence):Absence=>({
 });
 const key='college-schedule-extras-v2';
 const legacyKey='college-schedule-extras-v1';
-const defaults=():Store=>({calendar:CALENDAR,roster:ROSTERS,absences:ABSENCES.map(x=>({...x})),rooms:{},rules:RULES,snapshots:[],templates:[{id:'template-a',name:'Двухнедельный цикл ИТ',week:LEGACY_WEEK_OFFSET,group:'П-21',weeks:2,locked:true},{id:'template-b',name:'Основной цикл радиотехники',week:LEGACY_WEEK_OFFSET,group:'Р-21',weeks:4,locked:false}],times:[...TIMES],notifications:[],substitutionPolicy:{...DEFAULT_SUBSTITUTION_POLICY}});
+const defaults=():Store=>({calendar:CALENDAR,roster:ROSTERS,absences:ABSENCES.map(x=>({...x})),rooms:{},rules:RULES,snapshots:[],templates:[{id:'template-a',name:'Двухнедельный цикл ИТ',week:LEGACY_WEEK_OFFSET,group:'П-21',weeks:2,locked:true},{id:'template-b',name:'Основной цикл радиотехники',week:LEGACY_WEEK_OFFSET,group:'Р-21',weeks:4,locked:false}],times:[...TIMES],notifications:[],substitutionPolicy:{...DEFAULT_SUBSTITUTION_POLICY},practiceAssignments:[]});
 /** Read v1 once in memory. Its week numbers are November-based; the v1 key stays untouched. */
 const saved=():Store=>{try{
  const modern=localStorage.getItem(key);
@@ -107,6 +110,11 @@ export default function AdvancedWorkflows(p:Props){
  const [groupFilter,setGroupFilter]=useState('');
  const [showVisual,setShowVisual]=useState(true);
  const [subject,setSubject]=useState('Программирование');
+ const [practicePeriodId,setPracticePeriodId]=useState('');
+ const [practiceSupervisor,setPracticeSupervisor]=useState('');
+ const [practiceLocation,setPracticeLocation]=useState('');
+ const [practiceHours,setPracticeHours]=useState('');
+ const [practiceStartSlot,setPracticeStartSlot]=useState(1);
  const [day,setDay]=useState(1);
  const [slot,setSlot]=useState(2);
  const [selectedRoom,setSelectedRoom]=useState(ROOMS[0].id);
@@ -205,6 +213,20 @@ export default function AdvancedWorkflows(p:Props){
  };
  const makeAcademic=()=>{
   const grps=GROUPS.filter(g=>(g.id+' '+g.specialty+' '+g.department).toLowerCase().includes(query.toLowerCase()));
+  const periods=practicePeriodsFromKug(db.calendar,demoAcademicHorizon(db.calendar),p.days===5?5:6).filter(x=>x.group===p.group);
+  const period=periods.find(x=>x.id===practicePeriodId)||periods[0];
+  const existing=period?(db.practiceAssignments||[]).find(x=>x.periodId===period.id):undefined;
+  const choosePeriod=(id:string)=>{setPracticePeriodId(id);const value=(db.practiceAssignments||[]).find(x=>x.periodId===id);setPracticeSupervisor(value?.supervisor||'');setPracticeLocation(value?.location||'');setPracticeHours(value?String(value.approvedHours):'');setPracticeStartSlot(value?.startSlot||1)};
+  const savePractice=()=>{if(!period){p.notify('В КУГ для этой группы нет периода практики');return}
+   const record:AcademicPracticeAssignment={periodId:period.id,group:period.group,phase:period.phase,
+    supervisor:practiceSupervisor||existing?.supervisor||'',location:practiceLocation||existing?.location||'',
+    approvedHours:practiceHours?Number(practiceHours):existing?.approvedHours||0,
+    startSlot:practiceStartSlot,calendarStamp:practicePeriodStamp(period),approved:true};
+   const errors=practiceAssignmentProblems(period,record,6);
+   if(errors.length){p.notify('Назначение не сохранено: '+errors[0]);return}
+   put(d=>({...d,practiceAssignments:[...(d.practiceAssignments||[]).filter(x=>x.periodId!==period.id),record]}));
+   p.notify('Подтверждено назначение практики для '+period.group+' на '+period.from+' — '+period.to)
+  };
   return <div className="studio-stack"><div className="studio-headbar"><input placeholder="Найти группу, отделение, специальность..." value={query} onChange={e=>setQuery(e.target.value)}/><Pill color="green">{GROUPS.length} групп · {TEACHERS.length} преподавателя</Pill></div>
     <Panel title="Академические группы · демонстрационный адаптер Academic Core">
       <Rows heads={['Группа','Отделение','Курс','Специальность','Студентов','Действия']} rows={grps.slice(0,limit).map(g=>[g.id,g.department,g.course,g.specialty,g.count,<MiniButton onClick={()=>{setGroupDetails(g.id);p.onNavigate('groups')}}>Состав</MiniButton>])}/>
@@ -217,6 +239,34 @@ export default function AdvancedWorkflows(p:Props){
       <div className="studio-inline-filters"><Notice>Часы и назначения получены из отдельного тестового учебного плана, а не из текущего расписания. Реальный Academic Core ещё не подключён.</Notice>
        <Button onClick={()=>p.onNavigate('year')}>Проверить в годовом мастере</Button>
       </div>
+    </Panel>
+    <Panel title="Назначения практик · демонстрационный Academic Core">
+     <Notice>Даты и тип практики берутся только из КУГ. Здесь подтверждаются ресурсы и плановые часы для выбранной группы; это не фактические часы электронного журнала. Данные сохраняются в браузере.</Notice>
+     {!period?<p className="muted">В КУГ этой группы нет рабочих дней практики. Выберите другую группу или заполните учебный календарь.</p>:
+      <div className="studio-form">
+       <Field title="Период практики из КУГ"><Select value={period.id} onChange={choosePeriod}
+        items={periods.map(x=>({id:x.id,label:x.from+' — '+x.to+' · '+x.phase+' · неделя '+(x.week+1)}))}/></Field>
+       <div className="studio-duo">
+        <Field title="Руководитель практики"><Select value={practiceSupervisor||existing?.supervisor||''} onChange={setPracticeSupervisor}
+         items={[{id:'',label:'Не назначен'},...TEACHERS.map(t=>({id:t,label:t}))]}/></Field>
+        <Field title={period.phase==='training'?'Аудитория учебной практики':'Организация/место практики'}>
+         {period.phase==='training'?<Select value={practiceLocation||existing?.location||''} onChange={setPracticeLocation}
+          items={[{id:'',label:'Не выбрана'},...ROOMS.filter(r=>r.active).map(r=>({id:r.id,label:r.id+' · '+r.capacity+' мест'}))]}/>:
+          <input value={practiceLocation||existing?.location||''} onChange={e=>setPracticeLocation(e.target.value)} placeholder="Введите подтверждённое место прохождения"/>}
+        </Field>
+       </div>
+       <div className="studio-duo">
+        <Field title="Утверждённые академические часы для периода"><input type="number" min={2} max={72} step={2}
+         value={practiceHours} onChange={e=>setPracticeHours(e.target.value)} placeholder="Из учебного плана"/></Field>
+        <Field title="Начальная пара (для УП)"><Select value={practiceStartSlot} onChange={v=>setPracticeStartSlot(Number(v))}
+         items={[1,2,3,4,5,6].map(n=>({id:n,label:n+'-я пара'}))}/></Field>
+       </div>
+       {existing&&<Notice>Есть ранее сохранённое назначение: {existing.approvedHours} ч. {existing.calendarStamp===practicePeriodStamp(period)?'КУГ не изменён.':'После изменения КУГ требуется повторное подтверждение.'}</Notice>}
+       <div className="studio-inline-filters">
+        <Button primary onClick={savePractice}><Check size={14}/> Сохранить подтверждённое назначение</Button>
+        {existing&&<Button onClick={()=>{put(d=>({...d,practiceAssignments:(d.practiceAssignments||[]).filter(x=>x.periodId!==period.id)}));choosePeriod(period.id);p.notify('Назначение практики удалено')}}>Удалить назначение</Button>}
+       </div>
+      </div>}
     </Panel>
     <div className="studio-columns"><Panel title="Кадровый справочник">{TEACHERS.slice(0,15).map(t=><div className="studio-list-row" key={t}><b>{t}</b><small>{QUALIFICATIONS[t]?.join(', ')}</small></div>)}</Panel><Panel title="Учебные дисциплины">{SUBJECTS.map(s=><div className="studio-chip" key={s}>{s}</div>)}</Panel></div>
    <Notice>Данные предназначены для демонстрации. Реальные преподаватели, студенты, TeachingAssignment и учебные планы должны поступать из общего Academic Core.</Notice></div>;
