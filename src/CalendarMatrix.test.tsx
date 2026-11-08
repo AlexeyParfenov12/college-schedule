@@ -179,3 +179,16 @@ describe('KUG controls next to table and restored weekly group cards',()=>{
   expect(container.querySelector('.kug-single-timeline')).toBeNull();
  },20000);
 });
+
+
+describe('KUG Excel template import experience',()=>{
+ it('provides a downloadable blank template and in-place import instructions',()=>{
+  render(<CalendarMatrix events={CALENDAR} lessons={[]} group="П-21" setGroup={()=>{}} replace={()=>{}}/>);
+  fireEvent.click(screen.getByText('Шаблон таблицы, импорт и экспорт'));
+  expect(screen.getByRole('button',{name:/Скачать пустой шаблон CSV/})).toBeTruthy();
+  expect(screen.getByRole('button',{name:/Скачать текущий график CSV/})).toBeTruthy();
+  expect(screen.getByLabelText('Загрузить график из CSV')).toBeTruthy();
+  expect(screen.getByText(/Пустая ячейка/)).toBeTruthy();
+  expect(screen.getByText(/В нужных неделях впиши код периода/)).toBeTruthy();
+ },20000);
+});
