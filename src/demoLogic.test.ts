@@ -92,7 +92,7 @@ describe('planner suggestions and reports',()=>{
  });
  it('returns actual lessons in exports, not placeholder records',()=>{
   const lessons=buildSeed(1);
-  const streamRows=reportRows('Потоки',lessons,0);
+  const streamRows=reportRows('Потоки',lessons,10);
   expect(streamRows.length).toBeGreaterThan(1);
   expect(streamRows[0]).toContain('Преподаватель');
   expect(streamRows.slice(1).every(row=>row[7]==='stream')).toBe(true);
