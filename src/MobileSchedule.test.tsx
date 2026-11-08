@@ -70,4 +70,15 @@ describe('touch-first schedule agenda',()=>{
   expect(screen.getAllByRole('button',{name:/Добавить занятие/}).length).toBeGreaterThan(0);
   expect(screen.queryByRole('button',{name:/Сб.*14/})).toBeNull();
  });
+ it('does not offer new lessons on August 31 outside the academic year, while September 1 is available',()=>{
+  const props={week:0,days:6 as const,times,lessons:[] as Lesson[],moveMode:false,
+   targets:[] as MoveOption[],onDayChange:vi.fn(),onOpen:vi.fn(),onAdd:vi.fn(),
+   onTarget:vi.fn(),onCancelMove:vi.fn()};
+  const {rerender}=render(<MobileSchedule {...props} day={0}/>);
+  expect(screen.queryByRole('button',{name:'Добавить занятие: Пн, 1-я пара'})).toBeNull();
+  expect(screen.getAllByText('Вне учебного года')).toHaveLength(6);
+  rerender(<MobileSchedule {...props} day={1}/>);
+  expect(screen.getByRole('button',{name:'Добавить занятие: Вт, 1-я пара'})).toBeTruthy();
+ });
+
 });
