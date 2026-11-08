@@ -59,10 +59,10 @@ describe('Annual solver enforces configured group and teacher scope',()=>{
   expect(result.unplaced).toHaveLength(1);
  });
  it('preserves restrictions for continuously reserved practice blocks',()=>{
-  const cfg=defaultAnnualConfig();cfg.weeks=1;cfg.days=5;
+  const cfg=defaultAnnualConfig();cfg.weeks=2;cfg.days=5;
   cfg.groupRules={'П-21':{daysOff:[0]}};
   cfg.practiceBlocks=[{id:'practice',group:'П-21',kind:'college',title:'Учебная практика',teacher:TEACHERS[0],
-    startWeek:0,durationWeeks:1,days:[0,1],fromSlot:1,toSlot:1,room:'109'}];
+    startWeek:1,durationWeeks:1,days:[0,1],fromSlot:1,toSlot:1,room:'109'}];
   const result=solveAnnualVariant([],cfg,[],0);
   expect(result.lessons.filter(l=>l.practiceBlockId==='practice')).toHaveLength(1);
   expect(result.lessons.some(l=>l.practiceBlockId==='practice'&&l.day===0)).toBe(false);
