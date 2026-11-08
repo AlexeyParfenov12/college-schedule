@@ -383,4 +383,27 @@ describe('React interface smoke checks',()=>{
   expect(document.querySelector('.mobile-editor-backdrop')).toBeTruthy();
  },20000);
 
+ it('offers explicit substitution checking before confirmation and a verified bulk distance preview',()=>{
+  render(<App/>);
+  openScreen('substitutions');
+  expect(screen.getByRole('button',{name:/Проверить замены/})).toBeTruthy();
+  expect(screen.queryByRole('button',{name:'Подтвердить замену'})).toBeNull();
+  const check=screen.getByRole('button',{name:/Проверить замены/});
+  fireEvent.click(check);
+  expect(screen.getByText(/Проверено занятий:/)).toBeTruthy();
+  openScreen('distance');
+  const preview=screen.getByRole('button',{name:'Проверить выбранные занятия'});
+  expect(preview).toBeTruthy();
+  fireEvent.click(preview);
+  expect(screen.getByText(/Расписание пока не изменено/)).toBeTruthy();
+  expect(screen.getByText(/Результат проверки/)).toBeTruthy();
+ },20000);
+ it('renders six timetable slots and identifies the exact week for limited workflows',()=>{
+  render(<App/>);
+  openScreen('distance');
+  expect(document.querySelectorAll('.studio-context-visuals .viz-slot').length).toBe(6);
+  expect(screen.getAllByText(/неделя 11 \(/).length).toBeGreaterThan(0);
+  expect(screen.getByText('Все группы колледжа')).toBeTruthy();
+ },20000);
+
 });
