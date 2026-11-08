@@ -5,6 +5,7 @@ import { occupiedRooms, validate } from './demoLogic';
 import { assessRoomFit, needsComputers } from './roomPolicy';
 import { classifyCalendarDay, readCollegeWorkweek } from './productionCalendar';
 import type { Workweek } from './productionCalendar';
+import { GRID_START, ACADEMIC_WEEK_COUNT, academicLessonDate, withinAcademicYear } from './weekTimeline';
 export { needsComputers } from './roomPolicy';
 
 export type TeachingOffer = {key:string;group:string;teacher:string;subject:string;count:number;sampleRoom:string};
@@ -53,15 +54,15 @@ export function suitableSubgroupPair(lesson:Lesson,lessons:Lesson[],blocked:stri
  return [options[0]?.id||'',options.find(x=>x.id!==options[0]?.id)?.id||''];
 }
 
-export const START_ISO='2026-11-09';
-export const WEEK_COUNT=40;
-export function lessonDate(week:number,day:number):string{
- const d=new Date(Date.UTC(2026,10,9+week*7+day));return d.toISOString().slice(0,10);
-}
+export const START_ISO=GRID_START;
+export const WEEK_COUNT=ACADEMIC_WEEK_COUNT;
+export const lessonDate=academicLessonDate;
 export function calendarIssues(lesson:Lesson,calendar:CalendarEvent[],workweek:Workweek=readCollegeWorkweek()):string[]{
  const date=lessonDate(lesson.week||0,lesson.day);
  const automatic=classifyCalendarDay(date,workweek);
- const results=automatic.nonWorking?['Производственный календарь: '+automatic.label+' ('+date+')']:[];
+ const results:string[]=[];
+ if(!withinAcademicYear(date))results.push('Дата за пределами учебного года 2026/2027: '+date);
+ if(automatic.nonWorking)results.push('Производственный календарь: '+automatic.label+' ('+date+')');
  const custom=calendar.filter(e=>e.kind==='holiday'&&e.from<=date&&date<=e.to&&
   (e.groups.length===0||lesson.groups.some(g=>e.groups.includes(g))))
   .map(e=>'Учебный календарь: '+e.title+' ('+date+')');
