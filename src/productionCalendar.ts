@@ -15,7 +15,8 @@
  */
 export type Workweek=5|6;
 import { externalDayCode } from './productionCalendarSync';
-export type CalendarDayKind='work'|'weekend'|'holiday'|'transfer'|'working-weekend'|'shortened';
+import { getCollegeDayOverride } from './collegeDayOverrides';
+export type CalendarDayKind='work'|'weekend'|'holiday'|'transfer'|'working-weekend'|'shortened'|'college-off'|'college-work'|'college-shortened';
 export type CalendarDay={date:string;kind:CalendarDayKind;label:string;nonWorking:boolean;confirmedTransfers:boolean;basis:string};
 export const LEGAL_SOURCE='https://www.consultant.ru/document/cons_doc_LAW_34683/98ef2900507766e70ff29c0b9d8e2353ea80a1cf/';
 export const CONFIRMED_TRANSFERS:Record<number,{source:string;five:{off:string[];work:string[]};six:{off:string[];work:string[]}}>={
@@ -98,7 +99,7 @@ export function classifyLocalCalendarDay(iso:string,week:Workweek=6):CalendarDay
 /** A published API snapshot refines the baseline. It never silently reopens a day
  * declared non-working by the built-in legal rules, including future unapproved years.
  * Third-party statuses are reference data, not proof of a new government decree. */
-export function classifyCalendarDay(iso:string,week:Workweek=6):CalendarDay{
+export function classifyReferenceCalendarDay(iso:string,week:Workweek=6):CalendarDay{
  const baseline=classifyLocalCalendarDay(iso,week);
  const external=externalDayCode(iso,week);
  if(external===null)return baseline;
@@ -114,8 +115,27 @@ export function classifyCalendarDay(iso:string,week:Workweek=6):CalendarDay{
  // Never silently open a statutorily closed day on a disagreement.
  return baseline;
 }
+/** College-wide local exceptions; federal holidays and confirmed transfers cannot be reopened. */
+export function collegeWorkOverrideProhibited(iso:string,week:Workweek=6):string|null{
+ const federal=classifyReferenceCalendarDay(iso,week);
+ if(federal.kind==='holiday'||federal.kind==='transfer')return 'Федеральный праздник или перенесённый нерабочий день нельзя делать рабочим локальным исключением';
+ if(federal.nonWorking&&new Date(iso+'T00:00:00Z').getUTCDay()===0)return 'Воскресенье требует отдельного правового основания; локальный редактор не может сделать его обычным рабочим днём';
+ if(federal.nonWorking&&federal.kind!=='weekend')return 'Нерабочий день подтверждён внешним календарём и требует нормативной проверки';
+ return null;
+}
+export function classifyCalendarDay(iso:string,week:Workweek=6):CalendarDay{
+ const reference=classifyReferenceCalendarDay(iso,week);
+ const custom=getCollegeDayOverride(iso);
+ if(!custom)return reference;
+ const basis='Решение колледжа: '+custom.reason+' · внесено '+custom.author;
+ if(custom.action==='closed')return {...reference,kind:'college-off',label:'Дополнительный неучебный день · '+custom.reason,nonWorking:true,basis};
+ if(custom.action==='shortened'&&!reference.nonWorking)return {...reference,kind:'college-shortened',label:'Сокращённый учебный день · '+custom.reason,nonWorking:false,basis};
+ if(custom.action==='working'&&!collegeWorkOverrideProhibited(iso,week))
+  return {...reference,kind:'college-work',label:'Дополнительный рабочий день колледжа · '+custom.reason,nonWorking:false,basis};
+ return reference;
+}
 export function productionDiffersFromBaseline(iso:string,week:Workweek=6):boolean{
- const before=classifyLocalCalendarDay(iso,week),after=classifyCalendarDay(iso,week);
+ const before=classifyLocalCalendarDay(iso,week),after=classifyReferenceCalendarDay(iso,week);
  return before.nonWorking!==after.nonWorking||before.kind!==after.kind;
 }
 export function nonWorkingDays(from:string,to:string,week:Workweek=6):CalendarDay[]{
