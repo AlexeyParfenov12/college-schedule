@@ -8,14 +8,15 @@
 import { GROUPS, TEACHERS, CALENDAR } from './data';
 import type { CalendarEvent } from './data';
 import { phaseAt } from './calendarMatrixDomain';
-import { lessonDate, WEEK_COUNT } from './plannerDomain';
+import { lessonDate } from './plannerDomain';
+import { ACADEMIC_WEEK_COUNT } from './weekTimeline';
 import { classifyCalendarDay } from './productionCalendar';
 import type { Workweek } from './productionCalendar';
 import type { YearDemand } from './yearSolver';
 
 type SemesterFixture={id:'autumn'|'spring';title:string;from:string;to:string};
 export const DEMO_SEMESTERS:SemesterFixture[]=[
- {id:'autumn',title:'Осенний период (демо)',from:'2026-11-09',to:'2026-12-28'},
+ {id:'autumn',title:'Осенний период (демо)',from:'2026-09-01',to:'2026-12-28'},
  {id:'spring',title:'Весенний период (демо)',from:'2027-02-09',to:'2027-06-25'}
 ];
 const SUBJECTS_BY_DEPARTMENT:Record<string,string[]>={
@@ -62,13 +63,10 @@ export function teachingWeeks(group:string,calendar:CalendarEvent[],workweek:Wor
  return found;
 }
 /** Horizon follows the last declared teaching period, not the number entered by the dispatcher. */
-export function demoAcademicHorizon(calendar:CalendarEvent[]):number{
- const study=calendar.filter(e=>e.kind==='study');
- if(!study.length)return WEEK_COUNT;
- const first=new Date(lessonDate(0,0)+'T00:00:00Z').getTime();
- const last=Math.max(...study.map(e=>new Date(e.to+'T00:00:00Z').getTime()).filter(Number.isFinite));
- if(!Number.isFinite(last))return WEEK_COUNT;
- return Math.max(1,Math.min(WEEK_COUNT,Math.ceil((last-first+86400000)/(86400000*7))));
+/** The full KUG year remains available even when the last theoretical week is in June.
+ * The semester demand adapter still uses only its own expressly stated demo fixtures. */
+export function demoAcademicHorizon(_calendar:CalendarEvent[]):number{
+ return ACADEMIC_WEEK_COUNT;
 }
 export function demoAcademicDemands(calendar:CalendarEvent[],workweek:Workweek,weeks=demoAcademicHorizon(calendar)):YearDemand[]{
  const eligibility=new Map<string,{autumn:number[];spring:number[]}>();
