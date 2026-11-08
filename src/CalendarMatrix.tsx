@@ -288,41 +288,6 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
     <button onClick={()=>window.print()}>Печать</button>
    </div></details>
   </header>
-  <div className="kug-filters">
-   <label>Учебный год<select aria-label="Учебный год КУГ" value={year} onChange={e=>{setYear(Number(e.target.value));setSelection(null);setPreview(false);setImportPending(null);setBackupPending(null);setCopyPending(null)}}>
-    {[2025,2026,2027,2028].map(n=><option key={n} value={n}>{n}/{n+1}</option>)}</select></label>
-   <label>Отделение<select aria-label="Отделение КУГ" value={department} onChange={e=>setDepartment(e.target.value)}><option value="all">Все отделения</option>
-    {[...new Set(GROUPS.map(g=>g.department))].map(x=><option key={x} value={x}>{x}</option>)}</select></label>
-   <label>Курс<select aria-label="Курс КУГ" value={course} onChange={e=>setCourse(e.target.value)}><option value="all">Все курсы</option>
-    {[1,2,3,4].map(x=><option key={x} value={x}>{x} курс</option>)}</select></label>
-   <label className="kug-search"><span>Поиск групп</span><span><Search size={15}/><input aria-label="Поиск группы КУГ" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Группа, специальность..."/></span></label>
-   <label>Показать<select aria-label="Фильтр проблем КУГ" value={issueFilter} onChange={e=>{setIssueFilter(e.target.value as IssueFilter);setSelection(null);setPreview(false)}}>
-    <option value="all">Все группы</option><option value="unassigned">С незаполненными днями</option>
-    <option value="conflicts">С конфликтами</option><option value="practice">С практикой</option>
-   </select></label>
-   <div className="kug-modes" role="group" aria-label="Режим календаря">
-    <button className={mode==='year'?'active':''} aria-pressed={mode==='year'} onClick={()=>{setMode('year');setSelection(null);setPreview(false)}}><Table2 size={15}/> Компактная таблица</button>
-    <button className={mode==='large'?'active':''} aria-pressed={mode==='large'} onClick={()=>{setMode('large');setSelection(null);setPreview(false)}}><Table2 size={15}/> Большая таблица</button>
-    <button className={mode==='single'?'active':''} aria-pressed={mode==='single'} onClick={()=>{setMode('single');setSelection(null);setPreview(false)}}><Users size={15}/> Группа</button>
-   </div>
-  </div>
-  <div className="kug-display-options">
-   {mode==='year'&&<label>Период<select aria-label="Масштаб компактного календаря" value={compactSpan}
-    onChange={e=>{setCompactSpan(e.target.value as CompactSpan);setSelection(null);setPreview(false)}}>
-    <option value="all">Весь год</option><option value="quarter">4 месяца</option>
-   </select></label>}
-   {mode==='year'&&compactSpan==='quarter'&&<div className="kug-term-switch" role="group" aria-label="Период четырёх месяцев">
-    {([{start:0,label:'Сентябрь — декабрь'},{start:4,label:'Январь — апрель'},{start:8,label:'Май — август'}] as const)
-     .map(t=><button type="button" key={t.start} className={quarter===t.start?'active':''} aria-pressed={quarter===t.start}
-     onClick={()=>{setQuarter(t.start);setSelection(null);setPreview(false)}}>{t.label}</button>)}
-   </div>}
-   {mode!=='large'&&<label>Плотность<select aria-label="Плотность календаря" value={density} onChange={e=>setDensity(e.target.value as Density)}>
-    <option value="compact">Компактная</option><option value="standard">Стандартная</option>
-    <option value="detailed">Подробная</option>
-   </select></label>}
-   {mode==='large'&&<span>Подробные ячейки с отметками дней</span>}
-   <span>{visibleWeeks.length} недель · {groups.length} групп</span>
-  </div>
   {importError&&<p className="kug-alert" role="alert">{importError}</p>}
   {backupError&&<p className="kug-alert" role="alert">{backupError}</p>}
   {backupPending&&<div className="kug-preview" role="status">
@@ -378,6 +343,43 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
   </div></details>
   <div className="kug-workspace">
    <div className="kug-workspace-main">
+    <div className="kug-table-controls">
+  <div className="kug-filters">
+   <label>Учебный год<select aria-label="Учебный год КУГ" value={year} onChange={e=>{setYear(Number(e.target.value));setSelection(null);setPreview(false);setImportPending(null);setBackupPending(null);setCopyPending(null)}}>
+    {[2025,2026,2027,2028].map(n=><option key={n} value={n}>{n}/{n+1}</option>)}</select></label>
+   <label>Отделение<select aria-label="Отделение КУГ" value={department} onChange={e=>setDepartment(e.target.value)}><option value="all">Все отделения</option>
+    {[...new Set(GROUPS.map(g=>g.department))].map(x=><option key={x} value={x}>{x}</option>)}</select></label>
+   <label>Курс<select aria-label="Курс КУГ" value={course} onChange={e=>setCourse(e.target.value)}><option value="all">Все курсы</option>
+    {[1,2,3,4].map(x=><option key={x} value={x}>{x} курс</option>)}</select></label>
+   <label className="kug-search"><span>Поиск групп</span><span><Search size={15}/><input aria-label="Поиск группы КУГ" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Группа, специальность..."/></span></label>
+   <label>Показать<select aria-label="Фильтр проблем КУГ" value={issueFilter} onChange={e=>{setIssueFilter(e.target.value as IssueFilter);setSelection(null);setPreview(false)}}>
+    <option value="all">Все группы</option><option value="unassigned">С незаполненными днями</option>
+    <option value="conflicts">С конфликтами</option><option value="practice">С практикой</option>
+   </select></label>
+   <div className="kug-modes" role="group" aria-label="Режим календаря">
+    <button className={mode==='year'?'active':''} aria-pressed={mode==='year'} onClick={()=>{setMode('year');setSelection(null);setPreview(false)}}><Table2 size={15}/> Компактная таблица</button>
+    <button className={mode==='large'?'active':''} aria-pressed={mode==='large'} onClick={()=>{setMode('large');setSelection(null);setPreview(false)}}><Table2 size={15}/> Большая таблица</button>
+    <button className={mode==='single'?'active':''} aria-pressed={mode==='single'} onClick={()=>{setMode('single');setSelection(null);setPreview(false)}}><Users size={15}/> Группа</button>
+   </div>
+  </div>
+  <div className="kug-display-options">
+   {mode==='year'&&<label>Период<select aria-label="Масштаб компактного календаря" value={compactSpan}
+    onChange={e=>{setCompactSpan(e.target.value as CompactSpan);setSelection(null);setPreview(false)}}>
+    <option value="all">Весь год</option><option value="quarter">4 месяца</option>
+   </select></label>}
+   {mode==='year'&&compactSpan==='quarter'&&<div className="kug-term-switch" role="group" aria-label="Период четырёх месяцев">
+    {([{start:0,label:'Сентябрь — декабрь'},{start:4,label:'Январь — апрель'},{start:8,label:'Май — август'}] as const)
+     .map(t=><button type="button" key={t.start} className={quarter===t.start?'active':''} aria-pressed={quarter===t.start}
+     onClick={()=>{setQuarter(t.start);setSelection(null);setPreview(false)}}>{t.label}</button>)}
+   </div>}
+   {mode!=='large'&&<label>Плотность<select aria-label="Плотность календаря" value={density} onChange={e=>setDensity(e.target.value as Density)}>
+    <option value="compact">Компактная</option><option value="standard">Стандартная</option>
+    <option value="detailed">Подробная</option>
+   </select></label>}
+   {mode==='large'&&<span>Подробные ячейки с отметками дней</span>}
+   <span>{visibleWeeks.length} недель · {groups.length} групп</span>
+  </div>
+    </div>
     {mode!=='single'?<>
      <div className="kug-matrix-help">
       <span>Выбери группу и неделю. <b>Shift + нажатие</b> или протягивание выделит диапазон.</span>
@@ -397,23 +399,28 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
      </div>
      {groups.length===0&&<p className="kug-empty" role="status">По заданным фильтрам группы не найдены. Сбрось фильтр или уточни поиск.</p>}
     </>:<div className="kug-single">
-     <div className="kug-single-head"><label>Группа<select aria-label="Группа для подробного календаря" value={group}
-      onChange={e=>{setGroup(e.target.value);setRows([e.target.value]);setSelection(null)}}>
-      {GROUPS.map(g=><option key={g.id} value={g.id}>{g.id} · {g.specialty}</option>)}</select></label>
-      <span>Годовая линия группы: выбери неделю, чтобы увидеть её дни и назначить период.</span>
+     <div className="kug-single-head">
+      <label>Группа<select aria-label="Группа для подробного календаря" value={group}
+       onChange={e=>{setGroup(e.target.value);setRows([e.target.value]);setSelection(null)}}>
+       {GROUPS.map(g=><option key={g.id} value={g.id}>{g.id} · {g.specialty}</option>)}
+      </select></label>
+      <span>Все недели группы: период, даты и отметки дней. Нажми на неделю, чтобы изменить график.</span>
      </div>
-     <div className="kug-single-timeline" role="group" aria-label={'Годовая линия группы '+group}>
-      <div className="kug-single-months"><span>Сентябрь · {year}</span><span>Январь · {year+1}</span><span>Май · {year+1}</span></div>
-      <div className="kug-single-weeks">{groupWeeks.map(({week:w,cell})=><button key={w.index} type="button"
+     <div className="kug-single-weeks" role="group" aria-label={'Годовая линия группы '+group}>
+      {groupWeeks.map(({week:w,cell,days})=><button key={w.index} type="button"
        aria-label={group+', неделя '+(w.index+1)+': '+(cell.mixed?'Смешанная неделя':phaseInfo(cell.phase).name)}
-       title={'Неделя '+(w.index+1)+' · '+w.start+' — '+w.end+' · '+(cell.mixed?cell.parts.map(p=>phaseInfo(p).name).join(' / '):phaseInfo(cell.phase).name)}
-       className={'kug-single-week kug-'+phaseInfo(cell.phase).color+(cell.mixed?' kug-mixed':'')+
-        (selection&&w.index>=start&&w.index<=end?' kug-picked':'')}
+       className={'kug-single-week kug-'+phaseInfo(cell.phase).color+
+        (cell.mixed?' kug-mixed':'')+(selection&&w.index>=start&&w.index<=end?' kug-picked':'')}
        onClick={e=>selectCell(group,w.index,e.shiftKey)}>
-        <b>{w.index+1}</b><span>{cell.mixed?'◐':phaseInfo(cell.phase).short}</span>
-       </button>)}</div>
+       <b>{w.index+1}-я неделя · {dateText(w.start)}–{dateText(w.end)}</b>
+       <span>{cell.mixed?cell.parts.map(p=>phaseInfo(p).name).join(' / '):phaseInfo(cell.phase).name}</span>
+       <span className="kug-day-strip kug-single-strip" aria-label="Отметки дней недели">
+        {days.map(day=><i key={day.date} title={day.dayName+': '+day.label}
+         className={'kug-day-dot '+(day.withinYear?'kug-day-'+day.kind:'kug-day-outside')}/>)}
+       </span>
+       {cell.holidays>0&&<small>{cell.holidays} нерабочих дней</small>}
+      </button>)}
      </div>
-     <p className="kug-note">Цвет полосы — тип учебного периода. Детали и производственный календарь открываются в панели справа.</p>
     </div>}
    </div>
    <aside className="kug-workspace-side" aria-label="Свойства учебного периода">
