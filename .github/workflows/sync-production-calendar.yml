@@ -12,7 +12,8 @@ permissions:
   pages: write
   id-token: write
 concurrency:
-  group: github-pages
+  # Do not cancel a calendar refresh when normal source updates also deploy Pages.
+  group: production-calendar-sync
   cancel-in-progress: false
 jobs:
   sync-and-build:
