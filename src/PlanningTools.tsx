@@ -1,19 +1,16 @@
 import PolishedSelect from './PolishedSelect';
 import CalendarMatrix from './CalendarMatrix';
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ArrowRight, CalendarDays, Check, ChevronRight, Copy, HelpCircle, Layers3, RotateCcw, Search, ShieldCheck, Sparkles, WandSparkles } from 'lucide-react';
-import { DAYS, GROUPS, TIMES } from './data';
+import { ArrowRight, Check, Copy, HelpCircle, Layers3, Search, Sparkles, WandSparkles } from 'lucide-react';
+import { GROUPS, TIMES } from './data';
 import type { CalendarEvent, Lesson } from './data';
-import OfficialCalendar from './OfficialCalendar';
-import { VACATION_LABELS, daysInVacation, vacationEvents, vacationsIntersect } from './vacationPlanning';
-import { WEEK_COUNT, eventAffectedLessons, lessonDate, previewTemplate, previewAutofill, needsComputers, calendarIssues } from './plannerDomain';
-import { demoAcademicDemands, demoAcademicHorizon, isTeachingDate } from './academicPlanning';
+import { WEEK_COUNT, lessonDate, previewTemplate, previewAutofill, needsComputers } from './plannerDomain';
+import { demoAcademicDemands, demoAcademicHorizon } from './academicPlanning';
 import { readCollegeWorkweek } from './productionCalendar';
 import type { PreviewPlan } from './plannerDomain';
-import { MiniSchedule, PeriodTimeline, LoadBars, PlanningSummary } from './ScheduleVisuals';
+import { MiniSchedule, LoadBars, PlanningSummary } from './ScheduleVisuals';
 
 const weekOptions=Array.from({length:WEEK_COUNT},(_,i)=>({value:i,label:'Неделя '+(i+1)+' · '+lessonDate(i,0)}));
-const kinds:Record<CalendarEvent['kind'],string>={study:'Учебные недели',exam:'Сессия',vacation:'Каникулы',practice:'Практика',holiday:'Нерабочий день'};
 const grouped=GROUPS.map(x=>x.id);
 function Heading({step,children}:{step:number;children:React.ReactNode}){return <div className="plan-step"><b>{step}</b><strong>{children}</strong></div>}
 function Field({name,children}:{name:string;children:React.ReactNode}){return <label className="plan-field"><span>{name}</span>{children}</label>}
@@ -21,91 +18,11 @@ function Info({children}:{children:React.ReactNode}){return <p className="plan-i
 function Cmd({onClick,children,disabled=false}:{onClick:()=>void;children:React.ReactNode;disabled?:boolean}){return <button type="button" className="plan-command" disabled={disabled} onClick={onClick}>{children}</button>}
 
 type CalendarProps={events:CalendarEvent[];lessons:Lesson[];group:string;setGroup:(g:string)=>void;week:number;setWeek:(w:number)=>void;add:(v:CalendarEvent)=>void;remove:(id:string)=>void;replace:(v:CalendarEvent[])=>void};
-export function CalendarStudio({events,lessons,group,setGroup,week,setWeek,add,remove,replace}:CalendarProps){
- const [kind,setKind]=useState<CalendarEvent['kind']>('practice');
- const [title,setTitle]=useState('Учебная практика');
- const [from,setFrom]=useState('2026-11-16');
- const [to,setTo]=useState('2026-11-20');
- const [scope,setScope]=useState(group);
- const [multiGroups,setMultiGroups]=useState<string[]>([group]);
- const [groupQuery,setGroupQuery]=useState('');
- const [confirmed,setConfirmed]=useState(false);
- const [periodError,setPeriodError]=useState('');
- const [vacationNote,setVacationNote]=useState(false);
- const scopedGroups=scope==='all'?[]:scope==='custom'?multiGroups:
-  scope.startsWith('department:')?GROUPS.filter(g=>g.department===scope.slice('department:'.length)).map(g=>g.id):[scope];
- const candidate:CalendarEvent={id:'preview',kind,title,from,to,groups:scopedGroups};
- const existingVacations=vacationEvents(events,group);
- const matchingVacation=kind==='vacation'&&from&&to&&events.some(e=>e.kind==='vacation'&&e.from<=to&&from<=e.to&&
-  (e.groups.length===0||scopedGroups.length===0||scopedGroups.some(g=>e.groups.includes(g))));
- const conflicts=useMemo(()=>eventAffectedLessons(candidate,lessons),[kind,title,from,to,scope,multiGroups,lessons]);
- const isValid=Boolean(title.trim()&&from&&to&&from<=to&&(scope!=='custom'||multiGroups.length>0));
- const blocking=kind==='vacation'||kind==='holiday'||kind==='practice';
- const eventsSorted=[...events].sort((a,b)=>a.from.localeCompare(b.from));
- const create=()=>{
-  if(!isValid)return;
-  if(matchingVacation){setPeriodError('В выбранном диапазоне уже есть каникулы для одной или нескольких указанных групп. Измени даты или сначала удали прежний период.');return}
-  if(blocking&&conflicts.length&&!confirmed)return;
-  add({...candidate,id:'cal-'+Date.now().toString(36)});
-  setConfirmed(false);setPeriodError('');setVacationNote(false);
- };
- const prepareVacation=(name:typeof VACATION_LABELS[number])=>{
-  setKind('vacation');setTitle(name);setScope(group);setFrom('');setTo('');
-  setConfirmed(false);setPeriodError('');setVacationNote(true);
- };
+/** Unified calendar editor; federal holidays are displayed in the KUG matrix.
+ * The legacy form is deliberately not rendered, but its saved events are retained. */
+export function CalendarStudio({events,lessons,group,setGroup,replace}:CalendarProps){
  return <div className="plan-page" data-testid="calendar-studio">
   <CalendarMatrix events={events} lessons={lessons} group={group} setGroup={setGroup} replace={replace}/>
-  <details className="kug-legacy"><summary>Расширенный редактор и производственный календарь</summary>
-  <div className="plan-intro"><div><strong>Учебный календарь — когда колледж учится</strong><p>Определяет учебные недели, практики, сессии, каникулы и выходные. Расписание строится внутри разрешённых периодов. Календарь не заменяет расписание занятий.</p></div><CalendarDays size={25}/></div>
-  <OfficialCalendar/>
-  <Heading step={1}>Посмотри учебные периоды выбранной группы</Heading>
-  <div className="plan-calendar-group"><Field name="Просмотр календаря группы"><PolishedSelect aria-label="Просмотр календаря группы" value={group} onChange={e=>setGroup(e.target.value)}>{GROUPS.map(g=><option key={g.id} value={g.id}>{g.id} · {g.department} · {g.course} курс</option>)}</PolishedSelect></Field><span>Общие события колледжа и периоды конкретной группы.</span></div>
-  <PeriodTimeline calendar={events} lessons={lessons} group={group} activeWeek={week} onWeek={setWeek}/>
-  <section className="vacation-summary" aria-label="Каникулы выбранной группы">
-   <div className="vacation-summary-header">
-    <div><strong>Каникулы и межсеместровые перерывы · {group}</strong><p>Летний отдых и зимний межсеместровый перерыв по учебному графику группы. В эти дни обычные занятия не планируются.</p></div>
-    <span>{existingVacations.length} периодов · {existingVacations.reduce((sum,e)=>sum+daysInVacation(e),0)} календарных дней</span>
-   </div>
-   <div className="vacation-summary-list">
-    {existingVacations.length?existingVacations.map(e=><div className="vacation-period-chip" key={e.id}>
-     <span>{e.title}</span><small>{e.from} — {e.to} · {e.groups.length?'Для выбранных групп':'Весь колледж'}</small>
-    </div>):<div className="vacation-empty">Для группы каникулы пока не заданы. Выбери тип ниже и укажи даты.</div>}
-   </div>
-   <div className="vacation-actions"><span>Добавить период:</span>
-    {VACATION_LABELS.map(name=><button type="button" key={name} onClick={()=>prepareVacation(name)}>{name}</button>)}
-   </div>
-   <p className="vacation-footnote">В отличие от школы, в колледже нет стандартных осенних и весенних каникул. Летние каникулы и зимний межсеместровый перерыв учитываются по утверждённому календарному учебному графику. Для СПО зимой предусмотрено не менее двух недель каникул (п. 26 приказа Минпросвещения № 762).</p>
-  </section>
-  <div className="plan-columns">
-   <section className="plan-pane" id="calendar-event-form"><Heading step={2}>Добавь особый период</Heading>
-    {vacationNote&&<Info>Выбран тип каникул. Укажи даты по учебному графику группы; система не подставляет вымышленные сроки.</Info>}
-    <div className="plan-fields">
-     <Field name="Тип периода"><PolishedSelect value={kind} onChange={e=>{const v=e.target.value as CalendarEvent['kind'];setKind(v);setTitle(kinds[v]);setConfirmed(false);setPeriodError('');setVacationNote(v==='vacation')}}>{Object.entries(kinds).map(([k,n])=><option key={k} value={k}>{n}</option>)}</PolishedSelect></Field>
-     <Field name="Название"><input value={title} onChange={e=>setTitle(e.target.value)}/></Field>
-     <div className="plan-duo"><Field name="С даты"><input type="date" value={from} onChange={e=>{setFrom(e.target.value);setConfirmed(false);setPeriodError('')}}/></Field><Field name="По дату"><input type="date" value={to} onChange={e=>{setTo(e.target.value);setConfirmed(false);setPeriodError('')}}/></Field></div>
-     <Field name="На кого действует"><PolishedSelect value={scope} onChange={e=>{setScope(e.target.value);setConfirmed(false)}}><option value="all">Весь колледж</option><option value="custom">Несколько групп</option>{[...new Set(GROUPS.map(g=>g.department))].map(dep=><option key={dep} value={'department:'+dep}>Отделение {dep}</option>)}{grouped.map(g=><option key={g} value={g}>Группа {g}</option>)}</PolishedSelect></Field>
-    </div>
-    {scope==='custom'&&<div className="plan-calendar-multiselect">
-      <div><input aria-label="Поиск групп календаря" placeholder="Найти группу…" value={groupQuery} onChange={e=>setGroupQuery(e.target.value)}/>
-       <span>Выбрано групп: {multiGroups.length}</span></div>
-      <div className="plan-calendar-group-list">{GROUPS.filter(g=>g.id.toLowerCase().includes(groupQuery.toLowerCase())).map(g=><label key={g.id}>
-       <input type="checkbox" checked={multiGroups.includes(g.id)} onChange={e=>{setMultiGroups(curr=>e.target.checked?[...curr,g.id]:curr.filter(id=>id!==g.id));setConfirmed(false)}}/>{g.id} · {g.department}
-      </label>)}</div>
-     </div>}
-     <div className="plan-impact"><strong><AlertTriangle size={15}/> В этот период уже поставлено {conflicts.length} занятий</strong><small>{blocking?'Если период ограничивает учёбу, эти занятия потребуют перепланирования. При сохранении календарь их не удаляет.':'Учебный период сам по себе не запрещает поставленные занятия.'}</small></div>
-    {periodError&&<p className="vacation-error" role="alert">{periodError}</p>}
-    {matchingVacation&&<p className="vacation-warning">На выбранные даты уже назначены каникулы для пересекающихся групп.</p>}
-    {blocking&&conflicts.length>0&&<label className="plan-confirm"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/> Понимаю, что занятия останутся в расписании и потребуют решения</label>}
-    <Cmd onClick={create} disabled={!isValid||matchingVacation||blocking&&conflicts.length>0&&!confirmed}><Check size={15}/> Сохранить учебный период</Cmd>
-   </section>
-   <section className="plan-pane"><Heading step={3}>Проверь, что попадает в выбранную неделю</Heading>
-    <MiniSchedule week={week} lessons={lessons} group={group} title={'Группа '+group+' · неделя '+(week+1)}/>
-    <div className="plan-count"><span>Особых периодов в календаре</span><b>{events.length}</b></div>
-    <div className="plan-period-list">{eventsSorted.map(e=><div className="plan-period-row" key={e.id}><div><strong>{e.title}</strong><small>{e.from} — {e.to} · {e.groups.length?e.groups.join(', '):'Все группы'}</small></div><button onClick={()=>remove(e.id)} title={'Удалить период '+e.title}>×</button></div>)}</div>
-   </section>
-  </div>
-  <Info>Позже календарь будет формироваться из общего Academic Core: академический год, семестры, график практики, производственный календарь и периоды аттестации. Здесь редактируется только демоверсия.</Info>
-  </details>
  </div>;
 }
 
