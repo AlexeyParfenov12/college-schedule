@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import { solveAnnualVariant } from './yearSolver';
+import { solveAnnualVariant, rankAnnualVariants } from './yearSolver';
 import type { AnnualConfig, YearDemand, AnnualVariant } from './yearSolver';
 import type { Lesson, CalendarEvent } from './data';
 import type { AcademicPracticeAssignment } from './practiceAssignments';
@@ -20,7 +20,6 @@ self.onmessage=(event:MessageEvent<Request>)=>{
    variants.push(variant);
    self.postMessage({type:'progress',current:n+1,total:4,name:variant.name});
   }
-  variants.sort((a,b)=>b.score-a.score);
-  self.postMessage({type:'result',variants});
+   self.postMessage({type:'result',variants:rankAnnualVariants(variants)});
  }catch(e){self.postMessage({type:'error',message:e instanceof Error?e.message:String(e)})}
 };

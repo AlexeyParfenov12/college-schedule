@@ -167,6 +167,97 @@ function candidateScore(state:WeekState,l:Lesson,cfg:AnnualConfig,variant:number
  score+=((l.day*11+l.slot*7+variant*13+l.teacher.length)%9)*.02;
  return score;
 }
+/** Deterministic post-pass compaction of one week. Does not change academic coverage.
+ * It moves only regular planned meetings, NEVER approved practice slots or held lessons.
+ * A move may not increase the number of group OR teacher windows.
+ */
+export function compactAnnualWeek(lessons:Lesson[],cfg:AnnualConfig,calendar:CalendarEvent[],passes=2):number{
+ const roomCodes=(l:Lesson)=>l.mode==='online'?[]:l.room.match(/\\b\\d{3}\\b/g)||[];
+ const metric=(list:Lesson[])=>{
+  const gm=new Map<string,Lesson[]>(),tm=new Map<string,Lesson[]>();
+  const groupDays=new Set<string>(),teacherDays=new Set<string>();
+  let slotSum=0;
+  for(const x of list){
+   if(x.status==='cancelled')continue;
+   slotSum+=x.slot;
+   for(const g of x.groups){mAppend(gm,g+'|'+x.day,x);groupDays.add(g+'|'+x.day)}
+   mAppend(tm,x.teacher+'|'+x.day,x);teacherDays.add(x.teacher+'|'+x.day);
+  }
+  let groups=0,teachers=0;
+  for(const arr of gm.values())groups+=avoidableWindows(arr,cfg.commuteGap);
+  for(const arr of tm.values())teachers+=avoidableWindows(arr,cfg.commuteGap);
+  return {groups,teachers,activeDays:groupDays.size+teacherDays.size,slotSum};
+ };
+ let improved=0;
+ for(let pass=0;pass<Math.min(3,Math.max(0,passes));pass++){
+  let changes=0;
+  for(const current of lessons){
+   if(current.status==='held'||current.status==='cancelled'||current.practiceBlockId)continue;
+   const others=lessons.filter(x=>x!==current&&x.status!=='cancelled');
+   const prior=metric(lessons);
+   let best:{day:number;slot:number;quality:ReturnType<typeof metric>}|null=null;
+   const viableDays=new Set<number>([current.day]);
+   for(const other of others){
+    if(other.groups.some(g=>current.groups.includes(g))||other.teacher===current.teacher)
+     viableDays.add(other.day);
+   }
+   for(const day of [...viableDays].sort((a,b)=>a-b)){
+    if(day<0||day>=cfg.days)continue;
+    const existing=others.filter(x=>x.day===day);
+    for(let slot=1;slot<=cfg.slotsPerDay;slot++){
+     if(day===current.day&&slot===current.slot)continue;
+     const candidate={...current,day,slot};
+     if(current.groups.some(g=>!checkGroupSlot(cfg,g,day,slot,existing.filter(x=>x.groups.includes(g)).length).allowed))continue;
+     if(!checkTeacherSlot(cfg,current.teacher,day,slot,existing.filter(x=>x.teacher===current.teacher).length).allowed)continue;
+     if(existing.some(x=>x.slot===slot&&(x.teacher===current.teacher||
+      x.groups.some(g=>current.groups.includes(g))||
+      roomCodes(x).some(room=>roomCodes(candidate).includes(room)))))continue;
+     if(calendarIssues(candidate,calendar,cfg.days).length)continue;
+     if(calendar.some(e=>e.kind==='study')&&current.groups.some(g=>!isTeachingDate(lessonDate(current.week||0,day),g,calendar,cfg.days)))continue;
+     if(current.groups.some(g=>commuteViolations([...existing.filter(x=>x.groups.includes(g)),candidate],cfg.commuteGap).length))continue;
+     if(commuteViolations([...existing.filter(x=>x.teacher===current.teacher),candidate],cfg.commuteGap).length)continue;
+     const next=metric([...others,candidate]);
+     const previousBest=best?.quality||prior;
+     const allows=(next.groups<=prior.groups&&next.teachers<=prior.teachers);
+     const gain=(next.groups<previousBest.groups||next.teachers<previousBest.teachers||
+       (next.groups===previousBest.groups&&next.teachers===previousBest.teachers&&
+        (next.activeDays<previousBest.activeDays||
+         (next.activeDays===previousBest.activeDays&&next.slotSum<previousBest.slotSum))));
+     if(allows&&gain)best={day,slot,quality:next};
+    }
+   }
+   if(best){
+    // Preserve identity: the placed[] list references these same Lesson objects.
+    current.day=best.day;current.slot=best.slot;
+    improved++;changes++;
+   }
+  }
+  if(!changes)break;
+ }
+ return improved;
+}
+
+/** Labels are assigned AFTER comparing the computed alternatives, not by attempt index.
+ * "Fewest windows" means among these four feasible heuristic candidates, not a global optimum.
+ */
+export function rankAnnualVariants(input:AnnualVariant[]):AnnualVariant[]{
+ const remaining=[...input];
+ const take=(sort:(a:AnnualVariant,b:AnnualVariant)=>number,name:string)=>{
+  remaining.sort(sort);
+  const chosen=remaining.shift();
+  if(chosen)chosen.name=name;
+ };
+ const coverage=(a:AnnualVariant,b:AnnualVariant)=>b.placedPairs-a.placedPairs;
+ take((a,b)=>coverage(a,b)||a.groupWindows-b.groupWindows||a.teacherWindows-b.teacherWindows,
+  'Меньше всего окон у групп (из 4)');
+ take((a,b)=>coverage(a,b)||b.onlinePercent-a.onlinePercent||a.groupWindows-b.groupWindows,
+  'Больше дистанта (из 4)');
+ take((a,b)=>coverage(a,b)||a.teacherWindows-b.teacherWindows||a.groupWindows-b.groupWindows,
+  'Удобство преподавателей (из 4)');
+ take((a,b)=>coverage(a,b)||a.groupWindows-b.groupWindows||a.teacherWindows-b.teacherWindows,
+  'Равномерный график (из 4)');
+ return [...input].sort((a,b)=>coverage(a,b)||a.groupWindows-b.groupWindows||a.teacherWindows-b.teacherWindows||b.score-a.score);
+}
 export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:CalendarEvent[],variant:number,locked:Lesson[]=[],assignments:AcademicPracticeAssignment[]=[]):AnnualVariant{
  const label=['Минимум окон у групп','Удобство преподавателей','Равномерный график','Больше дистанта'][variant]||'Вариант';
  const placed:Lesson[]=[],unplaced:Unplaced[]=[];
@@ -322,6 +413,9 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
     if(l.type==='subgroup')subgroupCount++;
    }else if(task.members){queue.push(...task.members)}
   }
+  // The greedy pass may leave avoidable windows. Compaction preserves all hard rules
+  // and never changes approved practice slots, published/held meetings or academic hours.
+  compactAnnualWeek(state.lessons,cfg,events,2);
   // Remaining due is carried over into later weeks.
  }
  for(const d of regularDemands){
