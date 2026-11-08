@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Check, ClipboardCopy, Download, RotateCcw, Search, Table2, Users } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, ChevronRight, ClipboardCopy, Download, RotateCcw, Search, Table2, Users } from 'lucide-react';
 import { GROUPS } from './data';
 import type { CalendarEvent, Lesson } from './data';
 import { assignPeriod, calendarChangeImpact, CALENDAR_PHASES, calendarWeeks, checkCalendar, copyGroupCalendar, importMatrixCSV, kugWeekDays, matrixCSV, parseCalendarBackup, phaseInfo, weekCell } from './calendarMatrixDomain';
@@ -7,7 +7,7 @@ import type { MatrixImport } from './calendarMatrixDomain';
 import type { CalendarPhase, Week } from './calendarMatrixDomain';
 import { classifyCalendarDay, readCollegeWorkweek, productionDiffersFromBaseline } from './productionCalendar';
 import { useProductionCalendarState } from './productionCalendarSync';
-import { lessonDate } from './plannerDomain';
+import { calendarIssues, lessonDate } from './plannerDomain';
 import type { CalendarDay } from './productionCalendar';
 import { plusDays } from './calendarMatrixDomain';
 import './calendar-matrix.css';
@@ -16,6 +16,10 @@ import { useCollegeOverrideRevision } from './collegeDayOverrides';
 
 type Props={events:CalendarEvent[];lessons:Lesson[];group:string;setGroup:(group:string)=>void;replace:(events:CalendarEvent[])=>void};
 type Selected={anchor:number;end:number;group:string};
+type ViewMode='year'|'quarter'|'single';
+type Density='compact'|'standard'|'detailed';
+type IssueFilter='all'|'unassigned'|'conflicts'|'practice';
+const groupKey=(department:string,course:number)=>department+'::'+course;
 const MONTHS=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
 const statusName:Record<string,string>={shortened:'Сокращённый день', 'college-off':'Дополнительный выходной колледжа','college-work':'Рабочий день колледжа','college-shortened':'Сокращённый день колледжа',work:'Рабочий день',weekend:'Выходной',holiday:'Государственный праздник',transfer:'Перенесённый выходной','working-weekend':'Рабочая суббота',college:'Нерабочий день колледжа'};
 const dateText=(iso:string)=>iso.slice(8)+'.'+iso.slice(5,7);
@@ -38,7 +42,11 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
  const production=useProductionCalendarState();
  const collegeRevision=useCollegeOverrideRevision();
  const [year,setYear]=useState(2026);
- const [mode,setMode]=useState<'all'|'single'>('all');
+ const [mode,setMode]=useState<ViewMode>('year');
+ const [density,setDensity]=useState<Density>('compact');
+ const [quarter,setQuarter]=useState<0|4|8>(0);
+ const [issueFilter,setIssueFilter]=useState<IssueFilter>('all');
+ const [collapsed,setCollapsed]=useState<string[]>([]);
  const [query,setQuery]=useState('');
  const [department,setDepartment]=useState('all');
  const [course,setCourse]=useState('all');
@@ -61,10 +69,10 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
  const [exactTo,setExactTo]=useState('');
  const dragging=useRef(false);
  const weeks=useMemo(()=>calendarWeeks(year),[year]);
- const groups=useMemo(()=>GROUPS.filter(g=>
+ const baseGroups=useMemo(()=>GROUPS.filter(g=>
   (department==='all'||g.department===department)&&
   (course==='all'||String(g.course)===course)&&
-  (g.id+' '+g.specialty+' '+g.department).toLowerCase().includes(query.toLowerCase())
+  (g.id+' '+g.specialty+' '+g.department).toLowerCase().includes(query.trim().toLowerCase())
  ),[department,course,query]);
  const calendarWorkweek=readCollegeWorkweek();
  // Cache official non-working days once per displayed year, not per group and cell.
@@ -80,19 +88,32 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    productionDiffersFromBaseline(lessonDate(l.week||0,l.day),calendarWorkweek)),[lessons,calendarWorkweek,production.revision]);
  const cells=useMemo(()=>{
   const result=new Map<string,ReturnType<typeof weekCell>>();
-  for(const g of groups)for(const w of weeks){
-   result.set(g.id+':'+w.index,weekCell(events,g.id,w,closedDays));
-  }
+  for(const g of baseGroups)for(const w of weeks)result.set(g.id+':'+w.index,weekCell(events,g.id,w,closedDays));
   return result;
- },[groups,weeks,events,closedDays]);
- // Stable daily overlays: do not recompute 7*53*groups day classifications on each click.
- const dayCells=useMemo(()=>{
-  const cache=new Map<string,ReturnType<typeof kugWeekDays>>();
-  for(const g of groups)for(const w of weeks){
-   cache.set(g.id+':'+w.index,kugWeekDays(events,g.id,w,officialDays,calendarWorkweek));
+ },[baseGroups,weeks,events,closedDays]);
+ const problemGroups=useMemo(()=>{
+  const match=new Set<string>();
+  if(issueFilter==='all')return match;
+  for(const g of baseGroups){
+   const statuses=weeks.map(w=>cells.get(g.id+':'+w.index)!);
+   if(issueFilter==='unassigned'&&statuses.some(x=>x.unassignedDays>0))match.add(g.id);
+   if(issueFilter==='practice'&&statuses.some(x=>x.parts.some(p=>p==='training'||p==='industrial'||p==='prediploma')))match.add(g.id);
   }
-  return cache;
- },[groups,weeks,events,officialDays,calendarWorkweek]);
+  if(issueFilter==='conflicts'){
+   const findings=checkCalendar(events,baseGroups.map(g=>g.id),weeks,closedDays);
+   for(const finding of findings)if(/Конфликт периодов|Дублирующиеся/.test(finding.message))match.add(finding.group);
+   for(const lesson of lessons)if(lesson.status!=='cancelled'&&calendarIssues(lesson,events,calendarWorkweek).length)
+    for(const id of lesson.groups)match.add(id);
+  }
+  return match;
+ },[issueFilter,baseGroups,weeks,cells,events,closedDays,lessons,calendarWorkweek]);
+ const groups=useMemo(()=>baseGroups.filter(g=>issueFilter==='all'||problemGroups.has(g.id)),[baseGroups,issueFilter,problemGroups]);
+ const visibleWeeks=useMemo(()=>{
+  if(mode!=='quarter')return weeks;
+  const first=quarter===0?year+'-09-01':quarter===4?(year+1)+'-01-01':(year+1)+'-05-01';
+  const last=quarter===0?year+'-12-31':quarter===4?(year+1)+'-04-30':(year+1)+'-08-31';
+  return weeks.filter(w=>w.end>=first&&w.start<=last);
+ },[weeks,mode,quarter,year]);
  const selectedGroups=rows.filter(g=>GROUPS.some(x=>x.id===g));
  const start=selection?Math.min(selection.anchor,selection.end):0;
  const end=selection?Math.max(selection.anchor,selection.end):0;
