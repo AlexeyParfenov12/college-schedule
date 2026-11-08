@@ -14,6 +14,7 @@ import { moveOptions, explainCandidate, readBlockedRooms, swapOptions } from './
 import type { MoveOption } from './scheduleAssist';
 import { validate } from './demoLogic';
 import { lessonDate, WEEK_COUNT, calendarIssues, currentDemoCalendar } from './plannerDomain';
+import { LEGACY_WEEK_OFFSET, shiftLegacyWeek } from './weekTimeline';
 import { classifyCalendarDay } from './productionCalendar';
 import { auditAnnualDraft } from './yearAudit';
 import { readCollegeWorkweek } from './productionCalendar';
@@ -24,9 +25,19 @@ type Screen = typeof NAV[number][0];
 const iconSet=[LayoutDashboard,CalendarDays,CalendarDays,Layers3,WandSparkles,School,ArrowLeftRight,Users,Network,GitFork,Building2,Monitor,BarChart3,Send,FileText,School,Settings2,BookOpen,BookOpen];
 const BASE=buildSeed(16) as Item[];
 const BASE_MAP=new Map(BASE.map(x=>[x.id,JSON.stringify(x)]));
+/** Read old week indexes without modifying old browser records; persist future edits to v4. */
 const start=():Item[]=>{try{
- const raw=localStorage.getItem('college-schedule-edits-v3');
- if(raw){const edits=JSON.parse(raw) as {updated:Item[],removed:string[]};const deleted=new Set(edits.removed);const updates=new Map(edits.updated.map(x=>[x.id,x]));return [...BASE.filter(x=>!deleted.has(x.id)).map(x=>updates.get(x.id)||x),...edits.updated.filter(x=>!BASE_MAP.has(x.id))]}
+ const modern=localStorage.getItem('college-schedule-edits-v4');
+ const legacy=modern?null:localStorage.getItem('college-schedule-edits-v3');
+ const raw=modern||legacy;
+ if(raw){
+  const edits=JSON.parse(raw) as {updated:Item[],removed:string[]};
+  if(!Array.isArray(edits.updated)||!Array.isArray(edits.removed))return BASE;
+  const changed=legacy?edits.updated.map(shiftLegacyWeek):edits.updated;
+  const deleted=new Set(edits.removed);
+  const updates=new Map(changed.map(x=>[x.id,x]));
+  return [...BASE.filter(x=>!deleted.has(x.id)).map(x=>updates.get(x.id)||x),...changed.filter(x=>!BASE_MAP.has(x.id))];
+ }
 }catch{}return BASE};
 
 const id=()=>String(Date.now())+'-'+Math.random().toString(36).slice(2,7);
@@ -62,7 +73,7 @@ export default function App(){
  const [group,setGroup]=useState('П-21');
  const [teacher,setTeacher]=useState(TEACHERS[0]);
  const [room,setRoom]=useState('102');
- const [week,setWeek]=useState(0);
+ const [week,setWeek]=useState(LEGACY_WEEK_OFFSET);
  const [density,setDensity]=useState<'compact'|'standard'>('compact');
  const [days,setDays]=useState<5|6>(readCollegeWorkweek);
  const [status,setStatus]=useState<'draft'|'published'>('draft');
@@ -74,7 +85,7 @@ export default function App(){
  const existing=new Set(items.map(x=>x.id));
  const updated=items.filter(x=>BASE_MAP.get(x.id)!==JSON.stringify(x));
  const removed=BASE.filter(x=>!existing.has(x.id)).map(x=>x.id);
- localStorage.setItem('college-schedule-edits-v3',JSON.stringify({updated,removed}));
+ localStorage.setItem('college-schedule-edits-v4',JSON.stringify({updated,removed}));
 }catch(e){console.warn('Не удалось сохранить демо-изменения:',e)}},[items]);
  useEffect(()=>{if(notice){const timer=setTimeout(()=>setNotice(''),3500);return ()=>clearTimeout(timer)}},[notice]);
  const current=useMemo(()=>items.filter(x=>(x.week||0)===week),[items,week]);
@@ -235,7 +246,7 @@ export default function App(){
   return <><strong>{x.subject}</strong><small title={context}>{context}</small>
    <span className="tiny">{TYPES[x.type]}{x.mode!=='offline'?' · '+MODES[x.mode]:''}</span></>;
  };
- const weekDate=useMemo(()=>{const d=new Date(2026,10,9+week*7);const e=new Date(d);e.setDate(e.getDate()+5);return d.toLocaleDateString('ru-RU',{day:'numeric',month:'short'})+' – '+e.toLocaleDateString('ru-RU',{day:'numeric',month:'short',year:'numeric'})},[week]);
+ const weekDate=useMemo(()=>{const d=new Date(lessonDate(week,0)+'T12:00:00');const e=new Date(lessonDate(week,5)+'T12:00:00');return d.toLocaleDateString('ru-RU',{day:'numeric',month:'short'})+' – '+e.toLocaleDateString('ru-RU',{day:'numeric',month:'short',year:'numeric'})},[week]);
  const weekHeader=<div className="toolbar">
    <div className="control-group"><button className={view==='group'?'active':''} onClick={()=>{setView('group');closeSelected()}}><Users size={15}/> Группы</button><button className={view==='teacher'?'active':''} onClick={()=>{setView('teacher');closeSelected()}}>Преподаватели</button><button className={view==='room'?'active':''} onClick={()=>{setView('room');closeSelected()}}>Аудитории</button></div>
    <div className="control-group"><button aria-label="Предыдущая неделя" onClick={()=>{setWeek(w=>Math.max(0,w-1));closeSelected()}}><ChevronLeft size={15}/></button><b>{weekDate}</b><button aria-label="Следующая неделя" onClick={()=>{setWeek(w=>Math.min(WEEK_COUNT-1,w+1));closeSelected()}}><ChevronRight size={15}/></button></div>
@@ -384,12 +395,12 @@ export default function App(){
        setNotice('Годовой черновик превышает безопасный размер браузерного хранилища. Скачай JSON варианта.');return
       }
       try{
-       localStorage.setItem('college-year-unplaced-v1',JSON.stringify({
+       localStorage.setItem('college-year-unplaced-v2',JSON.stringify({
         at:new Date().toISOString(),weeks,unplaced:variant.unplaced,practiceIssues:variant.practiceIssues
        }));
       }catch{setNotice('Не удалось сохранить остатки нагрузки в браузере');return}
       setYearBackup({items,status});
-      setItems(audit.next);setStatus('draft');setLastChange(null);setSelected(null);setWeek(0);setScreen('schedule');
+      setItems(audit.next);setStatus('draft');setLastChange(null);setSelected(null);setWeek(LEGACY_WEEK_OFFSET);setScreen('schedule');
       setNotice('Вариант применён к черновику: '+audit.changed+' занятий. Неразмещённых назначений: '+variant.unplaced.length+'. Доступен возврат.');
     }}/>
   : <AdvancedWorkflows screen={screen} items={items} setItems={setItems} week={week} setWeek={setWeek} group={group} setGroup={setGroup} teacher={teacher} setTeacher={setTeacher} room={room} setRoom={setRoom} onNavigate={show} onEdit={setSelected} onFocusLesson={focusLesson} notify={setNotice} markDraft={()=>setStatus('draft')} status={status} setStatus={setStatus} density={density} setDensity={setDensity} days={days} setDays={v=>setDays(v===5?5:6)}/>;
