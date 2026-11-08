@@ -119,6 +119,7 @@ export default function AdvancedWorkflows(p:Props){
  const [bulkPreview,setBulkPreview]=useState<BulkFormatPreview|null>(null);
  const [bulkReviewed,setBulkReviewed]=useState(false);
  const [checkedSubstitution,setCheckedSubstitution]=useState<{lessonId:string;optionKey:string;week:number;absenceId:string}|null>(null);
+ const [substitutionAudit,setSubstitutionAudit]=useState<{week:number;absenceId:string;total:number;withOptions:number}|null>(null);
  const [genNumber,setGenNumber]=useState(6);
  const [targetWeek,setTargetWeek]=useState(1);
  const [calendarKind,setCalendarKind]=useState<CalendarEvent['kind']>('practice');
@@ -287,6 +288,9 @@ export default function AdvancedWorkflows(p:Props){
    if(!live||live.status==='held'||!selectedAbsence||live.teacher!==selectedAbsence.teacher){
     p.notify('Замена недоступна: занятие уже изменено или проведено');return;
    }
+   if(checkedSubstitution?.lessonId!==source.id||checkedSubstitution.optionKey!==selected.key||checkedSubstitution.week!==p.week||checkedSubstitution.absenceId!==selectedAbsence.id){
+    p.notify('Сначала нажмите «Проверить замену» для выбранного варианта');return;
+   }
    // Revalidate at the moment of confirmation in case another class was edited.
    const valid=offer(live).find(v=>v.key===selected.key);
    if(!valid){p.notify('Этот вариант больше недоступен. Обновите предложения.');return}
@@ -295,6 +299,7 @@ export default function AdvancedWorkflows(p:Props){
    const next=applySubstitutionOption(live,valid,selectedAbsence.reason);
    const updated=p.items.map(l=>l.id===live.id?next:l);
    editData(()=>updated,'Замена сохранена: '+live.subject+' → '+next.subject);
+   setCheckedSubstitution(null);setSubstitutionAudit(null);
    const left=updated.some(l=>(l.week||0)===p.week&&l.status!=='cancelled'&&l.teacher===selectedAbsence.teacher&&
      l.day>=selectedAbsence.from&&l.day<=selectedAbsence.to);
    if(!left)put(d=>({...d,absences:d.absences.map(a=>a.id===selectedAbsence.id?{...a,status:'resolved'}:a)}));
@@ -303,6 +308,7 @@ export default function AdvancedWorkflows(p:Props){
    if(x.status==='held'){p.notify('Проведённую замену нельзя отменить обычным редактированием');return}
    const restored=revertSubstitution(x);
    editData(old=>old.map(y=>y.id===x.id?restored:y),'Замена отменена, исходное занятие восстановлено');
+   setCheckedSubstitution(null);setSubstitutionAudit(null);
    put(d=>({...d,absences:d.absences.map(a=>a.teacher===restored.teacher&&restored.day>=a.from&&restored.day<=a.to?
     {...a,status:'open'}:a)}));
   };
@@ -337,8 +343,14 @@ export default function AdvancedWorkflows(p:Props){
      <Notice>Дистант предлагается только в начале или конце расписания группы и преподавателя, не между очными парами. Учитываются лимиты дистанта за неделю и время на дорогу. Правила сохраняются для этого демостенда в браузере.</Notice>
     </div>
    </Panel></div>
-   <Panel title="Подбор замен на текущую неделю" aside={<Pill color="amber">{teacherlessons.length} не решено</Pill>}>
-    <Notice>По умолчанию система подбирает другой предмет с подтверждённым демо-назначением преподавателя на группу. Если по правилам нельзя предложить дистанционную пару или отсутствуют свободные ресурсы, система не назначает её принудительно. Учебные планы в этом стенде демонстрационные.</Notice>
+   <Panel title={'Подбор замен · '+weekRange()} aside={<Pill color="amber">{teacherlessons.length} не решено</Pill>}>
+    <Notice>Сначала нажмите «Проверить замены», затем выберите конкретный вариант через «Проверить замену». Только после проверки появится отдельная кнопка подтверждения. Учебные назначения в этом стенде демонстрационные.</Notice>
+    <Button primary disabled={!teacherlessons.length} onClick={()=>{
+     setCheckedSubstitution(null);
+     setSubstitutionAudit({week:p.week,absenceId:selectedAbsence?.id||'',total:teacherlessons.length,withOptions:teacherlessons.filter(x=>offer(x).length>0).length});
+    }}><Search size={15}/> Проверить замены ({teacherlessons.length})</Button>
+    {substitutionAudit?.week===p.week&&substitutionAudit.absenceId===selectedAbsence?.id&&
+     <Notice kind={substitutionAudit.withOptions?'info':'warning'}>Проверено занятий: {substitutionAudit.total}. Есть допустимые варианты: {substitutionAudit.withOptions}. Без допустимых вариантов: {substitutionAudit.total-substitutionAudit.withOptions}. Автоматические изменения не выполнялись.</Notice>}
     <div className="studio-list">
      {!teacherlessons.length&&<p className="muted">Нет незакрытых занятий выбранного отсутствующего преподавателя на этой неделе.</p>}
      {teacherlessons.slice(0,30).map(x=>{
@@ -349,11 +361,21 @@ export default function AdvancedWorkflows(p:Props){
         'Для общего потока, подгрупп и параллелей требуется ручное согласование всех участников.':
         candidates.length?'Доступные варианты проверены по КУГ, расписанию, нагрузке и ресурсам.':
          'Нет безопасных вариантов: проверь занятость преподавателей, учебный план, кабинеты, долю дистанта и положение пары.'}</small>
-       {candidates.slice(0,5).map(candidate=><button key={candidate.key} className="studio-candidate"
-         aria-label={'Применить замену: '+candidate.label+' для '+x.subject+' '+DAYS[x.day]+' '+x.slot}
-         onClick={()=>useOption(x,candidate)}>
-         <b>{candidate.label}</b><span>{candidate.explanation}</span>
-        </button>)}
+       {candidates.slice(0,5).map(candidate=>{
+        const verified=checkedSubstitution?.lessonId===x.id&&checkedSubstitution.optionKey===candidate.key&&checkedSubstitution.week===p.week&&checkedSubstitution.absenceId===selectedAbsence?.id;
+        return <div key={candidate.key}>
+         <div className="studio-candidate"><b>{candidate.label}</b><span>{candidate.explanation}</span></div>
+         <Button onClick={()=>{
+          const fresh=offer(x).find(v=>v.key===candidate.key);
+          if(!fresh){setCheckedSubstitution(null);p.notify('Вариант больше не соответствует правилам');return}
+          setCheckedSubstitution({lessonId:x.id,optionKey:candidate.key,week:p.week,absenceId:selectedAbsence?.id||''});
+         }}><Search size={14}/> Проверить замену</Button>
+         {verified&&<div role="status" className="studio-note">
+          <CheckCircle2 size={15}/> Проверка пройдена: КУГ, учебный план, квалификация/назначение, занятость, кабинеты, новые окна, положение и лимиты дистанта. Часы исходной дисциплины требуют последующего размещения.
+          <Button primary onClick={()=>useOption(x,candidate)}><Check size={14}/> Подтвердить замену</Button>
+         </div>}
+        </div>;
+       })}
        <MiniButton onClick={()=>ifOpen(x)}>Открыть исходное занятие</MiniButton>
       </div>;
      })}
@@ -391,18 +413,61 @@ export default function AdvancedWorkflows(p:Props){
    </Panel></div></div>;
  };
  const makeDistance=()=>{
-  const eligible=curr.filter(x=>x.groups.includes(formatGroup)&&x.day>=distanceStart&&x.day<=distanceEnd);
-  return <div className="studio-stack"><div className="studio-columns"><Panel title="Массовая смена формата"><div className="studio-form">
-   <Field title="Группа"><Select value={formatGroup} onChange={setFormatGroup} items={opts(GROUPS.map(x=>x.id))}/></Field>
-   <Field title="Формат занятий"><Select value={mode} onChange={v=>setMode(v as Mode)} items={Object.entries(MODES).map(([id,label])=>({id,label}))}/></Field>
-   <div className="studio-duo"><Field title="С дня"><Select value={distanceStart} onChange={v=>setDistanceStart(Number(v))} items={DAYS.map((v,i)=>({id:i,label:v}))}/></Field><Field title="По день"><Select value={distanceEnd} onChange={v=>setDistanceEnd(Number(v))} items={DAYS.map((v,i)=>({id:i,label:v}))}/></Field></div>
-   <Pill color="blue">Будет изменено: {eligible.length} занятий</Pill>
-   <Button primary disabled={distanceStart>distanceEnd||!eligible.length} onClick={()=>{
-    editData(old=>old.map(x=>eligible.some(y=>y.id===x.id)?{...x,mode,room:mode==='online'||mode==='async'?'Онлайн':x.room,notes:(x.notes||'')+'; Массовое изменение формата'}:x),'Формат занятий изменён');
-   }}><Laptop size={15}/> Применить к выбранным занятиям</Button>
-  </div></Panel><Panel title="Форматы обучения">{[['Очно','Аудитория + преподаватель'],['Онлайн','Синхронная конференция'],['Асинхронно','Материалы и задания без общего времени подключения'],['Гибрид','Часть студентов очно, часть онлайн']].map(([t,d])=><div className="studio-list-row" key={t}><b>{t}</b><small>{d}</small></div>)}
-  <Notice>Создание реальных видеовстреч, посещаемость и подтверждение часов требуют подключённых LMS, ВКС и журнала. Здесь проверяется планирование формата.</Notice></Panel></div>
-  <Panel title="Дистанционные занятия за неделю"><Rows heads={['Группа','День','Пара','Дисциплина','Формат','']} rows={curr.filter(x=>x.mode!=='offline').slice(0,70).map(x=>[x.groups.join(', '),DAYS[x.day],x.slot,x.subject,<Pill color="blue">{MODES[x.mode]}</Pill>,<MiniButton onClick={()=>ifOpen(x)}>Открыть</MiniButton>])}/></Panel></div>;
+  const selectedGroups=formatScope==='all'?GROUPS.map(g=>g.id):formatScope==='department'?
+   GROUPS.filter(g=>g.department===formatDepartment).map(g=>g.id):[formatGroup];
+  const eligible=curr.filter(x=>x.groups.some(g=>selectedGroups.includes(g))&&x.day>=distanceStart&&x.day<=distanceEnd);
+  const build=()=>previewBulkFormat(p.items,db.calendar,db.absences,substitutionPolicy,p.days===5?5:6,{
+   week:p.week,groups:selectedGroups,fromDay:distanceStart,toDay:distanceEnd,mode
+  });
+  const change=()=>{setBulkPreview(null);setBulkReviewed(false)};
+  const apply=()=>{
+   if(!bulkPreview)return;
+   const fresh=build();
+   const ids=(a:BulkFormatPreview)=>a.accepted.map(x=>x.id+'|'+x.mode+'|'+x.room).sort().join(',')+'#'+a.blocked.map(x=>x.lesson.id+'|'+x.reason).sort().join(',');
+   if(ids(fresh)!==ids(bulkPreview)){setBulkPreview(fresh);p.notify('Расписание или ограничения изменились. Проверьте результаты повторно');return}
+   if(!fresh.accepted.length){p.notify('Нет занятий, которые прошли проверку');return}
+   const blocked=fresh.blocked.length;
+   if(!window.confirm('Подтвердить смену формата только для '+fresh.accepted.length+' проверенных занятий на '+weekRange()+'?'+
+    (blocked?'\\nОстальные '+blocked+' занятий НЕ будут изменены.':'')+'\\nЗанятия будут сохранены в черновике.'))return;
+   const byId=new Map(fresh.accepted.map(x=>[x.id,x]));
+   editData(old=>old.map(x=>byId.get(x.id)||x),'Формат изменён для '+byId.size+' проверенных занятий');
+   setBulkPreview(null);setBulkReviewed(false);
+  };
+  return <div className="studio-stack"><div className="studio-columns">
+   <Panel title={'Массовая смена формата · '+weekRange()}><div className="studio-form">
+    <Field title="Кого переводим"><Select value={formatScope} onChange={v=>{setFormatScope(v as typeof formatScope);change()}} items={[
+     {id:'one',label:'Одну группу'},
+     {id:'department',label:'Все группы отделения'},
+     {id:'all',label:'Все группы колледжа'}
+    ]}/></Field>
+    {formatScope==='one'&&<Field title="Группа"><Select value={formatGroup} onChange={v=>{setFormatGroup(v);change()}} items={opts(GROUPS.map(g=>g.id))}/></Field>}
+    {formatScope==='department'&&<Field title="Отделение"><Select value={formatDepartment} onChange={v=>{setFormatDepartment(v);change()}} items={opts([...new Set(GROUPS.map(g=>g.department))])}/></Field>}
+    <Notice>Область изменения: {selectedGroups.length} групп. Общие потоки изменяются только при выборе всех групп-участников.</Notice>
+    <Field title="Новый формат занятий"><Select value={mode} onChange={v=>{setMode(v as Mode);change()}} items={Object.entries(MODES).map(([id,label])=>({id,label}))}/></Field>
+    <div className="studio-duo">
+     <Field title="С дня"><Select value={distanceStart} onChange={v=>{setDistanceStart(Number(v));change()}} items={DAYS.slice(0,p.days).map((v,i)=>({id:i,label:v}))}/></Field>
+     <Field title="По день"><Select value={distanceEnd} onChange={v=>{setDistanceEnd(Number(v));change()}} items={DAYS.slice(0,p.days).map((v,i)=>({id:i,label:v}))}/></Field>
+    </div>
+    <Pill color="blue">Выбрано на {weekRange()}: {eligible.length} занятий</Pill>
+    <Button primary disabled={distanceStart>distanceEnd||!eligible.length} onClick={()=>{setBulkPreview(build());setBulkReviewed(true)}}>
+     <Search size={15}/> Проверить выбранные занятия
+    </Button>
+   </div></Panel>
+   <Panel title="Правила и доступные форматы">
+    {Object.entries(MODES).map(([id,label])=><div className="studio-list-row" key={id}><b>{label}</b><small>{id==='offline'?'Аудитория и занятость ресурсов':id==='online'?'Синхронно, с края дня, доля онлайн и время на дорогу':id==='async'?'Нужны LMS, задания и учёт часов':'Требуется схема очных/дистанционных участников'}</small></div>)}
+    <Notice>Результаты проверяются по КУГ, занятиям, занятости группы и преподавателя, аудиториям, отсутствиям, лимитам дистанта и новым окнам. Проверка не создаёт видеовстречу или запись посещаемости.</Notice>
+   </Panel></div>
+   {bulkPreview&&bulkReviewed&&<Panel title={'Результат проверки · '+weekRange()}>
+    <div className="studio-stats"><BaseStat value={bulkPreview.considered} label="Рассмотрено"/><BaseStat value={bulkPreview.accepted.length} label="Можно изменить"/><BaseStat value={bulkPreview.blocked.length} label="Не прошли проверку"/></div>
+    <Notice kind={bulkPreview.blocked.length?'warning':'info'}>Расписание пока не изменено. Ниже указано, какие пары можно перевести в формат «{MODES[mode]}» и почему остальные недоступны. Подтверждение затронет только проверенные занятия.</Notice>
+    {bulkPreview.accepted.slice(0,20).map(x=><div key={x.id} className="studio-list-row"><b><Check size={14}/> {DAYS[x.day]}, {x.slot}-я · {x.groups.join(' + ')} · {x.subject}</b><small>Подходит: {MODES[x.mode]}</small></div>)}
+    {bulkPreview.blocked.slice(0,50).map(x=><div key={x.lesson.id} className="studio-list-row"><b><X size={14}/> {DAYS[x.lesson.day]}, {x.lesson.slot}-я · {x.lesson.groups.join(' + ')}</b><small>Отклонено: {x.reason}</small></div>)}
+    <Button primary disabled={!bulkPreview.accepted.length} onClick={apply}><Check size={15}/> Подтвердить прошедшие проверку ({bulkPreview.accepted.length})</Button>
+   </Panel>}
+   <Panel title={'Дистанционные занятия · '+weekRange()}>
+    <Rows heads={['Группа','День','Пара','Дисциплина','Формат','']} rows={curr.filter(x=>x.mode!=='offline').slice(0,70).map(x=>[x.groups.join(', '),DAYS[x.day],x.slot,x.subject,<Pill color="blue">{MODES[x.mode]}</Pill>,<MiniButton onClick={()=>ifOpen(x)}>Открыть</MiniButton>])}/>
+   </Panel>
+  </div>;
  };
  const makeWorkload=()=>{
   const curriculum=demoAcademicDemands(db.calendar,p.days===5?5:6,demoAcademicHorizon(db.calendar));
@@ -541,10 +606,10 @@ export default function AdvancedWorkflows(p:Props){
  case 'student':return makeStudent();
  default:return <Notice>Для этого раздела используйте главный редактор расписания.</Notice>;
  }})();
- const contextGroup=p.screen==='groups'?groupDetails:p.screen==='streams'||p.screen==='parallels'?groups[0]:p.screen==='distance'?formatGroup:p.screen==='student'?p.group:['overview','academic','publication','reports','settings'].includes(p.screen)?p.group:undefined;
+ const contextGroup=p.screen==='groups'?groupDetails:p.screen==='streams'||p.screen==='parallels'?groups[0]:p.screen==='distance'?(formatScope==='one'?formatGroup:undefined):p.screen==='student'?p.group:['overview','academic','publication','reports','settings'].includes(p.screen)?p.group:undefined;
  const contextTeacher=p.screen==='substitutions'?selectedAbsence?.teacher:p.screen==='teacher'?p.teacher:p.screen==='workload'?teacherHours:undefined;
  const contextRoom=p.screen==='resources'?selectedRoom:undefined;
- const viewTitle=p.screen==='substitutions'?'Преподаватель: '+(selectedAbsence?.teacher||''):p.screen==='resources'?'Аудитория '+selectedRoom:p.screen==='workload'||p.screen==='teacher'?'Преподаватель '+(contextTeacher||''):'Группа '+(contextGroup||'');
+ const viewTitle=p.screen==='distance'?(formatScope==='all'?'Все группы':formatScope==='department'?'Отделение: '+formatDepartment:'Группа '+formatGroup):p.screen==='substitutions'?'Преподаватель: '+(selectedAbsence?.teacher||''):p.screen==='resources'?'Аудитория '+selectedRoom:p.screen==='workload'||p.screen==='teacher'?'Преподаватель '+(contextTeacher||''):'Группа '+(contextGroup||'');
  if(['calendar','templates','generator','settings','academic','overview','reports','publication'].includes(p.screen))return content;
  return <div className="studio-stack">
   <section className="studio-context-box">
