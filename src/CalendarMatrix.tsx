@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Check, ClipboardCopy, Download, RotateCcw, Search, Table2, Users } from 'lucide-react';
 import { GROUPS } from './data';
 import type { CalendarEvent, Lesson } from './data';
-import { affectedLessons, assignPeriod, CALENDAR_PHASES, calendarWeeks, checkCalendar, copyGroupCalendar, importMatrixCSV, matrixCSV, phaseInfo, weekCell } from './calendarMatrixDomain';
+import { assignPeriod, calendarChangeImpact, CALENDAR_PHASES, calendarWeeks, checkCalendar, copyGroupCalendar, importMatrixCSV, matrixCSV, phaseInfo, weekCell } from './calendarMatrixDomain';
 import type { MatrixImport } from './calendarMatrixDomain';
 import type { CalendarPhase, Week } from './calendarMatrixDomain';
 import './calendar-matrix.css';
@@ -45,6 +45,8 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
  const [copyTarget,setCopyTarget]=useState('П-22');
  const [copyOverwrite,setCopyOverwrite]=useState(false);
  const [copyPending,setCopyPending]=useState<CalendarEvent[]|null>(null);
+ const [exactFrom,setExactFrom]=useState('');
+ const [exactTo,setExactTo]=useState('');
  const dragging=useRef(false);
  const weeks=useMemo(()=>calendarWeeks(year),[year]);
  const groups=useMemo(()=>GROUPS.filter(g=>
@@ -55,15 +57,22 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
  const selectedGroups=rows.filter(g=>GROUPS.some(x=>x.id===g));
  const start=selection?Math.min(selection.anchor,selection.end):0;
  const end=selection?Math.max(selection.anchor,selection.end):0;
- const from=weeks[start]?.start||'',to=weeks[end]?.end||'';
- const affected=useMemo(()=>selection?affectedLessons(lessons,selectedGroups,from,to):[],[lessons,selection,selectedGroups.join('|'),from,to]);
+ const from=exactFrom||weeks[start]?.start||'',to=exactTo||weeks[end]?.end||'';
+ const academicStart=year+'-09-01',academicEnd=(year+1)+'-08-31';
+ const validRange=Boolean(selection&&selectedGroups.length&&from&&to&&from<=to&&from>=academicStart&&to<=academicEnd);
+ const projected=useMemo(()=>preview&&validRange?
+  assignPeriod(events,selectedGroups,from,to,phase,title):null,
+  [preview,validRange,events,selectedGroups.join('|'),from,to,phase,title]);
+ const impact=useMemo(()=>projected?calendarChangeImpact(events,projected,lessons,selectedGroups,from,to):null,
+  [projected,events,lessons,selectedGroups.join('|'),from,to]);
+ const copyReceiver=copyTarget===group?(GROUPS.find(g=>g.id!==group)?.id||copyTarget):copyTarget;
  const findings=useMemo(()=>showCheck?checkCalendar(events,groups.map(x=>x.id),weeks):[],[showCheck,events,groups,weeks]);
  const phaseName=phaseInfo(phase).name;
  const selectCell=(g:string,index:number,shift=false)=>{
   if(!rows.includes(g))setRows([g]);
   setGroup(g);
   setSelection(old=>old&&shift?{anchor:old.anchor,end:index,group:g}:{anchor:index,end:index,group:g});
-  setPreview(false);setMessage('');
+  setPreview(false);setExactFrom('');setExactTo('');setMessage('');
  };
  useEffect(()=>{
   const stop=()=>dragging.current=false;
@@ -73,17 +82,16 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
  const markRange=(g:string,index:number)=>{
   if(!dragging.current)return;
   setSelection(old=>old?{...old,end:index,group:g}:{anchor:index,end:index,group:g});
-  setPreview(false);
+  setPreview(false);setExactFrom('');setExactTo('');
  };
  const toggleRow=(id:string,checked:boolean)=>{
   setRows(old=>checked?[...new Set([...old,id])]:old.filter(x=>x!==id));
   setPreview(false);
  };
  const apply=()=>{
-  if(!selection||!selectedGroups.length)return;
-  const result=assignPeriod(events,selectedGroups,from,to,phase,title);
-  setPrevious(events);replace(result);setPreview(false);setShowCheck(false);
-  setMessage('Сохранено: '+selectedGroups.length+' групп, '+(end-start+1)+' недель. Можно отменить.');
+  if(!validRange||!projected)return;
+  setPrevious(events);replace(projected);setPreview(false);setShowCheck(false);
+  setMessage('Сохранено: '+selectedGroups.length+' групп · '+from+' — '+to+'. Можно отменить.');
  };
  const handleExport=()=>csvDownload('KUG-'+year+'-'+(year+1)+'.csv',
   matrixCSV(events,groups.map(g=>g.id),weeks),'text/csv;charset=utf-8');
@@ -106,7 +114,7 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
  };
  const prepareCopy=()=>{
   try{
-   const result=copyGroupCalendar(events,group,copyTarget,year,copyOverwrite);
+   const result=copyGroupCalendar(events,group,copyReceiver,year,copyOverwrite);
    if(result===events||JSON.stringify(result)===JSON.stringify(events)){setMessage('Нет доступных пустых периодов для копирования. При необходимости разреши замену текущего графика.');return}
    setCopyPending(result);setMessage('');
   }catch(error){setMessage(error instanceof Error?error.message:'Не удалось сформировать копию')}
@@ -114,7 +122,7 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
  const confirmCopy=()=>{
   if(!copyPending)return;
   setPrevious(events);replace(copyPending);setCopyPending(null);
-  setMessage('График группы '+group+' скопирован в '+copyTarget+'. Проверь связанные занятия.');
+  setMessage('График группы '+group+' скопирован в '+copyReceiver+'. Проверь связанные занятия.');
  };
  const groupWeeks=weeks.map(w=>({week:w,cell:weekCell(events,group,w)}));
  return <section className="kug" data-testid="calendar-matrix">
@@ -158,7 +166,14 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    <span><i className="kug-holiday"/> Праздник или выходной</span>
   </div>
   {mode==='all'?<>
-   <div className="kug-matrix-help">Отметь группы флажками, затем выбери неделю. <b>Shift + нажатие</b> или протягивание мышью выделит интервал. На планшете можно задать номера недель в редакторе ниже.</div>
+   <div className="kug-matrix-help">
+    <span>Отметь группы, затем выбери неделю. <b>Shift + нажатие</b> или протягивание выделит интервал.</span>
+    <div className="kug-row-actions">
+     <button type="button" onClick={()=>{setRows(old=>[...new Set([...old,...groups.map(g=>g.id)])]);setPreview(false)}}>Выбрать все видимые ({groups.length})</button>
+     <button type="button" onClick={()=>{setRows([]);setPreview(false)}}>Снять выбор</button>
+     <span>Выбрано групп: {selectedGroups.length}</span>
+    </div>
+   </div>
    <div className="kug-scroll" role="region" aria-label="Годовой график всех групп" tabIndex={0}>
     <table className="kug-table"><thead><HeaderMonths weeks={weeks}/>
      <tr className="kug-weekheads"><th className="kug-sticky-label">Группа · {weeks.length} недель</th>
@@ -203,26 +218,33 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    </button>)}</div>
   </div>}
   <div className="kug-editor" aria-label="Быстрое заполнение учебных недель">
-   <div className="kug-editor-title"><b>Быстрое заполнение</b><span>{selectedGroups.length} групп · {selection?'Недели '+(start+1)+'–'+(end+1):'Выбери неделю'}</span></div>
+   <div className="kug-editor-title"><b>Быстрое заполнение</b><span>{selectedGroups.length} групп · {selection?'Недели '+(start+1)+'–'+(end+1):'Выбери неделю'} · {selection?from+' — '+to:''}</span></div>
    <div className="kug-editor-fields">
-    <label>С недели<select aria-label="Начало диапазона КУГ" value={start} onChange={e=>{const n=Number(e.target.value);setSelection({anchor:n,end:Math.max(n,end),group});setPreview(false)}}>
+    <label>С недели<select aria-label="Начало диапазона КУГ" value={start} onChange={e=>{const n=Number(e.target.value);setSelection({anchor:n,end:Math.max(n,end),group});setExactFrom('');setExactTo('');setPreview(false)}}>
      {weeks.map(w=><option key={w.index} value={w.index}>{w.index+1} · {dateText(w.start)}</option>)}</select></label>
-    <label>По неделю<select aria-label="Конец диапазона КУГ" value={end} onChange={e=>{const n=Number(e.target.value);setSelection({anchor:Math.min(start,n),end:n,group});setPreview(false)}}>
+    <label>По неделю<select aria-label="Конец диапазона КУГ" value={end} onChange={e=>{const n=Number(e.target.value);setSelection({anchor:Math.min(start,n),end:n,group});setExactFrom('');setExactTo('');setPreview(false)}}>
      {weeks.map(w=><option key={w.index} value={w.index}>{w.index+1} · {dateText(w.end)}</option>)}</select></label>
     <label>Вид периода<select aria-label="Вид периода КУГ" value={phase} onChange={e=>{setPhase(e.target.value as CalendarPhase);setTitle('');setPreview(false)}}>
      {CALENDAR_PHASES.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-    <label>Уточнение названия<input aria-label="Название периода КУГ" value={title} onChange={e=>setTitle(e.target.value)} placeholder={phaseName}/></label>
+    <label>Уточнение названия<input aria-label="Название периода КУГ" value={title} onChange={e=>{setTitle(e.target.value);setPreview(false)}} placeholder={phaseName}/></label>
+     <label>Точная дата начала<input aria-label="Точная дата начала периода" type="date" min={academicStart} max={academicEnd} value={from} onChange={e=>{setExactFrom(e.target.value);setPreview(false)}}/></label>
+     <label>Точная дата окончания<input aria-label="Точная дата окончания периода" type="date" min={academicStart} max={academicEnd} value={to} onChange={e=>{setExactTo(e.target.value);setPreview(false)}}/></label>
    </div>
+   {selection&&!validRange&&<p className="kug-alert" role="alert">Выбери группы и корректные даты в пределах учебного года ({academicStart} — {academicEnd}).</p>}
    <div className="kug-editor-actions">
-    <button className="kug-primary" disabled={!selection||selectedGroups.length===0} onClick={()=>setPreview(true)}><ClipboardCopy size={15}/> Рассчитать изменения</button>
+    <button className="kug-primary" disabled={!validRange} onClick={()=>setPreview(true)}><ClipboardCopy size={15}/> Рассчитать изменения</button>
     {previous&&<button onClick={()=>{replace(previous);setPrevious(null);setPreview(false);setMessage('Последняя операция отменена')}}><RotateCcw size={15}/> Отменить</button>}
     <button onClick={()=>setShowCheck(v=>!v)}><AlertTriangle size={15}/> {showCheck?'Скрыть проверку':'Проверить график'}</button>
    </div>
    {preview&&<div className="kug-preview" role="status">
     <strong>Предварительный просмотр</strong>
     <p>Период «{title||phaseName}» для {selectedGroups.length} групп; {from} — {to} ({end-start+1} недель).</p>
-    <p>Затронутых уже назначенных занятий: <b>{affected.length}</b>. Их не удаляем. {affected.length?'Они потребуют проверки и при необходимости перепланирования.':'Конфликтов с текущими занятиями по этому диапазону нет.'}</p>
-    {affected.some(l=>l.status==='held')&&<p className="kug-alert">В выбранном диапазоне есть проведённые занятия. Изменение графика не изменяет их статусы.</p>}
+    <p>Занятий в этом периоде: <b>{impact?.affected.length||0}</b>.
+     Новых конфликтов после изменения: <b>{impact?.newlyBlocked.length||0}</b>.
+     Ранее проблемных занятий: <b>{impact?.alreadyBlocked.length||0}</b>.
+     Занятия не удаляются автоматически.</p>
+    {Boolean(impact?.newlyBlocked.length)&&<p className="kug-alert">После изменения некоторые запланированные пары станут недопустимыми. Перепроверь расписание перед публикацией.</p>}
+    {Boolean(impact?.held.length)&&<p className="kug-alert">Есть проведённые занятия ({impact?.held.length}). Их статусы и часы не изменяются.</p>}
     <button className="kug-primary" onClick={apply}><Check size={15}/> Подтвердить и сохранить</button>
     <button onClick={()=>setPreview(false)}>Отмена</button>
    </div>}
@@ -232,14 +254,14 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    <strong>Копирование графика группы</strong>
    <div className="kug-copy-controls">
     <label>Из группы <b>{group}</b></label>
-    <label>В группу <select aria-label="Получатель копии КУГ" value={copyTarget} onChange={e=>{setCopyTarget(e.target.value);setCopyPending(null)}}>
+    <label>В группу <select aria-label="Получатель копии КУГ" value={copyReceiver} onChange={e=>{setCopyTarget(e.target.value);setCopyPending(null)}}>
      {GROUPS.filter(g=>g.id!==group).map(g=><option key={g.id} value={g.id}>{g.id}</option>)}</select></label>
     <label className="kug-copy-overwrite"><input type="checkbox" checked={copyOverwrite}
      onChange={e=>{setCopyOverwrite(e.target.checked);setCopyPending(null)}}/> Заменить заполненные периоды получателя</label>
     <button type="button" onClick={prepareCopy}><ClipboardCopy size={15}/> Предпросмотр копирования</button>
    </div>
    {copyPending&&<div className="kug-preview" role="status">
-    <p>Скопировать график {group} в {copyTarget}. {copyOverwrite?'Заполненные периоды получателя будут перезаписаны.':'Уже заполненные периоды получателя сохранятся.'}</p>
+    <p>Скопировать график {group} в {copyReceiver}. {copyOverwrite?'Заполненные периоды получателя будут перезаписаны.':'Уже заполненные периоды получателя сохранятся.'}</p>
     <button className="kug-primary" onClick={confirmCopy}><Check size={15}/> Подтвердить копирование</button>
     <button onClick={()=>setCopyPending(null)}>Отмена</button>
    </div>}

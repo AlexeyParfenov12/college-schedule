@@ -33,3 +33,29 @@ describe('KUG annual matrix: user interaction',()=>{
   expect(replace.mock.calls[1][0]).toEqual(CALENDAR);
  },30000);
 });
+
+describe('KUG exact dates and bulk selection',()=>{
+ it('can edit a partial week without changing neighbouring dates',()=>{
+  const replace=vi.fn<(events:CalendarEvent[])=>void>();
+  const {container}=render(<CalendarMatrix events={CALENDAR} lessons={[]} group="П-21" setGroup={()=>{}} replace={replace}/>);
+  fireEvent.click(container.querySelector<HTMLButtonElement>('[aria-label^="П-21, неделя 1:"]')!);
+  fireEvent.change(screen.getByLabelText('Точная дата начала периода'),{target:{value:'2026-09-02'}});
+  fireEvent.change(screen.getByLabelText('Точная дата окончания периода'),{target:{value:'2026-09-03'}});
+  fireEvent.click(screen.getByRole('button',{name:'Рассчитать изменения'}));
+  fireEvent.click(screen.getByRole('button',{name:'Подтвердить и сохранить'}));
+  const result=replace.mock.calls[0][0];
+  expect(phaseAt(result,'П-21','2026-09-01')).toBe('study');
+  expect(phaseAt(result,'П-21','2026-09-02')).toBe('training');
+  expect(phaseAt(result,'П-21','2026-09-03')).toBe('training');
+  expect(phaseAt(result,'П-21','2026-09-04')).toBe('study');
+ });
+ it('selects all visible filtered groups in one action and allows clearing selection',()=>{
+  render(<CalendarMatrix events={CALENDAR} lessons={[]} group="П-21" setGroup={()=>{}} replace={()=>{}}/>);
+  fireEvent.change(screen.getByRole('combobox',{name:'Курс КУГ'}),{target:{value:'2'}});
+  const bulk=screen.getByRole('button',{name:/Выбрать все видимые/});
+  fireEvent.click(bulk);
+  expect(screen.getByText('Выбрано групп: 10')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button',{name:'Снять выбор'}));
+  expect(screen.getByText('Выбрано групп: 0')).toBeTruthy();
+ });
+});

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CALENDAR } from './data';
 import type { CalendarEvent } from './data';
-import { assignPeriod, calendarWeeks, checkCalendar, copyGroupCalendar, importMatrixCSV, matrixCSV, phaseAt, weekCell } from './calendarMatrixDomain';
+import { assignPeriod, calendarChangeImpact, calendarWeeks, checkCalendar, copyGroupCalendar, importMatrixCSV, matrixCSV, phaseAt, weekCell } from './calendarMatrixDomain';
 
 describe('college academic calendar matrix domain',()=>{
  it('covers the full academic year including partial boundary weeks',()=>{
@@ -79,10 +79,37 @@ describe('KUG structured CSV import and group copying',()=>{
  });
  it('copies a group to another without overwriting unless explicitly requested',()=>{
   const a=assignPeriod(CALENDAR,['П-21'],'2026-09-14','2026-09-20','industrial');
-  const skipped=copyGroupCalendar(a,'П-21','П-22',2026,false);
-  expect(phaseAt(skipped,'П-22','2026-09-17')).toBe('study');
-  const overwritten=copyGroupCalendar(a,'П-21','П-22',2026,true);
+  const inheritedOnly=copyGroupCalendar(a,'П-21','П-22',2026,false);
+  expect(phaseAt(inheritedOnly,'П-22','2026-09-17')).toBe('industrial');
+  const customized=assignPeriod(a,['П-22'],'2026-09-14','2026-09-20','vacation');
+  const skipped=copyGroupCalendar(customized,'П-21','П-22',2026,false);
+  expect(phaseAt(skipped,'П-22','2026-09-17')).toBe('vacation');
+  const overwritten=copyGroupCalendar(customized,'П-21','П-22',2026,true);
   expect(phaseAt(overwritten,'П-22','2026-09-17')).toBe('industrial');
   expect(phaseAt(overwritten,'П-21','2026-09-17')).toBe('industrial');
+ });
+});
+
+describe('calendar validation and actual impact',()=>{
+ it('detects contradictory direct group periods without treating normal inherited overrides as conflicts',()=>{
+  const weeks=calendarWeeks(2026);
+  const exact=assignPeriod(CALENDAR,['П-21'],'2026-11-09','2026-11-14','training');
+  const ok=checkCalendar(exact,['П-21'],weeks);
+  expect(ok.some(f=>f.message.includes('Конфликт периодов'))).toBe(false);
+  const inconsistent=[...exact,{id:'contradictory',title:'Сессия',kind:'exam' as const,
+   periodCode:'exam' as const,from:'2026-11-10',to:'2026-11-12',groups:['П-21']}];
+  const bad=checkCalendar(inconsistent,['П-21'],weeks);
+  expect(bad.some(f=>f.level==='error'&&f.message.includes('Конфликт периодов'))).toBe(true);
+ });
+ it('counts only lessons made newly incompatible, not every lesson in changed weeks',()=>{
+  const lessons=[{id:'lesson-1',week:0,day:0,slot:1,subject:'Математика',teacher:'Тест',
+   groups:['П-21'],room:'101',type:'regular' as const,mode:'offline' as const},
+   {id:'lesson-2',week:0,day:0,slot:1,subject:'История',teacher:'Тест',
+   groups:['П-22'],room:'102',type:'regular' as const,mode:'offline' as const}];
+  const after=assignPeriod(CALENDAR,['П-21'],'2026-11-09','2026-11-15','vacation');
+  const impact=calendarChangeImpact(CALENDAR,after,lessons,['П-21'],'2026-11-09','2026-11-15');
+  expect(impact.affected.map(x=>x.id)).toEqual(['lesson-1']);
+  expect(impact.newlyBlocked.map(x=>x.id)).toEqual(['lesson-1']);
+  expect(impact.alreadyBlocked).toHaveLength(0);
  });
 });

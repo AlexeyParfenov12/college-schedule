@@ -1,6 +1,6 @@
 import type { CalendarEvent, Lesson } from './data';
 import { classifyCalendarDay, readCollegeWorkweek } from './productionCalendar';
-import { lessonDate } from './plannerDomain';
+import { calendarIssues, lessonDate } from './plannerDomain';
 
 export type CalendarPhase =
  'study'|'training'|'industrial'|'prediploma'|'exam'|'state'|'vacation'|'other'|'unassigned';
@@ -112,6 +112,28 @@ export function assignPeriod(events:CalendarEvent[],groups:string[],from:string,
  return out;
 }
 export type CalendarFinding={level:'error'|'warning';group:string;week:number;message:string};
+export type CalendarChangeImpact={
+ affected:Lesson[];
+ newlyBlocked:Lesson[];
+ alreadyBlocked:Lesson[];
+ held:Lesson[];
+};
+/** Calculate actual newly incompatible lessons after a change; never delete or move them silently. */
+export function calendarChangeImpact(before:CalendarEvent[],after:CalendarEvent[],lessons:Lesson[],
+ groups:string[],from:string,to:string):CalendarChangeImpact{
+ const affected=affectedLessons(lessons,groups,from,to);
+ const newlyBlocked:Lesson[]=[],alreadyBlocked:Lesson[]=[],held:Lesson[]=[];
+ for(const lesson of affected){
+  const issuesBefore=calendarIssues(lesson,before);
+  const issuesAfter=calendarIssues(lesson,after);
+  if(issuesAfter.length){
+   if(issuesBefore.length)alreadyBlocked.push(lesson);
+   else newlyBlocked.push(lesson);
+  }
+  if(lesson.status==='held')held.push(lesson);
+ }
+ return {affected,newlyBlocked,alreadyBlocked,held};
+}
 export function checkCalendar(events:CalendarEvent[],groups:string[],weeks:Week[]):CalendarFinding[]{
  const findings:CalendarFinding[]=[];
  for(const group of groups)for(const week of weeks){
@@ -120,6 +142,18 @@ export function checkCalendar(events:CalendarEvent[],groups:string[],weeks:Week[
    message:'Не заполнено учебных дней: '+status.unassignedDays});
   if(status.mixed)findings.push({level:'warning',group,week:week.index,
    message:'Смешанная неделя: '+status.parts.map(p=>phaseInfo(p).short).join(' / ')});
+  // Explicit group-specific events must not contradict each other; inherited college
+  // defaults can legitimately overlap with a group override.
+  const conflicts=new Set<string>();
+  for(let date=week.start;date<=week.end;date=plusDays(date,1)){
+   const explicit=events.filter(e=>e.kind!=='holiday'&&e.groups.includes(group)&&e.from<=date&&date<=e.to);
+   if(explicit.length>1){
+    const phases=new Set(explicit.map(phaseForEvent));
+    if(phases.size>1)conflicts.add('Конфликт периодов '+[...phases].map(p=>phaseInfo(p).short).join(' / '));
+    else conflicts.add('Дублирующиеся индивидуальные периоды');
+   }
+  }
+  for(const message of conflicts)findings.push({level:'error',group,week:week.index,message});
  }
  return findings;
 }
@@ -208,7 +242,10 @@ export function copyGroupCalendar(events:CalendarEvent[],source:string,target:st
  for(let date=from;date<=to;date=plusDays(date,1)){
   const phase=phaseAt(events,source,date);
   const targetPhase=phaseAt(events,target,date);
-  if(!overwrite&&targetPhase!=='unassigned'){current=undefined;continue}
+  // An inherited college-wide period is not a group-specific customization.
+  // Preserve explicit target overrides, not merely the shared defaults.
+  const explicitTarget=events.some(e=>e.kind!=='holiday'&&e.groups.includes(target)&&e.from<=date&&date<=e.to);
+  if(phase===targetPhase||(!overwrite&&explicitTarget)){current=undefined;continue}
   if(current&&current.phase===phase&&plusDays(current.end,1)===date)current.end=date;
   else{current={phase,start:date,end:date};edits.push(current)}
  }
