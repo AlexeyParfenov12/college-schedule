@@ -329,6 +329,9 @@ export default function App(){
        day.kind==='shortened'?'Сокращённый':day.kind==='working-weekend'?'Рабочая суббота':'Рабочий'}
     </span>)}
   </div>
+  {production.warnings.length>0&&<div className="schedule-production-warning" title={production.warnings.join('\n')}>
+   <AlertTriangle size={15}/> Справочный API расходится с подтверждёнными постановлениями ({production.warnings.length}). Приоритет имеют официальные правила. Подробности при наведении.
+  </div>}
   {(closedWithLessons.length>0||productionChangedLessons.length>0)&&<div className="schedule-production-warning">
    <AlertTriangle size={15}/> {closedWithLessons.length>0
      ?'На нерабочие дни текущей недели назначено пар: '+closedWithLessons.length+'. Проверьте или перенесите их вручную.'
