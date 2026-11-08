@@ -67,10 +67,57 @@ describe('integrated KUG production calendar display',()=>{
   const {container}=render(<CalendarMatrix events={CALENDAR} lessons={[]} group="П-21" setGroup={()=>{}} replace={()=>{}}/>);
   const button=container.querySelector<HTMLButtonElement>('[aria-label^="П-21, неделя 10:"]');
   expect(button).not.toBeNull();
-  expect(button!.querySelectorAll('.kug-day-dot')).toHaveLength(7);
+  // Federal holidays are rendered once above the groups, not repeated in every group/week cell.
+  expect(button!.querySelectorAll('.kug-day-dot')).toHaveLength(0);
+  const official=container.querySelector<HTMLButtonElement>('[aria-label="Производственный календарь, неделя 10"]');
+  expect(official).not.toBeNull();
+  expect(official!.querySelectorAll('.kug-day-dot')).toHaveLength(7);
   fireEvent.click(button!);
   const detail=screen.getByRole('region',{name:'Дни выбранной недели'});
   expect(detail.textContent).toContain('День народного единства');
   expect(detail.querySelectorAll('.kug-detail-day')).toHaveLength(7);
  });
+});
+
+
+describe('compact KUG navigation, progressive disclosure and density',()=>{
+ it('uses the full 53-week matrix and keeps holidays in one common row',()=>{
+  const {container}=render(<CalendarMatrix events={CALENDAR} lessons={[]} group="П-21" setGroup={()=>{}} replace={()=>{}}/>);
+  const weeks=container.querySelectorAll<HTMLButtonElement>('[aria-label^="П-21, неделя "]');
+  expect(weeks).toHaveLength(53);
+  expect(container.querySelectorAll('.kug-calendar-row')).toHaveLength(1);
+  expect(container.querySelectorAll('.kug-calendar-row .kug-day-dot')).toHaveLength(371);
+  expect(container.classList.contains('kug-density-compact')).toBe(false);
+  expect(screen.getByTestId('calendar-matrix').classList.contains('kug-density-compact')).toBe(true);
+  fireEvent.change(screen.getByRole('combobox',{name:'Плотность календаря'}),{target:{value:'detailed'}});
+  expect(screen.getByTestId('calendar-matrix').classList.contains('kug-density-detailed')).toBe(true);
+ },20000);
+ it('shows four months, switches the term, and scopes selection to visible weeks',()=>{
+  const {container}=render(<CalendarMatrix events={CALENDAR} lessons={[]} group="П-21" setGroup={()=>{}} replace={()=>{}}/>);
+  fireEvent.click(screen.getByRole('button',{name:'4 месяца'}));
+  expect(screen.getByTestId('calendar-matrix').classList.contains('kug-view-quarter')).toBe(true);
+  expect(container.querySelectorAll('[aria-label^="П-21, неделя "]').length).toBeLessThan(25);
+  fireEvent.click(screen.getByRole('button',{name:'Январь — апрель'}));
+  expect(container.querySelector('[aria-label^="П-21, неделя 1:"]')).toBeNull();
+  expect(container.querySelector('[aria-label^="П-21, неделя 20:"]')).not.toBeNull();
+  fireEvent.click(screen.getByRole('button',{name:'Весь год'}));
+  expect(container.querySelectorAll('[aria-label^="П-21, неделя "]')).toHaveLength(53);
+ },20000);
+ it('collapses department/course sections without losing their group records',()=>{
+  const {container}=render(<CalendarMatrix events={CALENDAR} lessons={[]} group="П-21" setGroup={()=>{}} replace={()=>{}}/>);
+  expect(container.querySelector('[aria-label^="П-21, неделя 1:"]')).not.toBeNull();
+  fireEvent.click(screen.getByRole('button',{name:'Свернуть ИТ · 2 курс'}));
+  expect(container.querySelector('[aria-label^="П-21, неделя 1:"]')).toBeNull();
+  fireEvent.click(screen.getByRole('button',{name:'Развернуть ИТ · 2 курс'}));
+  expect(container.querySelector('[aria-label^="П-21, неделя 1:"]')).not.toBeNull();
+ },20000);
+ it('shows a separate year-long group strip while preserving week editing',()=>{
+  const {container}=render(<CalendarMatrix events={CALENDAR} lessons={[]} group="П-21" setGroup={()=>{}} replace={()=>{}}/>);
+  fireEvent.click(screen.getByRole('button',{name:'Группа'}));
+  const strip=screen.getByRole('group',{name:'Годовая линия группы П-21'});
+  expect(strip.querySelectorAll('button')).toHaveLength(53);
+  fireEvent.click(strip.querySelectorAll('button')[9]);
+  expect(screen.getByRole('region',{name:'Дни выбранной недели'})).toBeTruthy();
+  expect(container.querySelector('.kug-workspace-side')).not.toBeNull();
+ },20000);
 });
