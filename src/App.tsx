@@ -15,7 +15,8 @@ import type { MoveOption } from './scheduleAssist';
 import { validate } from './demoLogic';
 import { lessonDate, WEEK_COUNT, calendarIssues, currentDemoCalendar } from './plannerDomain';
 import { LEGACY_WEEK_OFFSET, shiftLegacyWeek } from './weekTimeline';
-import { classifyCalendarDay } from './productionCalendar';
+import { classifyCalendarDay, productionDiffersFromBaseline } from './productionCalendar';
+import { useProductionCalendarState } from './productionCalendarSync';
 import { auditAnnualDraft } from './yearAudit';
 import { readCollegeWorkweek } from './productionCalendar';
 
@@ -53,6 +54,7 @@ function Action({onClick,children,primary=false,disabled=false,title}:{onClick:(
 function Field({label,children}:{label:string;children:ReactNode}){return <label className="field"><span>{label}</span>{children}</label>}
 
 export default function App(){
+ const production=useProductionCalendarState();
  const [screen,setScreen]=useState<Screen>('schedule');
  const [collapsed,setCollapsed]=useState(false);
  const [mobileNavOpen,setMobileNavOpen]=useState(false);
@@ -99,6 +101,10 @@ export default function App(){
  const visible=current.filter(x=>view==='group'?x.groups.includes(group):view==='teacher'?x.teacher===teacher:x.room.includes(room));
  const collisions=selected?cellConflict(selected,current):[];
  const issueCount=current.filter(x=>x.status!=='cancelled'&&(cellConflict(x,current).length>0||calendarIssues(x,currentDemoCalendar(),days).length>0)).length;
+ const productionChangedLessons=useMemo(()=>items.filter(x=>x.status!=='cancelled'&&
+  productionDiffersFromBaseline(lessonDate(x.week||0,x.day),days)),[items,days,production.revision]);
+ const weekProductionDays=Array.from({length:days},(_,i)=>classifyCalendarDay(lessonDate(week,i),days));
+ const closedWithLessons=current.filter(x=>x.status!=='cancelled'&&weekProductionDays[x.day]?.nonWorking);
  const displayName=NAV.find(x=>x[0]===screen)?.[1]||'Расписание';
  const choose=(x:Item)=>{setMobileDay(x.day);setFocusId(null);setContextMenu(null);setSelected(x);setSideMode('assistant');setMoveMode(false);setDraggingId(null);setPreview(null);setHoverMove(null)};
  const beginDrag=(event:DragEvent<HTMLButtonElement>,lesson:Item)=>{
@@ -264,7 +270,7 @@ export default function App(){
  const federal=classifyCalendarDay(lessonDate(week,i),days);
  return <div key={i} title={federal.label} className={'grid-head'+(selectedCell?.day===i?' selected-column-head':'')+(federal.nonWorking?' nonworking-head':'')}>
  {d}<small>{lessonDate(week,i).slice(8)}.{lessonDate(week,i).slice(5,7)}</small>
- {federal.nonWorking&&<span className="federal-day-caption">{federal.kind==='holiday'?'Праздник':'Выходной'}</span>}
+ {(federal.nonWorking||federal.kind==='shortened')&&<span className="federal-day-caption">{federal.kind==='holiday'?'Праздник':federal.kind==='shortened'?'Сокращённый':federal.kind==='transfer'?'Перенос':'Выходной'}</span>}
  </div>;
  })}
  {bellTimes.map((tm,row)=><div className="grid-fragment" key={row}>
@@ -311,6 +317,24 @@ export default function App(){
  </div></div>;
  const legend=<div className="legend"><span><i className="swatch regular"/>Обычное</span><span><i className="swatch subgroup"/>Подгруппы</span><span><i className="swatch stream"/>Поток</span><span><i className="swatch parallel"/>Параллель</span><span><i className="swatch online"/>Онлайн/гибрид</span></div>;
  const schedule=<>
+ <div className="schedule-production-strip" role="status" aria-label="Производственный календарь недели">
+  <div className="schedule-production-heading"><strong>Производственный календарь</strong>
+   <span>{production.status==='updated'?'Сверен '+production.checkedAt.slice(0,10):
+      'Встроенные правила · '+(production.status==='unavailable'?'обновление временно недоступно':'проверка обновлений')}</span></div>
+  <div className="schedule-production-days">
+   {weekProductionDays.map((day,i)=><span key={day.date} className={'schedule-production-day schedule-production-'+day.kind}
+     title={day.date+' · '+day.label} aria-label={DAYS[i]+', '+day.date+': '+day.label}>
+      <b>{DAYS[i]}</b> {day.date.slice(8,10)} · {day.kind==='holiday'?'Праздник':
+       day.kind==='transfer'?'Перенос':day.kind==='weekend'?'Выходной':
+       day.kind==='shortened'?'Сокращённый':day.kind==='working-weekend'?'Рабочая суббота':'Рабочий'}
+    </span>)}
+  </div>
+  {(closedWithLessons.length>0||productionChangedLessons.length>0)&&<div className="schedule-production-warning">
+   <AlertTriangle size={15}/> {closedWithLessons.length>0
+     ?'На нерабочие дни текущей недели назначено пар: '+closedWithLessons.length+'. Проверьте или перенесите их вручную.'
+     :'Изменились календарные статусы дней. Проверьте занятия: '+productionChangedLessons.length+'.'}
+  </div>}
+ </div>
  {moveMode&&selected&&!draggingId&&<div className="move-toolbar"><div><ArrowLeftRight size={16}/><b>{draggingId?'Перетаскивание занятия':'Режим переноса'}</b><span>Выбрано: {selected.subject} · {selected.groups.join(' + ')}</span></div><div className="move-summary"><span className="marker available"/>{availableTargetCount} доступно <span className="marker blocked"/>{targets.filter(t=>t.kind==='blocked').length} недоступно</div><span className="move-hover-reason" role="status">{hoverMove?hoverMove.reason:draggingId?'Наведи на ячейку: зелёная — можно, красная — нельзя':'Выбери доступную ячейку'}</span><button onClick={()=>{setMoveMode(false);setDraggingId(null);setPreview(null)}}>Закрыть режим <X size={13}/></button></div>}
  {draggingId&&selected&&<div className="drag-floating-feedback" role="status" data-testid="drag-guide">
    <strong>Перемещаем: {selected.subject}</strong>
