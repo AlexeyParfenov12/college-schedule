@@ -11,7 +11,7 @@ on:
       - 'scripts/test_calendar_monitor.py'
       - '.github/workflows/sync-production-calendar.yml'
 permissions:
-  contents: read
+  contents: write
   issues: write
   pages: write
   id-token: write
@@ -43,6 +43,41 @@ jobs:
         run: npm test
       - name: Typecheck and build
         run: npm run build
+      - name: Persist only validated calendar snapshots on current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          temp_dir="$(mktemp -d)"
+          trap 'rm -rf "$temp_dir"' EXIT
+          cp public/production-calendar.json "$temp_dir/production-calendar.json"
+          cp public/official-calendar-monitor.json "$temp_dir/official-calendar-monitor.json"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          pushed=false
+          for attempt in 1 2 3 4; do
+            git fetch origin main
+            git reset --hard origin/main
+            cp "$temp_dir/production-calendar.json" public/production-calendar.json
+            cp "$temp_dir/official-calendar-monitor.json" public/official-calendar-monitor.json
+            git add public/production-calendar.json public/official-calendar-monitor.json
+            if git diff --cached --quiet; then
+              echo "Validated snapshots already match main"
+              pushed=true
+              break
+            fi
+            git commit -m "Update verified production-calendar snapshots"
+            if git push origin HEAD:main; then
+              echo "Validated calendar snapshot committed on current main"
+              pushed=true
+              break
+            fi
+            echo "Main changed during publication; preparing a fresh commit"
+            sleep 2
+          done
+          if [ "$pushed" != true ]; then
+            echo "::error::Calendar snapshot could not be saved after four retries"
+            exit 1
+          fi
       - name: Archive checked calendar snapshots and official-monitor diagnostics
         uses: actions/upload-artifact@v4
         with:
@@ -51,8 +86,10 @@ jobs:
             public/production-calendar.json
             public/official-calendar-monitor.json
           retention-days: 90
-      - name: Final validated site build
-        run: npm run build
+      - name: Final regression and site build against current main
+        run: |
+          npm test
+          npm run build
       - name: Notify college academic office of discrepancies
         continue-on-error: true
         env:
