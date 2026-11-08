@@ -14,7 +14,8 @@
  * Regional or college closures are additional events in the academic calendar.
  */
 export type Workweek=5|6;
-export type CalendarDayKind='work'|'weekend'|'holiday'|'transfer'|'working-weekend';
+import { externalDayCode } from './productionCalendarSync';
+export type CalendarDayKind='work'|'weekend'|'holiday'|'transfer'|'working-weekend'|'shortened';
 export type CalendarDay={date:string;kind:CalendarDayKind;label:string;nonWorking:boolean;confirmedTransfers:boolean;basis:string};
 export const LEGAL_SOURCE='https://www.consultant.ru/document/cons_doc_LAW_34683/98ef2900507766e70ff29c0b9d8e2353ea80a1cf/';
 export const CONFIRMED_TRANSFERS:Record<number,{source:string;five:{off:string[];work:string[]};six:{off:string[];work:string[]}}>={
@@ -75,7 +76,7 @@ function observedFor(year:number,week:Workweek,annual:{off:string[];work:string[
  if(!map){map=observedHolidays(year,week,annual);cache.set(key,map)}
  return map;
 }
-export function classifyCalendarDay(iso:string,week:Workweek=6):CalendarDay{
+export function classifyLocalCalendarDay(iso:string,week:Workweek=6):CalendarDay{
  if(!/^\d{4}-\d{2}-\d{2}$/.test(iso)||Number.isNaN(dateUTC(iso).getTime()))throw new Error('Некорректная дата календаря: '+iso);
  const year=Number(iso.slice(0,4));
  const official=CONFIRMED_TRANSFERS[year];
@@ -93,6 +94,29 @@ export function classifyCalendarDay(iso:string,week:Workweek=6):CalendarDay{
  if(annual.work.includes(iso))return make('working-weekend','Рабочая суббота по переносу · '+basis,false);
  if(isNormalWeekend(iso,week))return make('weekend',dayOfWeek(iso)===0?'Воскресенье · выходной':'Суббота · выходной',true);
  return make('work','Рабочий учебный день',false);
+}
+/** A published API snapshot refines the baseline. It never silently reopens a day
+ * declared non-working by the built-in legal rules, including future unapproved years.
+ * Third-party statuses are reference data, not proof of a new government decree. */
+export function classifyCalendarDay(iso:string,week:Workweek=6):CalendarDay{
+ const baseline=classifyLocalCalendarDay(iso,week);
+ const external=externalDayCode(iso,week);
+ if(external===null)return baseline;
+ const reference=' · Сверка: isdayoff.ru (справочные данные; изменение требует проверки)';
+ if(external==='1'&&!baseline.nonWorking){
+  return {...baseline,kind:'transfer',label:'Нерабочий день по обновлённому календарю'+reference,
+   nonWorking:true,basis:baseline.basis+reference};
+ }
+ if(external==='2'&&!baseline.nonWorking){
+  return {...baseline,kind:'shortened',label:'Предпраздничный сокращённый день'+reference,
+   basis:baseline.basis+reference};
+ }
+ // Never silently open a statutorily closed day on a disagreement.
+ return baseline;
+}
+export function productionDiffersFromBaseline(iso:string,week:Workweek=6):boolean{
+ const before=classifyLocalCalendarDay(iso,week),after=classifyCalendarDay(iso,week);
+ return before.nonWorking!==after.nonWorking||before.kind!==after.kind;
 }
 export function nonWorkingDays(from:string,to:string,week:Workweek=6):CalendarDay[]{
  const start=dateUTC(from),end=dateUTC(to);
