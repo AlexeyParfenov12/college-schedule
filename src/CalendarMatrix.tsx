@@ -16,7 +16,8 @@ import { useCollegeOverrideRevision } from './collegeDayOverrides';
 
 type Props={events:CalendarEvent[];lessons:Lesson[];group:string;setGroup:(group:string)=>void;replace:(events:CalendarEvent[])=>void};
 type Selected={anchor:number;end:number;group:string};
-type ViewMode='year'|'quarter'|'single';
+type ViewMode='year'|'large'|'single';
+type CompactSpan='all'|'quarter';
 type Density='compact'|'standard'|'detailed';
 type IssueFilter='all'|'unassigned'|'conflicts'|'practice';
 const groupKey=(department:string,course:number)=>department+'::'+course;
@@ -44,6 +45,8 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
  const [year,setYear]=useState(2026);
  const [mode,setMode]=useState<ViewMode>('year');
  const [density,setDensity]=useState<Density>('compact');
+ const [compactSpan,setCompactSpan]=useState<CompactSpan>('all');
+ const [adminOpen,setAdminOpen]=useState(false);
  const [quarter,setQuarter]=useState<0|4|8>(0);
  const [issueFilter,setIssueFilter]=useState<IssueFilter>('all');
  const [collapsed,setCollapsed]=useState<string[]>([]);
@@ -109,11 +112,12 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
  },[issueFilter,baseGroups,weeks,cells,events,closedDays,lessons,calendarWorkweek]);
  const groups=useMemo(()=>baseGroups.filter(g=>issueFilter==='all'||problemGroups.has(g.id)),[baseGroups,issueFilter,problemGroups]);
  const visibleWeeks=useMemo(()=>{
-  if(mode!=='quarter')return weeks;
+  if(mode!=='year'||compactSpan!=='quarter')return weeks;
   const first=quarter===0?year+'-09-01':quarter===4?(year+1)+'-01-01':(year+1)+'-05-01';
   const last=quarter===0?year+'-12-31':quarter===4?(year+1)+'-04-30':(year+1)+'-08-31';
   return weeks.filter(w=>w.end>=first&&w.start<=last);
- },[weeks,mode,quarter,year]);
+ },[weeks,mode,compactSpan,quarter,year]);
+ const warningCount=(production.discrepancies.length||production.warnings.length)+(production.officialMonitor?.candidates.length||0);
  const selectedGroups=rows.filter(g=>GROUPS.some(x=>x.id===g));
  const start=selection?Math.min(selection.anchor,selection.end):0;
  const end=selection?Math.max(selection.anchor,selection.end):0;
@@ -213,6 +217,13 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
   }
   return [...buckets.entries()].map(([key,items])=>({key,items,label:items[0].department+' · '+items[0].course+' курс'}));
  },[groups]);
+ const largeWeekDays=useMemo(()=>{
+  const cache=new Map<string,ReturnType<typeof kugWeekDays>>();
+  if(mode!=='large')return cache;
+  for(const g of groups)for(const week of weeks)
+   cache.set(g.id+':'+week.index,kugWeekDays(events,g.id,week,officialDays,calendarWorkweek));
+  return cache;
+ },[mode,groups,weeks,events,officialDays,calendarWorkweek]);
  const tableRows=useMemo(()=>sections.flatMap(section=>{
   const hidden=collapsed.includes(section.key)&&!query.trim();
   const heading=<tr key={'section-'+section.key} className="kug-section"><th colSpan={visibleWeeks.length+1}>
@@ -237,12 +248,17 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
      onMouseEnter={e=>{if(e.buttons===1)markRange(g.id,w.index)}}
      onMouseUp={()=>dragging.current=false}>
      <span className="kug-cell-label">{cell.mixed?'◐':chosen.short}</span>
+     {mode==='large'&&<span className="kug-day-strip kug-large-weekdays" aria-label="Дни недели">
+      {(largeWeekDays.get(g.id+':'+w.index)||[]).map(day=>
+       <i key={day.date} title={day.dayName+': '+day.label}
+        className={'kug-day-dot '+(day.withinYear?'kug-day-'+day.kind:'kug-day-outside')}/>)}
+     </span>}
      {cell.unassignedDays>0&&<i className="kug-cell-unassigned" aria-hidden="true"/>}
      {special&&<i className="kug-cell-exception" aria-hidden="true"/>}
     </button></td>;
    })}
   </tr>)];
- }),[sections,collapsed,query,visibleWeeks,rows,selection,start,end,cells,events]);
+ }),[sections,collapsed,query,visibleWeeks,rows,selection,start,end,cells,events,mode,largeWeekDays]);
  const globalCalendarRow=<tr className="kug-calendar-row">
   <th scope="row" className="kug-sticky-label">Праздники и выходные</th>
   {visibleWeeks.map(w=><td key={w.index}><button type="button" className="kug-calendar-week"
@@ -285,21 +301,26 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
     <option value="conflicts">С конфликтами</option><option value="practice">С практикой</option>
    </select></label>
    <div className="kug-modes" role="group" aria-label="Режим календаря">
-    <button className={mode==='year'?'active':''} aria-pressed={mode==='year'} onClick={()=>{setMode('year');setSelection(null);setPreview(false)}}><Table2 size={15}/> Весь год</button>
-    <button className={mode==='quarter'?'active':''} aria-pressed={mode==='quarter'} onClick={()=>{setMode('quarter');setSelection(null);setPreview(false)}}><Table2 size={15}/> 4 месяца</button>
+    <button className={mode==='year'?'active':''} aria-pressed={mode==='year'} onClick={()=>{setMode('year');setSelection(null);setPreview(false)}}><Table2 size={15}/> Компактная таблица</button>
+    <button className={mode==='large'?'active':''} aria-pressed={mode==='large'} onClick={()=>{setMode('large');setSelection(null);setPreview(false)}}><Table2 size={15}/> Большая таблица</button>
     <button className={mode==='single'?'active':''} aria-pressed={mode==='single'} onClick={()=>{setMode('single');setSelection(null);setPreview(false)}}><Users size={15}/> Группа</button>
    </div>
   </div>
   <div className="kug-display-options">
-   {mode==='quarter'&&<div className="kug-term-switch" role="group" aria-label="Период четырёх месяцев">
+   {mode==='year'&&<label>Период<select aria-label="Масштаб компактного календаря" value={compactSpan}
+    onChange={e=>{setCompactSpan(e.target.value as CompactSpan);setSelection(null);setPreview(false)}}>
+    <option value="all">Весь год</option><option value="quarter">4 месяца</option>
+   </select></label>}
+   {mode==='year'&&compactSpan==='quarter'&&<div className="kug-term-switch" role="group" aria-label="Период четырёх месяцев">
     {([{start:0,label:'Сентябрь — декабрь'},{start:4,label:'Январь — апрель'},{start:8,label:'Май — август'}] as const)
      .map(t=><button type="button" key={t.start} className={quarter===t.start?'active':''} aria-pressed={quarter===t.start}
      onClick={()=>{setQuarter(t.start);setSelection(null);setPreview(false)}}>{t.label}</button>)}
    </div>}
-   <label>Плотность<select aria-label="Плотность календаря" value={density} onChange={e=>setDensity(e.target.value as Density)}>
+   {mode!=='large'&&<label>Плотность<select aria-label="Плотность календаря" value={density} onChange={e=>setDensity(e.target.value as Density)}>
     <option value="compact">Компактная</option><option value="standard">Стандартная</option>
     <option value="detailed">Подробная</option>
-   </select></label>
+   </select></label>}
+   {mode==='large'&&<span>Подробные ячейки с отметками дней</span>}
    <span>{visibleWeeks.length} недель · {groups.length} групп</span>
   </div>
   {importError&&<p className="kug-alert" role="alert">{importError}</p>}
@@ -330,7 +351,20 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    </b>}
    {affectedLessons.length>0&&<b className="kug-production-affected">Проверьте {affectedLessons.length} занятий после обновления</b>}
   </div>
-  <details className="kug-admin-details"><summary>Уведомления учебной части и ручные изменения календаря</summary><CalendarAdminCenter lessons={lessons}/></details>
+  <div className="kug-admin-accordion">
+    <button type="button" className="kug-admin-toggle" aria-expanded={adminOpen}
+     aria-controls="kug-admin-center" onClick={()=>setAdminOpen(value=>!value)}>
+     <span className="kug-admin-toggle-main">
+      <span className="kug-admin-chevron">{adminOpen?<ChevronDown size={15}/>:<ChevronRight size={15}/>}</span>
+      <strong>Центр календаря учебной части</strong>
+      {warningCount>0&&<span className="kug-admin-count">{warningCount} требуют проверки</span>}
+     </span>
+     <span className="kug-admin-toggle-action">{adminOpen?'Скрыть':'Раскрыть'}</span>
+    </button>
+    {adminOpen&&<div id="kug-admin-center" className="kug-admin-content">
+      <CalendarAdminCenter lessons={lessons}/>
+    </div>}
+   </div>
   <details className="kug-legend-details"><summary>Условные обозначения периодов и календарных дней</summary><div className="kug-legend" aria-label="Обозначения периодов">
    {CALENDAR_PHASES.filter(x=>x.id!=='unassigned').map(p=><span key={p.id}><i className={'kug-fill kug-'+p.color}/><b>{p.short}</b> {p.name}</span>)}
    <span><i className="kug-fill kug-unassigned"/>— Не заполнено</span>
