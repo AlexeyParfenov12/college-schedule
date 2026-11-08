@@ -44,8 +44,24 @@ jobs:
             echo "No changes to publish"
           else
             git commit -m "Refresh production calendar source snapshot"
-            git push origin HEAD:main
+            for attempt in 1 2 3; do
+              git fetch origin main
+              git rebase origin/main
+              if git push origin HEAD:main; then
+                echo "Committed the updated calendar on top of the latest main branch."
+                break
+              fi
+              if [ "$attempt" -eq 3 ]; then
+                echo "::error::Calendar branch changed during sync; rerun the workflow."
+                exit 1
+              fi
+              sleep 3
+            done
           fi
+      - name: Rebuild against current repository head
+        run: |
+          npm test
+          npm run build
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
         with:
