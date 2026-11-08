@@ -8,12 +8,14 @@ import { migrateDemoWinterPeriod } from './demoCalendarMigration';
 import { exportCSV, exportJSON, findFree, validate, groupCount, workload, reportRows, QUALIFICATIONS, occupiedRooms } from './demoLogic';
 import { CalendarStudio, TemplateStudio, GeneratorStudio } from './PlanningTools';
 import { MiniSchedule, LoadBars, PeriodTimeline } from './ScheduleVisuals';
-import { WEEK_COUNT, calendarIssues } from './plannerDomain';
+import { WEEK_COUNT, calendarIssues, lessonDate } from './plannerDomain';
 import { LEGACY_WEEK_OFFSET, shiftLegacyWeek } from './weekTimeline';
 import RoomManager from './RoomManager';
 import { demoAcademicDemands, demoAcademicHorizon } from './academicPlanning';
 import { DEFAULT_SUBSTITUTION_POLICY, suggestSubstitutions, applySubstitutionOption, revertSubstitution } from './substitutionPlanner';
 import type { SubstitutionPolicy, SubstitutionOption } from './substitutionPlanner';
+import { previewBulkFormat } from './bulkFormatPlanning';
+import type { BulkFormatPreview } from './bulkFormatPlanning';
 
 type Screen=typeof NAV[number][0];
 type Snapshot={id:string;label:string;at:string;week:number;lessons:Lesson[];notice:string};
@@ -112,6 +114,11 @@ export default function AdvancedWorkflows(p:Props){
  const [absenceId,setAbsenceId]=useState('abs-1');
  const [mode,setMode]=useState<Mode>('online');
  const [formatGroup,setFormatGroup]=useState('П-21');
+ const [formatScope,setFormatScope]=useState<'one'|'department'|'all'>('one');
+ const [formatDepartment,setFormatDepartment]=useState(GROUPS[0].department);
+ const [bulkPreview,setBulkPreview]=useState<BulkFormatPreview|null>(null);
+ const [bulkReviewed,setBulkReviewed]=useState(false);
+ const [checkedSubstitution,setCheckedSubstitution]=useState<{lessonId:string;optionKey:string;week:number;absenceId:string}|null>(null);
  const [genNumber,setGenNumber]=useState(6);
  const [targetWeek,setTargetWeek]=useState(1);
  const [calendarKind,setCalendarKind]=useState<CalendarEvent['kind']>('practice');
@@ -133,6 +140,7 @@ export default function AdvancedWorkflows(p:Props){
  const [viewRule,setViewRule]=useState('all');
  const [distanceStart,setDistanceStart]=useState(0);
  const [distanceEnd,setDistanceEnd]=useState(4);
+ const weekRange=()=>`неделя ${p.week+1} (${lessonDate(p.week,0)} — ${lessonDate(p.week,p.days-1)})`;
  const selectedAbsence=db.absences.find(x=>x.id===absenceId)||db.absences[0];
  const substitutionPolicy={...DEFAULT_SUBSTITUTION_POLICY,...db.substitutionPolicy};
  const updateSubstitutionPolicy=(patch:Partial<SubstitutionPolicy>)=>put(s=>({...s,substitutionPolicy:{...DEFAULT_SUBSTITUTION_POLICY,...s.substitutionPolicy,...patch}}));
@@ -540,11 +548,12 @@ export default function AdvancedWorkflows(p:Props){
  if(['calendar','templates','generator','settings','academic','overview','reports','publication'].includes(p.screen))return content;
  return <div className="studio-stack">
   <section className="studio-context-box">
-   <header><div><strong>Как это выглядит в расписании</strong><span>{viewTitle} · неделя {p.week+1}</span></div>
+   <header><div><strong>Как это выглядит в расписании</strong><span>{viewTitle} · {weekRange()}</span></div>
     <button type="button" onClick={()=>setShowVisual(v=>!v)}>{showVisual?'Свернуть':'Развернуть'} {showVisual?<ChevronRight size={14}/>:<ChevronRight size={14}/>}</button>
    </header>
-   {showVisual&&<div className="studio-context-visuals"><MiniSchedule lessons={p.items} week={p.week} group={contextGroup} teacher={contextTeacher} room={contextRoom} maxSlot={4} title={viewTitle}/><LoadBars lessons={p.items} week={p.week} group={contextGroup} teacher={contextTeacher} room={contextRoom}/></div>}
+   {showVisual&&<div className="studio-context-visuals"><MiniSchedule lessons={p.items} week={p.week} group={contextGroup} teacher={contextTeacher} room={contextRoom} maxSlot={6} title={viewTitle}/><LoadBars lessons={p.items} week={p.week} group={contextGroup} teacher={contextTeacher} room={contextRoom}/></div>}
   </section>
+  <div className="studio-note" role="status"><Clock size={15}/> Действия в этом разделе относятся к текущей учебной неделе: {weekRange()}. Настройки года и КУГ изменяются в соответствующих разделах.</div>
   {content}
  </div>;
 

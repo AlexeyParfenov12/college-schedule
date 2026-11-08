@@ -6,7 +6,7 @@ import { occupiedRooms } from './demoLogic';
 import { calendarWeekSummaries, lessonDate } from './plannerDomain';
 
 type MiniProps={lessons:Lesson[];week:number;group?:string;teacher?:string;room?:string;highlightIds?:string[];onSelect?:(lesson:Lesson)=>void;maxSlot?:number;title?:string};
-export function MiniSchedule({lessons,week,group,teacher,room,highlightIds=[],onSelect,maxSlot=5,title}:MiniProps){
+export function MiniSchedule({lessons,week,group,teacher,room,highlightIds=[],onSelect,maxSlot=6,title}:MiniProps){
  const relevant=useMemo(()=>lessons.filter(l=>(l.week||0)===week&&l.status!=='cancelled'&&
    (!group||l.groups.includes(group))&&(!teacher||l.teacher===teacher)&&(!room||occupiedRooms(l).includes(room))),
  [lessons,week,group,teacher,room]);

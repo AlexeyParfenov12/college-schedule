@@ -8,6 +8,7 @@ import { DEMO_TEACHING_ASSIGNMENTS } from './academicPlanning';
 import { calendarIssues } from './plannerDomain';
 import { validate, QUALIFICATIONS } from './demoLogic';
 import type { Workweek } from './productionCalendar';
+import { newWindowsForChange } from './scheduleWindowRules';
 
 export type SubstitutionStrategy='subject-first'|'mixed'|'teacher-only';
 export type SubstitutionPolicy={
@@ -26,7 +27,6 @@ export type SubstitutionOption={
 const remote=(l:Lesson)=>l.mode==='online'||l.mode==='async';
 const isOnline=(l:Lesson)=>l.mode!=='offline';
 const inWeek=(l:Lesson,week:number)=>l.status!=='cancelled'&&(l.week||0)===week;
-const sameSubject=(a:Lesson,b:Lesson)=>a.subject===b.subject;
 const absenceCovers=(teacher:string,day:number,absences:Absence[])=>
  absences.some(a=>a.status==='open'&&a.teacher===teacher&&day>=a.from&&day<=a.to);
 /** A remote lesson may only sit at an edge of the group's AND remote teacher's timetable,
@@ -85,6 +85,7 @@ export function suggestSubstitutions(
    if(validate(proposed,all).some(x=>x.hard))continue;
    if(calendarIssues(proposed,events,workweek).length)continue;
    if(mode==='online'&&checkOnlineEdge(proposed,all,policy).length)continue;
+   if(newWindowsForChange(all,source,proposed,policy.commuteGap).length)continue;
    const label=(kind==='online'?'Дистант':kind==='teacher'?'Преподаватель':'Другой предмет')+
     ': '+subject+' · '+teacher+(mode==='online'?'':' · каб. '+room);
    result.push({key:substitutionOptionKey(kind,proposed),kind,lesson:proposed,label,
