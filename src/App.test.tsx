@@ -2,11 +2,25 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import App from './App';
-import { NAV } from './data';
+import { NAV, buildSeed } from './data';
 
 beforeEach(()=>{localStorage.clear()});
 afterEach(()=>cleanup());
 
+describe('non-destructive academic-week migration',()=>{
+ it('preserves saved legacy dates while writing only the new v4 edit key',()=>{
+  const first=buildSeed(1).find(x=>x.id==='demo-01')!;
+  const legacy={updated:[{...first,week:0,notes:'Пользовательское примечание'}],removed:[]};
+  const original=JSON.stringify(legacy);
+  localStorage.setItem('college-schedule-edits-v3',original);
+  render(<App/>);
+  const fresh=JSON.parse(localStorage.getItem('college-schedule-edits-v4')||'{}');
+  const migrated=fresh.updated?.find((x:{id:string})=>x.id==='demo-01');
+  expect(migrated?.week).toBe(10);
+  expect(migrated?.notes).toBe('Пользовательское примечание');
+  expect(localStorage.getItem('college-schedule-edits-v3')).toBe(original);
+ },20000);
+});
 describe('React interface smoke checks',()=>{
  it('renders the compact timetable and exposes all 18 main sections',()=>{
   render(<App/>);
