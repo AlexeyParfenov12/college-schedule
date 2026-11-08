@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CALENDAR } from './data';
 import type { CalendarEvent } from './data';
-import { assignPeriod, calendarChangeImpact, calendarWeeks, checkCalendar, copyGroupCalendar, importMatrixCSV, kugWeekDays, matrixCSV, parseCalendarBackup, phaseAt, weekCell } from './calendarMatrixDomain';
+import { assignPeriod, calendarChangeImpact, calendarWeeks, checkCalendar, copyGroupCalendar, importMatrixCSV, kugWeekDays, matrixCSV, matrixTemplateCSV, parseCalendarBackup, phaseAt, weekCell } from './calendarMatrixDomain';
 
 describe('college academic calendar matrix domain',()=>{
  it('covers the full academic year including partial boundary weeks',()=>{
@@ -171,5 +171,66 @@ describe('day-level federal calendar embedded in the academic KUG',()=>{
   expect(day.nonWorking).toBe(true);
   expect(day.phase).toBe('study');
   expect(kugWeekDays([...CALENDAR,extra],'П-22',week,undefined,6).find(d=>d.date==='2026-11-10')?.nonWorking).toBe(false);
+ });
+});
+
+
+describe('downloadable empty KUG template and safe sparse import',()=>{
+ const makeTemplate=()=>matrixTemplateCSV(['П-21','П-22'],calendarWeeks(2026));
+ const filled=(groupRow:number,weekColumn:number,code:string)=>{
+  const lines=makeTemplate().split('\r\n');
+  const cells=lines[groupRow].split(';');
+  cells[weekColumn]='"'+code+'"';
+  lines[groupRow]=cells.join(';');
+  return lines.join('\r\n');
+ };
+ it('produces an Excel-friendly BOM+semicolon template with the exact importer header',()=>{
+  const csv=makeTemplate();
+  expect(csv.charCodeAt(0)).toBe(0xFEFF);
+  const lines=csv.split('\r\n');
+  expect(lines).toHaveLength(3);
+  expect(lines[0]).toBe(matrixCSV(CALENDAR,['П-21'],calendarWeeks(2026)).split('\r\n')[0]);
+  expect(lines[1].startsWith('"П-21";"";""')).toBe(true);
+  expect(lines[2].startsWith('"П-22";"";""')).toBe(true);
+ });
+ it('changes only one explicitly filled week and preserves other groups, weeks and years',()=>{
+  const unrelated={id:'next-year',kind:'vacation' as const,title:'Данные другого года',
+   from:'2028-01-10',to:'2028-01-20',groups:['П-21']};
+  const before=[...CALENDAR,unrelated];
+  const changed=importMatrixCSV(filled(1,2,'ПП'),before,2026,['П-21','П-22']);
+  expect(changed.groups).toBe(1);
+  expect(changed.cells).toBe(1);
+  expect(changed.ranges).toBe(1);
+  expect(phaseAt(changed.next,'П-21','2026-09-08')).toBe('industrial');
+  expect(phaseAt(changed.next,'П-21','2026-09-16')).toBe('study');
+  expect(phaseAt(changed.next,'П-22','2026-09-08')).toBe('study');
+  expect(changed.next.find(e=>e.id==='next-year')).toEqual(unrelated);
+  expect(before).toHaveLength(CALENDAR.length+1);
+ });
+ it('accepts sparse day-level changes inside a mixed week without touching empty days',()=>{
+  const result=importMatrixCSV(filled(1,1,'~|УП|||||'),CALENDAR,2026,['П-21','П-22']);
+  expect(result.cells).toBe(1);
+  expect(result.groups).toBe(1);
+  expect(phaseAt(result.next,'П-21','2026-09-01')).toBe('training');
+  expect(phaseAt(result.next,'П-21','2026-09-02')).toBe('study');
+  expect(phaseAt(result.next,'П-22','2026-09-01')).toBe('study');
+ });
+ it('only an explicit dash clears a week; all blank rows are rejected',()=>{
+  expect(()=>importMatrixCSV(makeTemplate(),CALENDAR,2026,['П-21','П-22']))
+   .toThrow(/нет заполненных недель/);
+  const result=importMatrixCSV(filled(2,2,'—'),CALENDAR,2026,['П-21','П-22']);
+  expect(result.groups).toBe(1);
+  expect(result.cells).toBe(1);
+  expect(phaseAt(result.next,'П-22','2026-09-09')).toBe('unassigned');
+  expect(phaseAt(result.next,'П-21','2026-09-09')).toBe('study');
+ });
+ it('still rejects invalid codes, wrong year and a duplicate group',()=>{
+  expect(()=>importMatrixCSV(filled(1,2,'Х'),CALENDAR,2026,['П-21','П-22']))
+   .toThrow(/Неизвестный код/);
+  expect(()=>importMatrixCSV(filled(1,2,'ПП'),CALENDAR,2027,['П-21','П-22']))
+   .toThrow(/заголовок|учебный год/i);
+  const duplicated=filled(1,2,'ПП').replace('"П-22";','"П-21";');
+  expect(()=>importMatrixCSV(duplicated,CALENDAR,2026,['П-21','П-22']))
+   .toThrow(/Повторяется группа/);
  });
 });
