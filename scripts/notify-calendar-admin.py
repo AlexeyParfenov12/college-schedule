@@ -45,7 +45,7 @@ def send_email(body,digest):
   return
  msg=EmailMessage();msg["From"]=sender;msg["To"]=destination
  msg["Subject"]=TITLE+" ("+digest+")";msg.set_content(body)
- port=int(os.getenv("CALENDAR_SMTP_PORT","465"))
+ port=int(os.getenv("CALENDAR_SMTP_PORT") or "465")
  if port==465:
   smtp=smtplib.SMTP_SSL(host,port,timeout=18)
  else:

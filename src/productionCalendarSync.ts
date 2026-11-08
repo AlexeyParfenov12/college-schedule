@@ -74,8 +74,9 @@ export function acceptProductionSnapshot(raw:unknown):boolean{
  const entries=Object.entries(data.years);
  if(!entries.length||entries.length>8||entries.some(([key,value])=>!/^20\d\d$/.test(key)||!validateYear(Number(key),value)))return false;
  const previous=JSON.stringify(snapshot?.years);
+ const changed=previous!==JSON.stringify(data.years);
  snapshot=data as ProductionSnapshot;
- state={revision:state.revision+1,status:'updated',checkedAt:data.checkedAt,years:entries.map(([k])=>Number(k)).sort(),
+ state={revision:state.revision+(changed?1:0),status:'updated',checkedAt:data.checkedAt,years:entries.map(([k])=>Number(k)).sort(),
   message:previous&&previous!==JSON.stringify(data.years)?'Производственный календарь обновлён. Проверьте существующие занятия.':'Данные производственного календаря загружены',warnings:data.warnings??[],discrepancies:data.discrepancies??[],officialMonitor:data.officialMonitor??null};
  emit();return true;
 }

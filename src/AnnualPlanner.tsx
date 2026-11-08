@@ -73,7 +73,7 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
  const [working,setWorking]=useState(false),[progress,setProgress]=useState('');
  const worker=useRef<Worker|null>(null);
  const lastProductionRevision=useRef(production.revision+'-'+collegeRevision);
- const [calculationRevision,setCalculationRevision]=useState<number|null>(null);
+ const [calculationRevision,setCalculationRevision]=useState<string|null>(null);
  const change=(next:(config:AnnualConfig)=>AnnualConfig)=>{
   setCfg(current=>{const value=next(current);try{localStorage.setItem('college-year-preferences-v3',JSON.stringify(value))}catch{}return value});
   setVariants([]);
@@ -146,7 +146,7 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
   }}
  }));
  const run=()=>{
-  worker.current?.terminate();setWorking(true);setProgress('Вычисление вариантов...');setVariants([]);setCalculationRevision(production.revision+collegeRevision);setTab('results');
+  worker.current?.terminate();setWorking(true);setProgress('Вычисление вариантов...');setVariants([]);setCalculationRevision(production.revision+':'+collegeRevision);setTab('results');
   const w=new Worker(new URL('./yearPlanner.worker.ts',import.meta.url),{type:'module'});worker.current=w;
   w.onmessage=(e:MessageEvent<{type:string;current?:number;name?:string;variants?:AnnualVariant[];message?:string}>)=>{
    if(e.data.type==='progress')setProgress('Вариант '+e.data.current+'/4: '+e.data.name);
@@ -179,7 +179,7 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
  };
  const applyVariant=()=>{
   if(!selected)return;
-  if(calculationRevision!==production.revision+collegeRevision)return notify('Производственный календарь изменился. Сначала пересчитайте 4 варианта.');
+  if(calculationRevision!==production.revision+':'+collegeRevision)return notify('Производственный календарь изменился. Сначала пересчитайте 4 варианта.');
   const gaps=selected.unplaced.length,practice=selected.practiceIssues.length;
   const details=gaps||practice
    ?'ВНИМАНИЕ: вариант неполный. Неразмещённых назначений: '+gaps+'. Проблем практики: '+practice+'. Они сохранятся для разбора учебной частью. '

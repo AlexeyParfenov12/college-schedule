@@ -260,8 +260,8 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
       ?'Сверено со справочным источником '+production.checkedAt.slice(0,10)
       :production.message}. Данные будущих лет до утверждения постановления предварительные.</span></div>
    <a href="https://www.consultant.ru/law/ref/calendar/proizvodstvennye/" target="_blank" rel="noreferrer">Сверить с нормативным календарём</a>
-   {production.warnings.length>0&&<b className="kug-production-affected" title={production.warnings.join('\n')}>
-    Расхождений со справочным API: {production.warnings.length} · применены нормативные правила
+   {production.warnings.length>0&&<b className="kug-production-affected">
+    Расхождений со справочным API: {production.warnings.length}. Причины и документы — ниже, в Центре календаря.
    </b>}
    {affectedLessons.length>0&&<b className="kug-production-affected">Проверьте {affectedLessons.length} занятий после обновления</b>}
   </div>
