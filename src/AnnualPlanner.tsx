@@ -8,6 +8,7 @@ import { defaultAnnualConfig, streamKey, teacherRule, practiceWeekActive } from 
 import { academicGroupStats, demoAcademicDemands, demoAcademicHorizon, DEMO_SEMESTERS } from './academicPlanning';
 import type { AnnualConfig, AnnualVariant, YearDemand, PracticeBlock, TeacherPreference } from './yearSolver';
 import { lessonDate } from './plannerDomain';
+import { ACADEMIC_START, ACADEMIC_END, LEGACY_WEEK_OFFSET } from './weekTimeline';
 import { assessRoomFit } from './roomPolicy';
 import { effectiveGroupRules } from './scheduleConstraints';
 import type { ScopeOverride } from './scheduleConstraints';
@@ -20,14 +21,24 @@ const tabs:{id:Tab;name:string}[]=[
  {id:'distance',name:'Дистант и дорога'},{id:'results',name:'4 варианта'}
 ];
 const F=({name,children}:{name:string;children:React.ReactNode})=><label className="year-field"><span>{name}</span>{children}</label>;
-const read=():AnnualConfig=>{try{const data=localStorage.getItem('college-year-preferences-v2');if(data)return {...defaultAnnualConfig(),...JSON.parse(data)}}catch{}return defaultAnnualConfig()};
+/** Saved teacher/room rules keep their values; only legacy practice week coordinates move. */
+const read=():AnnualConfig=>{try{
+ const modern=localStorage.getItem('college-year-preferences-v3');
+ if(modern)return {...defaultAnnualConfig(),...JSON.parse(modern)};
+ const legacy=localStorage.getItem('college-year-preferences-v2');
+ if(legacy){
+  const old=JSON.parse(legacy) as Partial<AnnualConfig>;
+  return {...defaultAnnualConfig(),...old,
+   practiceBlocks:old.practiceBlocks?.map(p=>({...p,startWeek:p.startWeek+LEGACY_WEEK_OFFSET}))??[]};
+ }
+}catch{}return defaultAnnualConfig()};
 const key=(name:string,subject:string)=>streamKey(name,subject);
-const periodOptions=(weeks:number)=>Array.from({length:weeks},(_,w)=><option key={w} value={w}>{w+1}-я · {lessonDate(w,0)}</option>);
+const periodOptions=(weeks:number)=>Array.from({length:weeks},(_,w)=><option key={w} value={w}>{w+1}-я · {w===0?ACADEMIC_START:lessonDate(w,0)}</option>);
 export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
  const horizon=useMemo(()=>demoAcademicHorizon(calendar),[calendar]);
  const [cfg,setCfg]=useState<AnnualConfig>(()=>({...read(),weeks:demoAcademicHorizon(calendar)}));
  const backlog=useMemo(()=>{
-  try{return JSON.parse(localStorage.getItem('college-year-unplaced-v1')||'null') as {at:string;weeks:number;unplaced:{group:string;subject:string;reason:string}[];practiceIssues:{group:string;week:number;reason:string}[]}|null}
+  try{return JSON.parse(localStorage.getItem('college-year-unplaced-v2')||'null') as {at:string;weeks:number;unplaced:{group:string;subject:string;reason:string}[];practiceIssues:{group:string;week:number;reason:string}[]}|null}
   catch{return null}
  },[]);
  const [tab,setTab]=useState<Tab>('load');
@@ -48,7 +59,7 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
  const [working,setWorking]=useState(false),[progress,setProgress]=useState('');
  const worker=useRef<Worker|null>(null);
  const change=(next:(config:AnnualConfig)=>AnnualConfig)=>{
-  setCfg(current=>{const value=next(current);try{localStorage.setItem('college-year-preferences-v2',JSON.stringify(value))}catch{}return value});
+  setCfg(current=>{const value=next(current);try{localStorage.setItem('college-year-preferences-v3',JSON.stringify(value))}catch{}return value});
   setVariants([]);
  };
  useEffect(()=>()=>{worker.current?.terminate()},[]);
@@ -165,7 +176,7 @@ export default function AnnualPlanner({lessons,calendar,onApply,notify}:Props){
    <div className="year-fields">
     <F name="Период определяется автоматически"><div className="year-auto-period" role="status">
       <strong>{cfg.weeks} недель календарного горизонта</strong>
-      <small>{lessonDate(0,0)} — {lessonDate(cfg.weeks-1,6)}</small>
+      <small>{ACADEMIC_START} — {ACADEMIC_END}</small>
      </div></F>
     <F name="Группа"><PolishedSelect value={group} onChange={e=>setGroup(e.target.value)}>{GROUPS.map(g=><option key={g.id} value={g.id}>{g.id}</option>)}</PolishedSelect></F>
    </div>
