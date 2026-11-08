@@ -5,6 +5,7 @@ import { DAYS, TYPES } from './data';
 import type { Lesson } from './data';
 import type { MoveOption } from './scheduleAssist';
 import { lessonDate } from './plannerDomain';
+import { withinAcademicYear } from './weekTimeline';
 import { classifyCalendarDay } from './productionCalendar';
 
 /** Touch-first agenda for small screens; the desktop timetable remains unchanged. */
@@ -34,6 +35,7 @@ export default function MobileSchedule({
  };
  const date=lessonDate(week,chosenDay);
  const official=classifyCalendarDay(date,days);
+ const unavailable=!withinAcademicYear(date)||official.nonWorking;
  const current=lessons.filter(l=>l.day===chosenDay&&l.status!=='cancelled');
  const slots=times.map((time,index)=>({slot:index+1,time,lessons:current.filter(l=>l.slot===index+1),
   target:targets.find(t=>t.day===chosenDay&&t.slot===index+1)}));
@@ -41,7 +43,7 @@ export default function MobileSchedule({
   <div className="mobile-day-strip" role="group" aria-label="Выбор дня недели">
    {DAYS.slice(0,days).map((name,i)=>{
     const iso=lessonDate(week,i);
-    const isOff=classifyCalendarDay(iso,days).nonWorking;
+    const isOff=!withinAcademicYear(iso)||classifyCalendarDay(iso,days).nonWorking;
     const count=lessons.filter(l=>l.day===i&&l.status!=='cancelled').length;
     return <button type="button" key={i} className={'mobile-day'+(i===chosenDay?' active':'')+(isOff?' is-off':'')}
       aria-pressed={i===chosenDay} onClick={()=>onDayChange(i)}>
@@ -50,12 +52,12 @@ export default function MobileSchedule({
    })}
   </div>
   <div className="mobile-agenda-heading">
-   <div><strong>{DAYS[chosenDay]} · {date.slice(8)}.{date.slice(5,7)}</strong><small>{official.nonWorking?official.label:current.length+' занятий · нажмите на пару для действий'}</small></div>
+   <div><strong>{DAYS[chosenDay]} · {date.slice(8)}.{date.slice(5,7)}</strong><small>{unavailable?withinAcademicYear(date)?official.label:'За пределами учебного года':current.length+' занятий · нажмите на пару для действий'}</small></div>
    {moveMode&&<button type="button" className="mobile-move-close" onClick={onCancelMove}><X size={14}/> Отмена</button>}
   </div>
   {moveMode&&<div role="status" className="mobile-move-help"><ArrowLeftRight size={15}/> Зелёная пара доступна для переноса, красная — занята или запрещена. Выберите новое время.</div>}
   <div className="mobile-agenda-slots">
-  {slots.map(({slot,time,lessons:here,target})=><div key={slot} className={'mobile-slot'+(here.some(l=>l.id===selectedId)?' picked':'')+(official.nonWorking?' closed':'')}>
+  {slots.map(({slot,time,lessons:here,target})=><div key={slot} className={'mobile-slot'+(here.some(l=>l.id===selectedId)?' picked':'')+(unavailable?' closed':'')}>
    <div className="mobile-slot-time"><b>{slot}</b><small>{time}</small></div>
    <div className="mobile-slot-body">
     {here.length?here.map(l=><button type="button" key={l.id} data-mobile-lesson-id={l.id}
@@ -72,8 +74,8 @@ export default function MobileSchedule({
        <span>{target.kind==='available'?'Сюда можно':target.kind==='blocked'?'Недоступно':'Исходная пара'}</span>
        {target.kind==='blocked'&&<small>{target.reason}</small>}
       </button>}
-    {!here.length&&!moveMode&&(official.nonWorking?
-      <span className="mobile-closed-note">Нерабочий день</span>:
+    {!here.length&&!moveMode&&(unavailable?
+      <span className="mobile-closed-note">{withinAcademicYear(date)?'Нерабочий день':'Вне учебного года'}</span>:
       <button type="button" className="mobile-add-lesson" onClick={()=>onAdd(chosenDay,slot)}
        aria-label={'Добавить занятие: '+DAYS[chosenDay]+', '+slot+'-я пара'}><Plus size={15}/> Добавить занятие</button>
     )}
