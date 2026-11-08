@@ -16,7 +16,8 @@ import urllib.request
 ROOT = Path(__file__).resolve().parents[1]
 DEST = ROOT / "public" / "production-calendar.json"
 TODAY = dt.date.today()
-YEARS = sorted({2026, 2027, TODAY.year, TODAY.year + 1})
+# Cover this year and the next two calendar years, including the next academic year.
+YEARS = sorted({2026, 2027, TODAY.year, TODAY.year + 1, TODAY.year + 2})
 TIMEOUT_SECONDS = 18
 
 
