@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent, ReactNode, DragEvent, MouseEvent } from 'react';
-import { CalendarDays, LayoutDashboard, ArrowLeftRight, Users, Building2, Settings2, FileText, Clock3, Plus, Download, Check, AlertTriangle, ChevronLeft, ChevronRight, Menu, BookOpen, Monitor, Network, GitFork, WandSparkles, Save, X, Pencil, Trash2, Copy, Bell, Layers3, BarChart3, RotateCcw, Eye, SlidersHorizontal, Send, School, Filter } from 'lucide-react';
+import { CalendarDays, LayoutDashboard, ArrowLeftRight, Users, Building2, Settings2, FileText, Clock3, Plus, Download, Check, AlertTriangle, ChevronLeft, ChevronRight, ChevronDown, Menu, BookOpen, Monitor, Network, GitFork, WandSparkles, Save, X, Pencil, Trash2, Copy, Bell, Layers3, BarChart3, RotateCcw, Eye, SlidersHorizontal, Send, School, Filter } from 'lucide-react';
 import { DAYS, TIMES, GROUPS, TEACHERS, SUBJECTS, ROOMS, TYPES, MODES, INITIAL, NAV, CALENDAR, buildSeed } from './data';
 import type { Lesson, Type, Mode } from './data';
 import AdvancedWorkflows from './AdvancedWorkflows';
+import { NAV_SECTIONS, PREVIEW_SCREENS, sectionForScreen } from './navigationModel';
 import LessonQuickActions from './LessonQuickActions';
 import SmartLessonEditor from './SmartLessonEditor';
 import LessonWeekMove from './LessonWeekMove';
@@ -61,6 +62,7 @@ export default function App(){
  const [screen,setScreen]=useState<Screen>('schedule');
  const [collapsed,setCollapsed]=useState(false);
  const [mobileNavOpen,setMobileNavOpen]=useState(false);
+ const [expandedNav,setExpandedNav]=useState<Screen[]>(['schedule']);
  const [mobileDay,setMobileDay]=useState(0);
  const [items,setItems]=useState<Item[]>(start);
  const [selected,setSelected]=useState<Item|null>(null);
@@ -212,7 +214,13 @@ export default function App(){
    window.addEventListener('keydown',handler);return ()=>window.removeEventListener('keydown',handler);
  },[lastChange,items]);
  const exportCSV=(dataset=current)=>download('college-schedule.csv',['День;Пара;Группа;Дисциплина;Преподаватель;Аудитория;Организация;Формат',...dataset.map(x=>[DAYS[x.day],x.slot,names(x.groups),x.subject,x.teacher,x.room,TYPES[x.type],MODES[x.mode]].join(';'))].join('\n'));
- const show=(to:Screen)=>{setMobileNavOpen(false);setFocusId(null);setScreen(to);closeSelected()};
+ const show=(to:Screen)=>{
+  setMobileNavOpen(false);setFocusId(null);setScreen(to);closeSelected();
+  const section=sectionForScreen(to);
+  if(section)setExpandedNav(previous=>previous.includes(section)?previous:[...previous,section]);
+ };
+ const toggleNavGroup=(key:Screen)=>setExpandedNav(previous=>
+  previous.includes(key)?previous.filter(x=>x!==key):[...previous,key]);
  useEffect(()=>{
   if(!mobileNavOpen)return;
   const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape')setMobileNavOpen(false)};
@@ -386,6 +394,9 @@ export default function App(){
  </div>
  {contextMenu&&<div role="menu" aria-label="Действия с занятием" className="lesson-context-menu" style={{left:contextMenu.x,top:contextMenu.y}} onClick={e=>e.stopPropagation()}>
     <div className="lesson-context-title">{contextMenu.lesson.subject}<small>{contextMenu.lesson.groups.join(' + ')} · {DAYS[contextMenu.lesson.day]}, {contextMenu.lesson.slot}-я</small></div>
+    <button role="menuitem" onClick={()=>{
+      choose(contextMenu.lesson);setSideMode('assistant');setContextMenu(null);
+     }}><Eye size={14}/> Открыть свойства</button>
     <button role="menuitem" onClick={()=>{setSelected(contextMenu.lesson);setSideMode('edit');setContextMenu(null)}}><Pencil size={14}/> Изменить занятие</button>
     <button role="menuitem" disabled={contextMenu.lesson.status==='held'} onClick={()=>{choose(contextMenu.lesson);setMoveMode(true)}}><ArrowLeftRight size={14}/> Перенести в этой неделе</button>
     <button role="menuitem" disabled={contextMenu.lesson.status==='held'} onClick={()=>{setWeekMoving(contextMenu.lesson);setContextMenu(null)}}><CalendarDays size={14}/> Перенести на другую неделю</button>
@@ -437,7 +448,40 @@ export default function App(){
    <div className="brand"><div className="brand-symbol">C</div><div><strong>College</strong><span>Schedule</span></div>
      <button onClick={()=>setCollapsed(v=>!v)} className="nav-toggle" aria-label={collapsed?'Развернуть навигацию':'Сузить навигацию'}><Menu size={16}/></button>
      <button type="button" className="mobile-menu-close" aria-label="Закрыть мобильное меню" onClick={()=>setMobileNavOpen(false)}><X size={20}/></button></div>
-   <nav aria-label="Разделы College Schedule">{NAV.map(([key,label],i)=>{const I=iconSet[i];return <button key={key} title={label} className={screen===key?'active':''} onClick={()=>show(key)}><I size={17}/><span>{label}</span></button>})}</nav>
+   <nav aria-label="Разделы College Schedule">
+    {NAV_SECTIONS.map(section=>{
+     const index=NAV.findIndex(([key])=>key===section.key);
+     const Icon=iconSet[index]||CalendarDays;
+     const active=screen===section.key||section.children.some(([key])=>key===screen);
+     const open=expandedNav.includes(section.key);
+     return <div className={'nav-section'+(active?' current':'')} key={section.key}>
+      <div className="nav-section-row">
+       <button type="button" title={section.label} className={'nav-primary'+(screen===section.key?' active':'')}
+        aria-current={screen===section.key?'page':undefined} onClick={()=>show(section.key)}>
+        <Icon size={17}/><span>{section.label}</span>
+       </button>
+       {section.children.length>0&&<button type="button" className="nav-expander"
+        aria-label={(open?'Свернуть ':'Развернуть ')+section.label}
+        aria-expanded={open} onClick={()=>toggleNavGroup(section.key)}>
+        {open?<ChevronDown size={15}/>:<ChevronRight size={15}/>}
+       </button>}
+      </div>
+      {section.children.length>0&&open&&<div className="nav-submenu">
+       {section.children.map(([key,label])=><button type="button" key={key}
+        title={label} className={'nav-subitem'+(screen===key?' active':'')}
+        aria-current={screen===key?'page':undefined} onClick={()=>show(key)}>
+        <span className="nav-subitem-dot"/><span>{label}</span>
+       </button>)}
+      </div>}
+     </div>;
+    })}
+    <details className="nav-preview">
+     <summary><Eye size={15}/><span>Предпросмотр ролей</span></summary>
+     {PREVIEW_SCREENS.map(([key,label])=><button type="button" key={key}
+      className={'nav-preview-link'+(screen===key?' active':'')} onClick={()=>show(key)}>
+      <BookOpen size={14}/><span>{label}</span></button>)}
+    </details>
+   </nav>
    <div className="nav-footer"><School size={17}/><span>Демо · Диспетчер</span></div>
   </aside>
   <button type="button" className={'mobile-nav-backdrop'+(mobileNavOpen?' is-visible':'')}
