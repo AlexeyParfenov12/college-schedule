@@ -62,8 +62,8 @@ export const CALENDAR:CalendarEvent[]=[
  {id:'cal-4',title:'Зимний межсеместровый перерыв',kind:'vacation',from:'2027-01-01',to:'2027-01-24',groups:[]},
  {id:'cal-5',title:'Нерабочий праздничный день',kind:'holiday',from:'2026-11-04',to:'2026-11-04',groups:[]}
 ];
-export type Absence={id:string;teacher:string;from:number;to:number;reason:string;status:'open'|'resolved'};
-export const ABSENCES:Absence[]=[{id:'abs-1',teacher:TEACHERS[0],from:0,to:2,reason:'Больничный',status:'open'}, {id:'abs-2',teacher:TEACHERS[7],from:1,to:1,reason:'Командировка',status:'open'}];
+export type Absence={id:string;teacher:string;from:number;to:number;week?:number;reason:string;status:'open'|'resolved'};
+export const ABSENCES:Absence[]=[{id:'abs-1',teacher:TEACHERS[0],from:0,to:2,week:LEGACY_WEEK_OFFSET,reason:'Больничный',status:'open'}, {id:'abs-2',teacher:TEACHERS[7],from:1,to:1,week:LEGACY_WEEK_OFFSET,reason:'Командировка',status:'open'}];
 export type Rule={id:string;name:string;hard:boolean;enabled:boolean;weight:number};
 export const RULES:Rule[]=[
  {id:'teacher',name:'Преподаватель не занят в другом месте',hard:true,enabled:true,weight:100},

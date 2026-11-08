@@ -25,7 +25,7 @@ export function previewBulkFormat(
   if(!lesson.groups.every(g=>selection.groups.includes(g)))reasons.push('Общий поток затрагивает группы вне выбранной области');
   if(lesson.mode===selection.mode)reasons.push('У занятия уже такой формат');
   if(lesson.day>=days)reasons.push('День вне учебной недели');
-  if(absences.some(a=>a.status==='open'&&a.teacher===lesson.teacher&&lesson.day>=a.from&&lesson.day<=a.to))
+  if(absences.some(a=>a.status==='open'&&(a.week===undefined||a.week===selection.week)&&a.teacher===lesson.teacher&&lesson.day>=a.from&&lesson.day<=a.to))
    reasons.push('Преподаватель отсутствует: изменение формата не заменяет преподавателя');
   if(selection.mode==='hybrid'&&!(lesson.type==='parallel'&&lesson.participants?.length))
    reasons.push('Для гибрида необходимо заранее назначить очных/удалённых участников и контроль');

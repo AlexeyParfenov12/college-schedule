@@ -23,19 +23,25 @@ type Template={id:string;name:string;week:number;group:string;weeks:number;locke
 type Roster=Record<string,{id:string;name:string;subgroup:number}[]>;
 type RoomsMap=Record<string,{blocked:boolean;reason:string}>;
 type Store={calendar:CalendarEvent[];roster:Roster;absences:Absence[];rooms:RoomsMap;rules:Rule[];snapshots:Snapshot[];templates:Template[];times:string[];notifications:string[];substitutionPolicy:SubstitutionPolicy};
+/** Earlier demo builds incorrectly shifted absence weekday indexes by the academic-week offset. */
+export const normalizeAbsenceDays=(a:Absence):Absence=>({
+ ...a,from:a.from>=LEGACY_WEEK_OFFSET&&a.from<LEGACY_WEEK_OFFSET+6?a.from-LEGACY_WEEK_OFFSET:a.from,
+ to:a.to>=LEGACY_WEEK_OFFSET&&a.to<LEGACY_WEEK_OFFSET+6?a.to-LEGACY_WEEK_OFFSET:a.to,
+ week:a.week??LEGACY_WEEK_OFFSET
+});
 const key='college-schedule-extras-v2';
 const legacyKey='college-schedule-extras-v1';
-const defaults=():Store=>({calendar:CALENDAR,roster:ROSTERS,absences:ABSENCES.map(x=>({...x,from:x.from+LEGACY_WEEK_OFFSET,to:x.to+LEGACY_WEEK_OFFSET})),rooms:{},rules:RULES,snapshots:[],templates:[{id:'template-a',name:'Двухнедельный цикл ИТ',week:LEGACY_WEEK_OFFSET,group:'П-21',weeks:2,locked:true},{id:'template-b',name:'Основной цикл радиотехники',week:LEGACY_WEEK_OFFSET,group:'Р-21',weeks:4,locked:false}],times:[...TIMES],notifications:[],substitutionPolicy:{...DEFAULT_SUBSTITUTION_POLICY}});
+const defaults=():Store=>({calendar:CALENDAR,roster:ROSTERS,absences:ABSENCES.map(x=>({...x})),rooms:{},rules:RULES,snapshots:[],templates:[{id:'template-a',name:'Двухнедельный цикл ИТ',week:LEGACY_WEEK_OFFSET,group:'П-21',weeks:2,locked:true},{id:'template-b',name:'Основной цикл радиотехники',week:LEGACY_WEEK_OFFSET,group:'Р-21',weeks:4,locked:false}],times:[...TIMES],notifications:[],substitutionPolicy:{...DEFAULT_SUBSTITUTION_POLICY}});
 /** Read v1 once in memory. Its week numbers are November-based; the v1 key stays untouched. */
 const saved=():Store=>{try{
  const modern=localStorage.getItem(key);
- if(modern){const current=JSON.parse(modern) as Partial<Store>;return {...defaults(),...current,calendar:migrateDemoWinterPeriod(current.calendar??CALENDAR)}};
+ if(modern){const current=JSON.parse(modern) as Partial<Store>;return {...defaults(),...current,absences:(current.absences??ABSENCES).map(normalizeAbsenceDays),calendar:migrateDemoWinterPeriod(current.calendar??CALENDAR)}};
  const legacy=localStorage.getItem(legacyKey);
  if(legacy){
   const old=JSON.parse(legacy) as Partial<Store>;
   return {...defaults(),...old,calendar:migrateDemoWinterPeriod(old.calendar??CALENDAR),
    templates:old.templates?.map(t=>({...t,week:t.week+LEGACY_WEEK_OFFSET}))??defaults().templates,
-   absences:old.absences?.map(a=>({...a,from:a.from+LEGACY_WEEK_OFFSET,to:a.to+LEGACY_WEEK_OFFSET}))??defaults().absences,
+   absences:old.absences?.map(normalizeAbsenceDays)??defaults().absences,
    snapshots:old.snapshots?.map(v=>({...v,week:v.week+LEGACY_WEEK_OFFSET,
     lessons:v.lessons.map(shiftLegacyWeek)}))??[]
   };
@@ -157,7 +163,7 @@ export default function AdvancedWorkflows(p:Props){
    ...calendarIssues(x,db.calendar,p.days===5?5:6).map(message=>({kind:'calendar' as const,hard:true,message}))].map(issue=>({lesson:x,issue}))
  ).filter((v,i,a)=>a.findIndex(z=>z.lesson.id===v.lesson.id&&z.issue.message===v.issue.message)===i),[curr,db.calendar,p.days]);
  const softWarnings=useMemo(()=>curr.flatMap(x=>validate(x,curr).filter(issue=>!issue.hard).map(issue=>({lesson:x,issue}))),[curr]);
- const involved=useMemo(()=>selectedAbsence?curr.filter(x=>x.teacher===selectedAbsence.teacher&&x.day>=selectedAbsence.from&&x.day<=selectedAbsence.to&&x.status!=='cancelled'&&x.status!=='held'):[],[curr,selectedAbsence]);
+ const involved=useMemo(()=>selectedAbsence&&selectedAbsence.week===p.week?curr.filter(x=>x.teacher===selectedAbsence.teacher&&x.day>=selectedAbsence.from&&x.day<=selectedAbsence.to&&x.status!=='cancelled'&&x.status!=='held'):[],[curr,selectedAbsence]);
  const selectedRoster=db.roster[groupDetails]||[];
  const byTeacher=curr.filter(x=>x.teacher===teacherHours&&x.status!=='cancelled');
  const roomUsages=curr.filter(x=>occupiedRooms(x).includes(selectedRoom));
@@ -301,7 +307,7 @@ export default function AdvancedWorkflows(p:Props){
    editData(()=>updated,'Замена сохранена: '+live.subject+' → '+next.subject);
    setCheckedSubstitution(null);setSubstitutionAudit(null);
    const left=updated.some(l=>(l.week||0)===p.week&&l.status!=='cancelled'&&l.teacher===selectedAbsence.teacher&&
-     l.day>=selectedAbsence.from&&l.day<=selectedAbsence.to);
+     (l.week||0)===(selectedAbsence.week??p.week)&&l.day>=selectedAbsence.from&&l.day<=selectedAbsence.to);
    if(!left)put(d=>({...d,absences:d.absences.map(a=>a.id===selectedAbsence.id?{...a,status:'resolved'}:a)}));
   };
   const undo=(x:Lesson)=>{
@@ -309,7 +315,7 @@ export default function AdvancedWorkflows(p:Props){
    const restored=revertSubstitution(x);
    editData(old=>old.map(y=>y.id===x.id?restored:y),'Замена отменена, исходное занятие восстановлено');
    setCheckedSubstitution(null);setSubstitutionAudit(null);
-   put(d=>({...d,absences:d.absences.map(a=>a.teacher===restored.teacher&&restored.day>=a.from&&restored.day<=a.to?
+   put(d=>({...d,absences:d.absences.map(a=>a.teacher===restored.teacher&&(a.week??p.week)===(restored.week||0)&&restored.day>=a.from&&restored.day<=a.to?
     {...a,status:'open'}:a)}));
   };
   const stateLabel=(kind:Lesson['replacementKind'])=>kind==='subject'?'Другой предмет':kind==='online'?'Дистант':kind==='teacher'?'Другой преподаватель':'Замена';
@@ -319,10 +325,10 @@ export default function AdvancedWorkflows(p:Props){
      <Field title="Преподаватель"><Select value={teacher} onChange={setTeacher} items={opts(TEACHERS)}/></Field>
      <div className="studio-duo"><Field title="С какого дня"><Select value={fromDay} onChange={v=>setFromDay(Number(v))} items={DAYS.map((x,i)=>({id:i,label:x}))}/></Field><Field title="По какой день"><Select value={toDay} onChange={v=>setToDay(Number(v))} items={DAYS.map((x,i)=>({id:i,label:x}))}/></Field></div>
      <Field title="Причина"><Select value={reason} onChange={setReason} items={opts(['Больничный','Командировка','Отпуск','Повышение квалификации','Другое'])}/></Field>
-     <Button disabled={fromDay>toDay} onClick={()=>{const abs:Absence={id:'abs-'+newId(),teacher,from:fromDay,to:toDay,reason,status:'open'};
+     <Button disabled={fromDay>toDay} onClick={()=>{const abs:Absence={id:'abs-'+newId(),teacher,from:fromDay,to:toDay,week:p.week,reason,status:'open'};
       put(d=>({...d,absences:[...d.absences,abs]}));setAbsenceId(abs.id);p.notify('Отсутствие зарегистрировано')}}><Plus size={14}/> Зарегистрировать отсутствие</Button>
     </div>
-    <div className="studio-list">{db.absences.map(a=><button className={'studio-candidate '+(selectedAbsence?.id===a.id?'selected':'')} onClick={()=>setAbsenceId(a.id)} key={a.id}><b>{a.teacher}</b><span>{DAYS[a.from]} — {DAYS[a.to]} · {a.reason} · {a.status==='open'?'Требует решения':'Решено'}</span></button>)}</div>
+    <div className="studio-list">{db.absences.map(a=><button className={'studio-candidate '+(selectedAbsence?.id===a.id?'selected':'')} onClick={()=>setAbsenceId(a.id)} key={a.id}><b>{a.teacher}</b><span>{DAYS[a.from]} — {DAYS[a.to]} · неделя {(a.week??p.week)+1} · {a.reason} · {a.status==='open'?'Требует решения':'Решено'}</span></button>)}</div>
    </Panel>
    <Panel title="Правила замены колледжа">
     <div className="studio-form">

@@ -27,8 +27,8 @@ export type SubstitutionOption={
 const remote=(l:Lesson)=>l.mode==='online'||l.mode==='async';
 const isOnline=(l:Lesson)=>l.mode!=='offline';
 const inWeek=(l:Lesson,week:number)=>l.status!=='cancelled'&&(l.week||0)===week;
-const absenceCovers=(teacher:string,day:number,absences:Absence[])=>
- absences.some(a=>a.status==='open'&&a.teacher===teacher&&day>=a.from&&day<=a.to);
+const absenceCovers=(teacher:string,day:number,week:number,absences:Absence[])=>
+ absences.some(a=>a.status==='open'&&a.teacher===teacher&&(a.week===undefined||a.week===week)&&day>=a.from&&day<=a.to);
 /** A remote lesson may only sit at an edge of the group's AND remote teacher's timetable,
  * with a genuine vacant travel interval between campus and home.
  */
@@ -76,7 +76,7 @@ export function suggestSubstitutions(
  const group=source.groups[0], result:SubstitutionOption[]=[];
  if(!GROUPS.some(g=>g.id===group))return [];
  const consider=(kind:SubstitutionOption['kind'],subject:string,teacher:string,mode:'offline'|'online',reason:string)=>{
-  if(teacher===source.teacher||absenceCovers(teacher,source.day,absences))return;
+  if(teacher===source.teacher||absenceCovers(teacher,source.day,week,absences))return;
   const eligibleRooms=mode==='online'?['Онлайн']:
    [...new Set([source.room,...ROOMS.filter(r=>r.active&&!blockedRooms.includes(r.id)).map(r=>r.id)])];
   for(const room of eligibleRooms){
