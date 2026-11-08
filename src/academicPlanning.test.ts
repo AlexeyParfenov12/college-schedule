@@ -13,12 +13,11 @@ describe('demo Academic Core adapter: no invented official curriculum',()=>{
   expect(demands.every(d=>d.requiredPairs>0&&d.availableWeeks)).toBe(true);
   expect(demands.find(d=>d.group==='П-21'&&d.subject==='Математика')?.requiredPairs).toBe(18);
  });
- it('gets the planning horizon from the last teaching period, not from user-edited required hours',()=>{
+ it('keeps the complete calendar horizon even when theory ends before summer',()=>{
   const horizon=demoAcademicHorizon(calendar);
-  expect(horizon).toBeGreaterThan(26);
-  expect(horizon).toBeLessThan(40);
+  expect(horizon).toBe(53);
   const extended=[...calendar,{id:'future',kind:'study' as const,title:'Учебный период',from:'2027-07-01',to:'2027-07-16',groups:[]}];
-  expect(demoAcademicHorizon(extended)).toBeGreaterThan(horizon);
+  expect(demoAcademicHorizon(extended)).toBe(horizon);
  });
  it('reports a group-specific teaching-week count and mock semester-hour summary',()=>{
   const d=demoAcademicDemands(calendar,5);
@@ -32,7 +31,7 @@ describe('demo Academic Core adapter: no invented official curriculum',()=>{
   expect(subject.periodAllocations?.reduce((sum,a)=>sum+a.requiredPairs,0)).toBe(subject.requiredPairs);
  });
  it('excludes weeks reserved for a specific group practice without affecting another group',()=>{
-  const practiceWeek=4; // 7–13 Dec: every teaching day belongs to the practice block.
+  const practiceWeek=14; // 7–13 Dec: every teaching day belongs to the practice block.
   const forPractice=teachingWeeks('П-31',calendar,5,demoAcademicHorizon(calendar),DEMO_SEMESTERS[0]);
   const forOther=teachingWeeks('П-21',calendar,5,demoAcademicHorizon(calendar),DEMO_SEMESTERS[0]);
   expect(forPractice).not.toContain(practiceWeek);
@@ -73,7 +72,7 @@ describe('annual solver respects semester quota and group eligibility',()=>{
    requiredPairs:3,pairsPerWeek:1,availableWeeks:[0,2],
    periodAllocations:[{id:'autumn',requiredPairs:2,weeks:[0]},{id:'spring',requiredPairs:1,weeks:[2]}]};
   const blockedAutumn:CalendarEvent[]=[{id:'holiday',kind:'holiday',title:'Закрыта осенняя неделя',
-    from:'2026-11-09',to:'2026-11-15',groups:['П-21']}];
+    from:'2026-09-01',to:'2026-09-06',groups:['П-21']}];
   const result=solveAnnualVariant([demand],cfg,blockedAutumn,0);
   expect(result.lessons.filter(l=>l.subject==='Математика').map(l=>l.week)).toEqual([2]);
   expect(result.coveredHours).toBe(2);
