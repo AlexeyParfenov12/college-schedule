@@ -65,7 +65,7 @@ export default function DecisionCenter({lessons,week,days,onNavigate,onApply,not
   <div className="dc-hero">
    <div className="dc-hero-title">
     <div className="dc-hero-icon"><ClipboardCheck size={23}/></div>
-    <div><h2>Центр решений</h2>
+    <div><h2>Рабочая очередь решений</h2>
      <p>Очередь задач учебной части · неделя {week+1} ({lessonDate(week,0)} — {lessonDate(week,days-1)})</p>
     </div>
    </div>

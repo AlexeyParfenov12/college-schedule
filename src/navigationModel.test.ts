@@ -3,9 +3,9 @@ import {NAV} from './data';
 import { NAV_SECTIONS, PREVIEW_SCREENS, menuContainsScreen, sectionForScreen } from './navigationModel';
 
 describe('dispatcher navigation model',()=>{
- it('contains exactly the eight agreed job areas',()=>{
+ it('includes the separate decision center and keeps all existing job areas',()=>{
   expect(NAV_SECTIONS.map(x=>x.label)).toEqual([
-   'Обзор','Расписание','Учебный календарь','Планирование',
+   'Обзор','Центр решений','Расписание','Учебный календарь','Планирование',
    'Замены','Отчёты','Справочники','Настройки']);
  });
  it('retains every old route exactly once without a destructive migration',()=>{
