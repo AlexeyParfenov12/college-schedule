@@ -4,6 +4,7 @@ import {cleanup,fireEvent,render,screen} from '@testing-library/react';
 import {TEACHERS} from './data';
 import type {Lesson} from './data';
 import DecisionCenter from './DecisionCenter';
+import type {DecisionProposal} from './decisionCenterDomain';
 
 const classInClosedRoom:Lesson={
  id:'room-demo',week:10,day:0,slot:1,subject:'Математика',teacher:TEACHERS[0],
@@ -35,7 +36,7 @@ describe('separate decision center UI',()=>{
   expect(JSON.stringify(classInClosedRoom)).toBe(original);
  });
  it('requires a separate confirm before emitting a single draft change',()=>{
-  const apply=vi.fn(()=>true);
+  const apply=vi.fn((_proposal:DecisionProposal)=>true);
   const confirm=vi.spyOn(window,'confirm').mockReturnValue(true);
   render(<DecisionCenter lessons={[classInClosedRoom]} week={10} days={6}
    onNavigate={vi.fn()} onApply={apply} notify={vi.fn()}/>);
