@@ -2,6 +2,7 @@ import type { CalendarEvent, Lesson } from './data';
 import { classifyCalendarDay, readCollegeWorkweek } from './productionCalendar';
 import type { CalendarDay, CalendarDayKind } from './productionCalendar';
 import { calendarIssues, lessonDate } from './plannerDomain';
+import { academicPractice, isPracticePhase } from './academicPracticeCatalog';
 
 export type CalendarPhase =
  'study'|'training'|'industrial'|'prediploma'|'exam'|'state'|'vacation'|'other'|'unassigned';
@@ -67,15 +68,17 @@ export const phaseAt=(events:CalendarEvent[],group:string,date:string):CalendarP
  const event=periodAt(events,group,date);
  return event?phaseForEvent(event):'unassigned';
 };
-export type WeekCell={phase:CalendarPhase;mixed:boolean;holidays:number;parts:CalendarPhase[];unassignedDays:number};
+export type WeekCell={phase:CalendarPhase;mixed:boolean;holidays:number;parts:CalendarPhase[];unassignedDays:number;practiceCodes:string[]};
 /** Never paint an unassigned week as theoretical training. */
 export function weekCell(events:CalendarEvent[],group:string,week:Week,closedDays?:ReadonlyMap<string,boolean>):WeekCell{
  const phases:CalendarPhase[]=[],seen=new Set<CalendarPhase>();
  const closedPhases:CalendarPhase[]=[],closedSeen=new Set<CalendarPhase>();
+ const practiceCodes=new Set<string>();
  let holidays=0,unassignedDays=0;
  const workweek=readCollegeWorkweek();
  for(let date=week.start;date<=week.end;date=plusDays(date,1)){
-  const phase=phaseAt(events,group,date);
+  const period=periodAt(events,group,date);
+  const phase=period?phaseForEvent(period):'unassigned';
   const nonWorking=(closedDays?.get(date)??classifyCalendarDay(date,workweek).nonWorking)||
    events.some(e=>e.kind==='holiday'&&e.from<=date&&e.to>=date&&
     (e.groups.length===0||e.groups.includes(group)));
@@ -89,11 +92,12 @@ export function weekCell(events:CalendarEvent[],group:string,week:Week,closedDay
    continue;
   }
   if(phase==='unassigned')unassignedDays++;
+  if(isPracticePhase(phase)&&period?.practiceCode)practiceCodes.add(period.practiceCode);
   if(!seen.has(phase)){seen.add(phase);phases.push(phase)}
  }
  const effective=phases.length?phases:closedPhases;
  return {phase:effective.length?effective[0]:'unassigned',
-  mixed:effective.length>1,holidays,parts:effective,unassignedDays};
+  mixed:effective.length>1||practiceCodes.size>1,holidays,parts:effective,unassignedDays,practiceCodes:[...practiceCodes]};
 }
 const relevant=(e:CalendarEvent,groups:string[],from:string,to:string)=>
  e.from<=to&&e.to>=from&&e.groups.some(g=>groups.includes(g));
@@ -105,8 +109,10 @@ export function affectedLessons(lessons:Lesson[],groups:string[],from:string,to:
 }
 let sequence=0;
 /** Atomic rewrite of group-specific calendar segments; global defaults are never destroyed. */
-export function assignPeriod(events:CalendarEvent[],groups:string[],from:string,to:string,phase:CalendarPhase,title?:string):CalendarEvent[]{
+export function assignPeriod(events:CalendarEvent[],groups:string[],from:string,to:string,phase:CalendarPhase,title?:string,practiceCode?:string):CalendarEvent[]{
  if(!groups.length||from>to)throw new Error('Некорректный диапазон или список групп');
+ const catalog=academicPractice(practiceCode);
+ if(practiceCode&&(!catalog||catalog.phase!==phase))throw new Error('Практика не соответствует виду периода Academic Core');
  const selected=new Set(groups),out:CalendarEvent[]=[];
  const nextId=()=> 'matrix-'+Date.now().toString(36)+'-'+(++sequence);
  for(const e of events){
@@ -119,7 +125,8 @@ export function assignPeriod(events:CalendarEvent[],groups:string[],from:string,
   }
  }
  const info=phaseInfo(phase);
- out.push({id:nextId(),title:title?.trim()||info.name,kind:info.kind,periodCode:phase,from,to,groups:[...selected]});
+ out.push({id:nextId(),title:catalog?.title||title?.trim()||info.name,kind:info.kind,periodCode:phase,from,to,groups:[...selected],
+  ...(catalog?{practiceCode:catalog.code}:{})});
  return out;
 }
 export type CalendarFinding={level:'error'|'warning';group:string;week:number;message:string};
@@ -182,7 +189,9 @@ export function matrixCSV(events:CalendarEvent[],groups:string[],weeks:Week[]):s
   // Export exact dates even when a holiday masks a transition on the weekly view.
   const days=Array.from({length:7},(_,i)=>{
    const date=plusDays(w.from,i);
-   return date<w.start||date>w.end?'~':phaseInfo(phaseAt(events,g,date)).short;
+   if(date<w.start||date>w.end)return '~';
+   const source=periodAt(events,g,date),phase=source?phaseForEvent(source):'unassigned';
+   return isPracticePhase(phase)&&source?.practiceCode?source.practiceCode:phaseInfo(phase).short;
   });
   const present=days.filter(x=>x!=='~');
   return present.every(x=>x===present[0])?present[0]:days.join('|');
@@ -222,7 +231,7 @@ export function importMatrixCSV(source:string,events:CalendarEvent[],year:number
  }
  const byCode=new Map(CALENDAR_PHASES.map(x=>[x.short,x.id]));
  const groups=new Set<string>(),seenGroups=new Set<string>();
- const edits:{group:string;phase:CalendarPhase;start:string;end:string}[]=[];
+ const edits:{group:string;phase:CalendarPhase;start:string;end:string;practiceCode?:string}[]=[];
  let editedCells=0;
  for(const row of lines.slice(1)){
   const group=row[0]?.trim();
@@ -247,10 +256,12 @@ export function importMatrixCSV(source:string,events:CalendarEvent[],year:number
    for(const part of parts){
     const code=part.code.trim();
     if(!code){current=undefined;continue}
-    const phase=byCode.get(code);
+    const catalog=academicPractice(code);
+    const phase=byCode.get(code)||catalog?.phase;
     if(!phase)throw new Error('Неизвестный код «'+code+'» у '+group+', неделя '+(i+1));
-    if(current&&current.phase===phase&&plusDays(current.end,1)===part.from)current.end=part.to;
-    else {current={group,phase,start:part.from,end:part.to};edits.push(current)}
+    const practiceCode=catalog?.code;
+    if(current&&current.phase===phase&&current.practiceCode===practiceCode&&plusDays(current.end,1)===part.from)current.end=part.to;
+    else {current={group,phase,start:part.from,end:part.to,practiceCode};edits.push(current)}
     editedWeek=true;
    }
    if(editedWeek){editedGroup=true;editedCells++}
@@ -259,27 +270,29 @@ export function importMatrixCSV(source:string,events:CalendarEvent[],year:number
  }
  if(!editedCells)throw new Error('В шаблоне нет заполненных недель. Впиши коды периодов в нужные ячейки; пустые ячейки не изменяют календарь.');
  let next=events;
- for(const edit of edits)next=assignPeriod(next,[edit.group],edit.start,edit.end,edit.phase);
+ for(const edit of edits)next=assignPeriod(next,[edit.group],edit.start,edit.end,edit.phase,undefined,edit.practiceCode);
  return {next,groups:groups.size,ranges:edits.length,cells:editedCells};
 }
 /** Copies exact daily activity, not a rough week label; optionally preserve target's existing periods. */
 export function copyGroupCalendar(events:CalendarEvent[],source:string,target:string,year:number,overwrite:boolean):CalendarEvent[]{
  if(source===target)throw new Error('Выбери другую группу');
  const from=String(year)+'-09-01',to=String(year+1)+'-08-31';
- const edits:{phase:CalendarPhase;start:string;end:string}[]=[];
+ const edits:{phase:CalendarPhase;start:string;end:string;practiceCode?:string}[]=[];
  let current:typeof edits[number]|undefined;
  for(let date=from;date<=to;date=plusDays(date,1)){
   const phase=phaseAt(events,source,date);
+  const sourcePractice=periodAt(events,source,date)?.practiceCode;
   const targetPhase=phaseAt(events,target,date);
+  const targetPractice=periodAt(events,target,date)?.practiceCode;
   // An inherited college-wide period is not a group-specific customization.
   // Preserve explicit target overrides, not merely the shared defaults.
   const explicitTarget=events.some(e=>e.kind!=='holiday'&&e.groups.includes(target)&&e.from<=date&&date<=e.to);
-  if(phase===targetPhase||(!overwrite&&explicitTarget)){current=undefined;continue}
-  if(current&&current.phase===phase&&plusDays(current.end,1)===date)current.end=date;
-  else{current={phase,start:date,end:date};edits.push(current)}
+  if((phase===targetPhase&&sourcePractice===targetPractice)||(!overwrite&&explicitTarget)){current=undefined;continue}
+  if(current&&current.phase===phase&&current.practiceCode===sourcePractice&&plusDays(current.end,1)===date)current.end=date;
+  else{current={phase,start:date,end:date,practiceCode:sourcePractice};edits.push(current)}
  }
  let next=events;
- for(const item of edits)next=assignPeriod(next,[target],item.start,item.end,item.phase);
+ for(const item of edits)next=assignPeriod(next,[target],item.start,item.end,item.phase,undefined,item.practiceCode);
  return next;
 }
 
@@ -316,8 +329,14 @@ export function parseCalendarBackup(source:string,expectedYear:number,allowedGro
   if(e.periodCode!==undefined&&(!codes.has(e.periodCode as CalendarPhase)||
      phaseInfo(e.periodCode as CalendarPhase).kind!==e.kind))
    throw new Error('Некорректный код учебного периода №'+(index+1));
+  if(e.practiceCode!==undefined){
+   const catalog=academicPractice(String(e.practiceCode));
+   if(e.kind!=='practice'||!catalog||catalog.phase!==phaseForEvent(e as CalendarEvent))
+    throw new Error('Неизвестный или несовместимый код практики №'+(index+1));
+  }
   return {id:e.id,title:e.title,kind:e.kind,from:e.from,to:e.to,
-   groups:[...e.groups],...(e.periodCode===undefined?{}:{periodCode:e.periodCode})} as CalendarEvent;
+   groups:[...e.groups],...(e.periodCode===undefined?{}:{periodCode:e.periodCode}),
+   ...(e.practiceCode===undefined?{}:{practiceCode:e.practiceCode})} as CalendarEvent;
  });
 }
 

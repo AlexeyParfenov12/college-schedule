@@ -11,10 +11,11 @@ export type AcademicPracticeAssignment={
  location:string; approvedHours:number;startSlot:number;
  calendarStamp:string;approved:boolean;
 };
-export const practicePeriodStamp=(p:KugPracticePeriod)=>[p.id,p.from,p.to,p.days.join(',')].join('|');
+export const practicePeriodStamp=(p:KugPracticePeriod)=>[p.id,p.practiceCode||'legacy',p.from,p.to,p.days.join(',')].join('|');
 export function practiceAssignmentProblems(p:KugPracticePeriod,a:AcademicPracticeAssignment|undefined,slotsPerDay:number):string[]{
  if(!a)return ['Нет подтверждённого назначения практики в Academic Core: укажите руководителя, место и часы'];
  const issues:string[]=[];
+ if(!p.practiceCode)issues.push('Укажи конкретную практику в КУГ (например, УП.05.01 или ПП.02.01)');
  if(a.periodId!==p.id||a.group!==p.group||a.phase!==p.phase)issues.push('Назначение не соответствует периоду КУГ');
  if(a.calendarStamp!==practicePeriodStamp(p))issues.push('КУГ изменён: подтвердите назначение для новых дат');
  if(!a.approved)issues.push('Назначение ещё не утверждено');
