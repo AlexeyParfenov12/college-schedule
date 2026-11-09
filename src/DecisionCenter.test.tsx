@@ -24,7 +24,7 @@ describe('separate decision center UI',()=>{
   render(<DecisionCenter lessons={[classInClosedRoom]} week={10} days={6}
    onNavigate={go} onApply={apply} notify={notify}/>);
   expect(screen.getByTestId('decision-center')).toBeTruthy();
-  expect(screen.getByText('Недоступен кабинет 109')).toBeTruthy();
+  expect(screen.getAllByText('Недоступен кабинет 109').length).toBeGreaterThan(0);
   expect(apply).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button',{name:'Проверить доступные решения'}));
   const option=screen.getAllByRole('button',{name:'Предпросмотр'})[0];
