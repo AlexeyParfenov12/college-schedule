@@ -2,19 +2,16 @@ import { DAYS, ROOMS, TEACHERS } from './data';
 import type { Lesson } from './data';
 import { QUALIFICATIONS, occupiedRooms, validate } from './demoLogic';
 import { calendarIssues, currentDemoCalendar } from './plannerDomain';
+import { readBlockedRooms } from './roomAvailability';
+export { readBlockedRooms } from './roomAvailability';
 
 export type Position = {day:number;slot:number};
 export type MoveOption = Position & {kind:'current'|'available'|'blocked';reason:string;label:string};
 export type TeacherSuggestion={name:string;available:boolean;qualified:boolean;reason:string;score:number};
 export type RoomSuggestion={id:string;available:boolean;reason:string;capacity:number;pcs:number;score:number};
-export const readBlockedRooms=():string[]=>{
- try{const raw=localStorage.getItem('college-schedule-extras-v1');if(!raw)return [];const settings=JSON.parse(raw);
- return Object.entries(settings.rooms||{}).filter(([,v])=>Boolean((v as {blocked?:boolean}).blocked)).map(([id])=>id)
- }catch{return []}
-};
 export const affectedParticipants=(lesson:Lesson)=>lesson.groups.join(' + ');
 /** A complete lesson is moved as a single linked unit: all stream/parallel members follow it. */
-export function explainCandidate(candidate:Lesson,all:Lesson[],blocked:string[]=[]):string[]{
+export function explainCandidate(candidate:Lesson,all:Lesson[],blocked:string[]=readBlockedRooms()):string[]{
  const messages:string[]=[];
  if(candidate.status==='held')messages.push('Занятие уже подтверждено как проведённое');
  for(const room of occupiedRooms(candidate)){
@@ -24,7 +21,7 @@ export function explainCandidate(candidate:Lesson,all:Lesson[],blocked:string[]=
  for(const issue of calendarIssues(candidate,currentDemoCalendar()))messages.push(issue);
  return [...new Set(messages)];
 }
-export function moveOptions(source:Lesson,all:Lesson[],blocked:string[]=[],days=6,slots=6):MoveOption[]{
+export function moveOptions(source:Lesson,all:Lesson[],blocked:string[]=readBlockedRooms(),days=6,slots=6):MoveOption[]{
  const result:MoveOption[]=[];
  for(let day=0;day<days;day++)for(let slot=1;slot<=slots;slot++){
    const label=DAYS[day]+' · '+slot+'-я пара';
@@ -34,7 +31,7 @@ export function moveOptions(source:Lesson,all:Lesson[],blocked:string[]=[],days=
  }
  return result;
 }
-export function teacherSuggestions(source:Lesson,all:Lesson[],blocked:string[]=[]):TeacherSuggestion[]{
+export function teacherSuggestions(source:Lesson,all:Lesson[],blocked:string[]=readBlockedRooms()):TeacherSuggestion[]{
  return TEACHERS.filter(t=>t!==source.teacher).map(name=>{
    const qualified=(QUALIFICATIONS[name]||[]).includes(source.subject);
    const conflicts=explainCandidate({...source,teacher:name},all,blocked);
@@ -43,7 +40,7 @@ export function teacherSuggestions(source:Lesson,all:Lesson[],blocked:string[]=[
    return {name,available,qualified,reason,score:(available?100:0)+(qualified?40:0)};
  }).sort((a,b)=>b.score-a.score||a.name.localeCompare(b.name,'ru'));
 }
-export function roomSuggestions(source:Lesson,all:Lesson[],blocked:string[]=[]):RoomSuggestion[]{
+export function roomSuggestions(source:Lesson,all:Lesson[],blocked:string[]=readBlockedRooms()):RoomSuggestion[]{
  return ROOMS.filter(room=>!occupiedRooms(source).includes(room.id)).map(room=>{
    const issues=explainCandidate({...source,room:room.id,mode:source.mode==='online'||source.mode==='async'?'offline':source.mode},all,blocked);
    const available=issues.length===0;
@@ -57,7 +54,7 @@ export function countAvailable(options:MoveOption[]):number{return options.filte
 
 export type SwapOption={lesson:Lesson;available:boolean;reason:string};
 /** Validate the two changed lessons as one atomic proposal before offering a swap. */
-export function swapOptions(source:Lesson,all:Lesson[],blocked:string[]=[]):SwapOption[]{
+export function swapOptions(source:Lesson,all:Lesson[],blocked:string[]=readBlockedRooms()):SwapOption[]{
  return all.filter(other=>other.id!==source.id&&(other.week||0)===(source.week||0)&&
    !(other.day===source.day&&other.slot===source.slot)&&other.status!=='cancelled').map(other=>{
    if(source.status==='held'||other.status==='held')return {lesson:other,available:false,reason:'Проведённые занятия нельзя переставлять'};

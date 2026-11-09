@@ -1,12 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import type { Lesson } from './data';
 import { ROOMS, TEACHERS } from './data';
-import { countAvailable, explainCandidate, moveOptions, teacherSuggestions, roomSuggestions, swapOptions } from './scheduleAssist';
+import { countAvailable, explainCandidate, moveOptions, teacherSuggestions, roomSuggestions, swapOptions, readBlockedRooms } from './scheduleAssist';
+import { readDispatcherSources } from './decisionCenterDomain';
 const src=(changes:Partial<Lesson>={}):Lesson=>({
  id:'original',week:10,day:0,slot:1,subject:'Программирование',teacher:TEACHERS[0],
  groups:['П-21'],room:'109',type:'regular',mode:'offline',...changes
 });
 describe('contextual scheduling assistant',()=>{
+ it('uses the v2 room closures in both the dispatcher and the assistant',()=>{
+  localStorage.setItem('college-schedule-extras-v1',JSON.stringify({rooms:{'102':{blocked:true}}}));
+  localStorage.setItem('college-schedule-extras-v2',JSON.stringify({rooms:{'109':{blocked:true},'110':{blocked:false}}}));
+  expect(readBlockedRooms()).toEqual(['109']);
+  expect(readDispatcherSources().blockedRooms).toEqual(['109']);
+  const a=src();
+  expect(moveOptions(a,[a]).find(x=>x.day===2&&x.slot===1)?.reason).toContain('Кабинет 109');
+  expect(roomSuggestions(src({room:'110'}),[a]).find(x=>x.id==='109')?.available).toBe(false);
+  localStorage.removeItem('college-schedule-extras-v1');
+  localStorage.removeItem('college-schedule-extras-v2');
+ });
+ it('uses the legacy closure key when the modern store does not exist',()=>{
+  localStorage.setItem('college-schedule-extras-v1',JSON.stringify({rooms:{'109':{blocked:true}}}));
+  expect(readBlockedRooms()).toEqual(['109']);
+  localStorage.removeItem('college-schedule-extras-v1');
+ });
  it('labels source, free slots and forbidden group collisions separately',()=>{
    const a=src(),other=src({id:'other',day:1,slot:2,teacher:TEACHERS[4],room:'110'});
    const slots=moveOptions(a,[a,other],[],6,6);

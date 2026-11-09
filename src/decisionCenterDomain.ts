@@ -11,6 +11,7 @@ import { practicePeriodsFromKug } from './kugPractice';
 import { practiceAssignmentProblems } from './practiceAssignments';
 import type { AcademicPracticeAssignment } from './practiceAssignments';
 import { roomSuggestions } from './scheduleAssist';
+import { readBlockedRooms } from './roomAvailability';
 import {
  DEFAULT_SUBSTITUTION_POLICY, suggestSubstitutions, applySubstitutionOption
 } from './substitutionPlanner';
@@ -53,8 +54,7 @@ export function readDispatcherSources():DispatcherSources{
  const data=value&&typeof value==='object'?value as Record<string,unknown>:{};
  const calendar=Array.isArray(data.calendar)?data.calendar as CalendarEvent[]:CALENDAR;
  const absences=Array.isArray(data.absences)?data.absences as Absence[]:ABSENCES;
- const rooms=data.rooms&&typeof data.rooms==='object'?data.rooms as Record<string,{blocked?:boolean}>:{};
- const blockedRooms=Object.entries(rooms).filter(([,r])=>r?.blocked).map(([id])=>id);
+ const blockedRooms=readBlockedRooms();
  const settings=data.substitutionPolicy&&typeof data.substitutionPolicy==='object'?
   data.substitutionPolicy as Partial<SubstitutionPolicy>:{};
  return {

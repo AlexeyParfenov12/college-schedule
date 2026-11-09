@@ -4,6 +4,8 @@ import { assessRoomFit } from './roomPolicy';
 export type Issue={kind:'group'|'teacher'|'room'|'capacity'|'equipment'|'parallel'|'calendar';message:string;hard:boolean};
 export const occupiedRooms=(l:Lesson)=> l.mode==='online'||l.mode==='async'?[]:Array.from(new Set((l.participants?.map(p=>p.room).join(' / ')||l.room).match(/\b\d{3}\b/g)||[]));
 export const participantGroups=(l:Lesson)=>Array.from(new Set(l.participants?.map(p=>p.group) || l.groups));
+/** A linked meeting reserves its primary teacher and every explicit participant teacher. */
+export const participantTeachers=(l:Lesson)=>Array.from(new Set([l.teacher,...(l.participants||[]).map(p=>p.teacher||'')].map(x=>x.trim()).filter(Boolean)));
 export function validate(l:Lesson, others:Lesson[], options:{capacity?:boolean;parallel?:boolean}={capacity:true,parallel:true}):Issue[]{
  const issues:Issue[]=[];
  const active=others.filter(x=>x.id!==l.id&&(x.week||0)===(l.week||0)&&x.day===l.day&&x.slot===l.slot&&x.status!=='cancelled');
@@ -11,7 +13,8 @@ export function validate(l:Lesson, others:Lesson[], options:{capacity?:boolean;p
  for(const x of active){
   const duplicates=groups.filter(g=>participantGroups(x).includes(g));
   if(duplicates.length)issues.push({kind:'group',hard:true,message:'Группа уже занята: '+duplicates.join(', ')});
-  if(x.teacher===l.teacher)issues.push({kind:'teacher',hard:true,message:'Преподаватель '+l.teacher+' уже ведёт '+x.subject});
+  const overlap=participantTeachers(l).filter(t=>participantTeachers(x).includes(t));
+  if(overlap.length)issues.push({kind:'teacher',hard:true,message:'Преподаватель '+overlap.join(', ')+' уже ведёт '+x.subject});
   const rooms=places.filter(r=>occupiedRooms(x).includes(r));
   if(rooms.length)issues.push({kind:'room',hard:true,message:'Аудитория '+rooms.join(', ')+' занята'});
  }

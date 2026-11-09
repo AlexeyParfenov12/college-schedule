@@ -29,6 +29,24 @@ describe('demonstration academic data',()=>{
  });
 });
 describe('hard scheduling constraints',()=>{
+ it('checks teachers named only inside parallel participants',()=>{
+  const parallel=basic({id:'parallel',type:'parallel',teacher:TEACHERS[0],groups:['П-21','П-22'],
+   room:'109 + онлайн',mode:'hybrid',participants:[
+    {group:'П-21',room:'109',mode:'offline',teacher:TEACHERS[1]},
+    {group:'П-22',room:'Онлайн',mode:'online',teacher:TEACHERS[2]}
+   ]});
+  const independent=basic({id:'independent',groups:['П-23'],room:'112',teacher:TEACHERS[2]});
+  expect(validate(independent,[parallel]).some(x=>x.kind==='teacher'&&x.hard&&x.message.includes(TEACHERS[2]))).toBe(true);
+  expect(validate(parallel,[independent]).some(x=>x.kind==='teacher'&&x.hard)).toBe(true);
+  expect(validate({...independent,teacher:TEACHERS[4]},[parallel]).some(x=>x.kind==='teacher')).toBe(false);
+ });
+ it('blocks two parallel lessons sharing a teacher through their participants',()=>{
+  const a=basic({id:'a',type:'parallel',groups:['П-21'],teacher:TEACHERS[0],room:'109',
+   participants:[{group:'П-21',room:'109',mode:'offline',teacher:TEACHERS[2]}]});
+  const b=basic({id:'b',type:'parallel',groups:['П-22'],teacher:TEACHERS[1],room:'110',
+   participants:[{group:'П-22',room:'110',mode:'offline',teacher:TEACHERS[2]}]});
+  expect(validate(a,[b]).some(x=>x.kind==='teacher'&&x.hard)).toBe(true);
+ });
  it('blocks a teacher in a second independent simultaneous lesson',()=>{
   const a=basic({id:'a',groups:['П-21']});
   const b=basic({id:'b',groups:['П-22']});
