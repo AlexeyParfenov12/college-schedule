@@ -54,6 +54,23 @@ describe('independent what-if timetable simulator',()=>{
   expect(report.differences).toHaveLength(2);
   expect(report.notice).toContain('не является опубликованным');
  });
+ it('models a closed building without relocating lessons into any room in that building',()=>{
+  const first=lesson('in-building-A',0,'109');
+  const second={...lesson('in-building-B',1,'209'),teacher:TEACHERS[1]};
+  const input={...roomScenario(),kind:'building' as const,building:'А'};
+  const result=modelScenario([first,second],input,sources(),6);
+  expect(result.affected.map(x=>x.id)).toEqual(['in-building-A']);
+  expect(result.variants.length).toBeGreaterThan(0);
+  const variant=result.variants[0];
+  if(variant.complete){
+   expect(variant.changes).toHaveLength(1);
+   const chosenRoom=ROOMS.find(r=>r.id===variant.changes[0].after.room);
+   expect(chosenRoom?.building).not.toBe('А');
+   expect(verifyScenarioVariant([first,second],input,sources(),6,variant).ok).toBe(true);
+  }else{
+   expect(variant.unresolved.length).toBeGreaterThan(0);
+  }
+ });
  it('does not fabricate a safe replacement for already held lessons',()=>{
   const original=[{...lesson('held'),status:'held' as const}];
   const plan=modelScenario(original,roomScenario(),sources(),6);

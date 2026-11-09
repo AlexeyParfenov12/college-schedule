@@ -13,10 +13,10 @@ import { idleWindows } from './scheduleWindowRules';
 import { suggestSubstitutions, applySubstitutionOption } from './substitutionPlanner';
 import type { DispatcherSources } from './decisionCenterDomain';
 
-export type ScenarioKind='room'|'teacher';
+export type ScenarioKind='room'|'building'|'teacher';
 export type ScenarioStrategy='minimal'|'compact'|'onsite';
 export type ScenarioInput={
- kind:ScenarioKind;week:number;room:string;teacher:string;fromDay:number;toDay:number;
+ kind:ScenarioKind;week:number;room:string;building?:string;teacher:string;fromDay:number;toDay:number;
 };
 export type ScenarioChange={before:Lesson;after:Lesson;reason:string};
 export type ScenarioUnresolved={lesson:Lesson;reason:string};
@@ -45,7 +45,9 @@ export function scenarioSignature(
 }
 export function scenarioAffected(lessons:Lesson[],input:ScenarioInput):Lesson[]{
  return lessons.filter(l=>active(l,input.week)&&l.day>=input.fromDay&&l.day<=input.toDay&&
-  (input.kind==='room'?occupiedRooms(l).includes(input.room):l.teacher===input.teacher)
+  (input.kind==='room'?occupiedRooms(l).includes(input.room):
+   input.kind==='building'?occupiedRooms(l).some(code=>ROOMS.some(r=>r.id===code&&r.building===input.building)):
+   l.teacher===input.teacher)
  ).sort((a,b)=>a.day-b.day||a.slot-b.slot||a.id.localeCompare(b.id));
 }
 export function scenarioInputProblems(input:ScenarioInput,days:5|6):string[]{
@@ -57,6 +59,8 @@ export function scenarioInputProblems(input:ScenarioInput,days:5|6):string[]{
   problems.push('Диапазон учебных дней задан неверно');
  if(input.kind==='room'&&!ROOMS.some(r=>r.id===input.room))
   problems.push('Аудитория отсутствует в общем справочнике');
+ if(input.kind==='building'&&!ROOMS.some(r=>r.building===input.building))
+  problems.push('Указанный корпус отсутствует в справочнике');
  if(input.kind==='teacher'&&!input.teacher)
   problems.push('Укажите преподавателя');
  return problems;
@@ -106,7 +110,9 @@ function simulate(
  const result=[...weekly];
  const updates:ScenarioChange[]=[];
  const unresolved:ScenarioUnresolved[]=[];
- const blocked=[...new Set([...sources.blockedRooms,...(input.kind==='room'?[input.room]:[])])];
+ const extraClosed=input.kind==='room'?[input.room]:input.kind==='building'?
+  ROOMS.filter(r=>r.building===input.building).map(r=>r.id):[];
+ const blocked=[...new Set([...sources.blockedRooms,...extraClosed])];
  const absences:Absence[]=input.kind==='teacher'?
   [...sources.absences,{id:'scenario-absence',teacher:input.teacher,week:input.week,
    from:input.fromDay,to:input.toDay,reason:'Гипотетическое отсутствие',status:'open'}]:
@@ -127,7 +133,7 @@ function simulate(
    unresolved.push({lesson:source,reason:'Связанное занятие, практика, поток или подгруппы требуют отдельной проверки целого блока'});continue;
   }
   let candidates:{after:Lesson;reason:string;score:number}[]=[];
-  if(input.kind==='room'){
+  if(input.kind==='room'||input.kind==='building'){
    if(source.mode!=='offline'){
     unresolved.push({lesson:source,reason:'Для гибридного или дистанционного формата нужна проверка всей схемы участия'});continue;
    }
@@ -217,6 +223,8 @@ export function verifyScenarioVariant(
    return {ok:false,reason:'После изменения нарушен КУГ или производственный календарь'};
   if(input.kind==='room'&&occupiedRooms(change.after).includes(input.room))
    return {ok:false,reason:'Пакет всё ещё использует закрытую аудиторию'};
+  if(input.kind==='building'&&occupiedRooms(change.after).some(code=>ROOMS.some(r=>r.id===code&&r.building===input.building)))
+   return {ok:false,reason:'Пакет использует помещение в закрытом корпусе'};
   if(input.kind==='teacher'&&change.after.teacher===input.teacher&&
    change.after.day>=input.fromDay&&change.after.day<=input.toDay)
    return {ok:false,reason:'Изменённое занятие всё ещё требует отсутствующего преподавателя'};

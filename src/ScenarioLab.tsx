@@ -1,5 +1,5 @@
 import {useMemo,useState} from 'react';
-import { AlertTriangle, ArrowLeftRight, CalendarDays, Check, ChevronDown, Download, DoorClosed,
+import { AlertTriangle, ArrowLeftRight, Building2, Check, ChevronDown, Download, DoorClosed,
  GitCompareArrows, Info, RefreshCw, ShieldCheck, UserRoundX, X } from 'lucide-react';
 import { DAYS, ROOMS, TEACHERS } from './data';
 import type {Lesson} from './data';
@@ -26,13 +26,14 @@ export default function ScenarioLab({lessons,week,days,onApply,notify}:Props){
  const [kind,setKind]=useState<ScenarioKind>('room');
  const [room,setRoom]=useState(usedRooms[0]||ROOMS[0].id);
  const [teacher,setTeacher]=useState(usedTeachers[0]||TEACHERS[0]);
+ const [building,setBuilding]=useState(ROOMS[0].building);
  const [fromDay,setFromDay]=useState(0);
  const [toDay,setToDay]=useState(days-1);
  const [result,setResult]=useState<ScenarioResult|null>(null);
  const [chosenId,setChosenId]=useState<ScenarioVariant['id']|null>(null);
  const [preview,setPreview]=useState(false);
  const [applied,setApplied]=useState(false);
- const input:ScenarioInput={kind,room,teacher,fromDay,toDay,week};
+ const input:ScenarioInput={kind,room,building,teacher,fromDay,toDay,week};
  const selected=result?.variants.find(x=>x.id===chosenId)||null;
  const freshSignature=result?scenarioSignature(lessons,input,readDispatcherSources(),days):'';
  const stale=Boolean(result&&freshSignature!==result.signature);
@@ -83,6 +84,10 @@ export default function ScenarioLab({lessons,week,days,onApply,notify}:Props){
       aria-pressed={kind==='room'} onClick={()=>{setKind('room');reset()}}>
       <DoorClosed size={19}/><b>Закрыта аудитория</b><small>Ремонт, авария, мероприятие</small>
      </button>
+     <button type="button" className={kind==='building'?'active':''}
+      aria-pressed={kind==='building'} onClick={()=>{setKind('building');reset()}}>
+      <Building2 size={19}/><b>Закрыт корпус</b><small>Ремонт, авария, ограничение доступа</small>
+     </button>
      <button type="button" className={kind==='teacher'?'active':''}
       aria-pressed={kind==='teacher'} onClick={()=>{setKind('teacher');reset()}}>
       <UserRoundX size={19}/><b>Отсутствует преподаватель</b><small>Больничный, командировка</small>
@@ -93,6 +98,10 @@ export default function ScenarioLab({lessons,week,days,onApply,notify}:Props){
       <select aria-label="Аудитория для сценария" value={room} onChange={e=>{setRoom(e.target.value);reset()}}>
        {[...new Set([...usedRooms,...ROOMS.filter(r=>r.active).map(r=>r.id)])].map(code=>
         <option key={code} value={code}>Каб. {code}{usedRooms.includes(code)?' · есть занятия':''}</option>)}
+      </select>
+     </label>:kind==='building'?<label>Корпус
+      <select aria-label="Корпус для сценария" value={building} onChange={e=>{setBuilding(e.target.value);reset()}}>
+       {[...new Set(ROOMS.map(r=>r.building))].map(name=><option key={name} value={name}>Корпус {name}</option>)}
       </select>
      </label>:<label>Преподаватель
       <select aria-label="Преподаватель для сценария" value={teacher} onChange={e=>{setTeacher(e.target.value);reset()}}>
