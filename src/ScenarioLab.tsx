@@ -164,6 +164,12 @@ export default function ScenarioLab({lessons,week,days,onApply,notify}:Props){
       </tbody></table>
       <p>Оценки приведены по всей выбранной учебной неделе. Сокращение окон здесь не гарантируется глобальным оптимумом.</p>
      </div>
+     <section className="sl-recipients" aria-label="Предпросмотр уведомлений">
+      <h4>Кого затронут изменения при публикации</h4>
+      <div><b>Группы:</b> {selected.metrics.groups.join(', ')||'—'}</div>
+      <div><b>Преподаватели:</b> {selected.metrics.teachers.join(', ')||'—'}</div>
+      <p>Это предварительный список для проверки оператором. Уведомления не отправлялись; публикация выполняется отдельно.</p>
+     </section>
      <div className="sl-controls">
       <button type="button" className="sl-btn" disabled={stale}
        onClick={()=>setPreview(p=>!p)}><ArrowLeftRight size={15}/>

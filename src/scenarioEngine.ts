@@ -96,7 +96,7 @@ function metric(before:Lesson[],after:Lesson[],affected:Lesson[],changes:Scenari
   onlineBefore:distant(before),onlineAfter:distant(after),
   replanHours:changes.reduce((sum,c)=>sum+(c.before.subject===c.after.subject?0:c.before.hours??2),0),
   groups:[...new Set(affected.flatMap(l=>l.groups))].sort(),
-  teachers:[...new Set(affected.map(l=>l.teacher))].sort()
+  teachers:[...new Set([...affected.map(l=>l.teacher),...changes.map(c=>c.after.teacher)])].sort()
  };
 }
 const variance=(before:Lesson[],after:Lesson[],policy:DispatcherSources['substitutionPolicy']):number=>
@@ -174,7 +174,7 @@ function simulate(
  }
  const metrics=metric(weekly,result,affected,updates,unresolved,sources.substitutionPolicy.commuteGap);
  const titles:Record<ScenarioStrategy,string>={
-  minimal:'Минимальные изменения',compact:'Меньше окон',onsite:'Приоритет очных занятий'
+  minimal:'Минимальные изменения',compact:'Приоритет сокращения окон',onsite:'Приоритет очных занятий'
  };
  const descriptions:Record<ScenarioStrategy,string>={
   minimal:'Предпочтение небольшим изменениям и знакомым аудиториям',

@@ -69,3 +69,8 @@
 .sl-done svg{flex:none}
 @media(max-width:850px){.sl-variants{grid-template-columns:1fr 1fr}.sl-fields{grid-template-columns:1fr 1fr}.sl-fields label:first-child{grid-column:span 2}}
 @media(max-width:590px){.sl-hero{align-items:flex-start;flex-direction:column;padding:13px}.sl-title h2{font-size:17px}.sl-kind{grid-template-columns:1fr}.sl-fields{grid-template-columns:1fr}.sl-fields label:first-child{grid-column:auto}.sl-mini-stats{gap:5px}.sl-mini-stats>div{padding:8px}.sl-mini-stats strong{font-size:17px}.sl-variants{grid-template-columns:1fr}.sl-panel-heading{align-items:flex-start;flex-direction:column}.sl-approval{flex-direction:column;align-items:stretch}.sl-approval .sl-btn{max-width:none}}
+
+.sl-recipients{margin:10px 15px;background:#f3f8f5;border:1px solid #dbe8df;border-radius:8px;padding:12px}
+.sl-recipients h4{font-size:12px;margin:0 0 9px}
+.sl-recipients>div{font-size:11px;line-height:1.6;margin:5px 0;overflow-wrap:anywhere}
+.sl-recipients p{font-size:10px;color:#627e76;line-height:1.5;margin:8px 0 0}
