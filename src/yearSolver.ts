@@ -428,6 +428,67 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
   compactAnnualWeek(state.lessons,cfg,events,2);
   // Remaining due is carried over into later weeks.
  }
+ // Second pass: the pace is a SOFT target, never a ceiling. If later weeks were
+ // blocked by calendar/resource constraints, recover missing semester hours in
+ // earlier eligible weeks. Never move the debt to another academic period.
+ for(const demand of regularDemands){
+  const periods=demand.periodAllocations?.map(p=>({
+   id:p.id,weeks:p.weeks,requiredHours:p.requiredHours??p.requiredPairs*2
+  }))||[{id:undefined,weeks:demand.availableWeeks||
+    Array.from({length:cfg.weeks},(_,i)=>i),requiredHours:demand.requiredHours??demand.requiredPairs*2}];
+  for(const period of periods){
+   const key=period.id?demand.id+'|'+period.id:'';
+   const already=period.id?coveredByPeriod.get(key)||0:covered.get(demand.id)||0;
+   let missing=Math.max(0,period.requiredHours-already);
+   if(!missing)continue;
+   const weeks=[...new Set(period.weeks)].filter(w=>w>=0&&w<cfg.weeks).sort((a,b)=>a-b);
+   for(const week of weeks){
+    if(!missing)break;
+    const state=createWeek();
+    for(const l of locked.filter(x=>(x.week||0)===week&&x.status==='held'))append(state,l);
+    for(const l of placed.filter(x=>(x.week||0)===week))append(state,l);
+    const rule=teacherRule(cfg,demand.teacher);
+    let additions=0;
+    while(missing>0&&additions<cfg.days*cfg.slotsPerDay){
+     const hours=(missing>=2?2:1) as 1|2;
+     const task:Task={demand,group:demand.group,teacher:demand.teacher,
+      subject:demand.subject,week,hours,periodId:period.id};
+     const candidates:{l:Lesson;score:number}[]=[];
+     for(let day=0;day<cfg.days;day++){
+      if(rule.daysOff.includes(day))continue;
+      for(let slot=1;slot<=cfg.slotsPerDay;slot++){
+       if(slot<rule.fromSlot||slot>rule.toSlot||
+        rule.forbidden.some(x=>x.day===day&&slot>=x.from&&slot<=x.to))continue;
+       if(!checkGroupSlot(cfg,demand.group,day,slot,get(state.groupByDay,k(demand.group,day)).length).allowed)continue;
+       if(!checkTeacherSlot(cfg,demand.teacher,day,slot,get(state.teacherByDay,k(demand.teacher,day)).length).allowed)continue;
+       if(state.groupBusy.has(busyKey(demand.group,day,slot))||
+        state.teacherBusy.has(busyKey(demand.teacher,day,slot)))continue;
+       if(events.some(e=>e.kind==='study')&&!isTeachingDate(lessonDate(week,day),demand.group,events,cfg.days))continue;
+       for(const room of suitableRooms(task,cfg,state,day,slot)){
+        const lesson:Lesson={id:'year-rebalance-'+variant+'-'+week+'-'+demand.id+'-'+additions+'-'+day+'-'+slot,
+         week,day,slot,groups:[demand.group],teacher:demand.teacher,subject:demand.subject,
+         room:room.room,mode:'offline',type:room.type,hours};
+        if(calendarIssues(lesson,events,cfg.days).length||hasSlotConflict(state,lesson))continue;
+        if(commuteViolations([...get(state.groupByDay,k(demand.group,day)),lesson],cfg.commuteGap).length||
+         commuteViolations([...get(state.teacherByDay,k(demand.teacher,day)),lesson],cfg.commuteGap).length)continue;
+        candidates.push({l:lesson,score:candidateScore(state,lesson,cfg,variant)});
+       }
+      }
+     }
+     candidates.sort((a,b)=>b.score-a.score);
+     if(!candidates.length)break;
+     const lesson=candidates[0].l;
+     append(state,lesson);placed.push(lesson);
+     covered.set(demand.id,(covered.get(demand.id)||0)+hours);
+     coveredByWeek.set(demand.id+'|'+week,(coveredByWeek.get(demand.id+'|'+week)||0)+hours);
+     if(period.id)coveredByPeriod.set(key,(coveredByPeriod.get(key)||0)+hours);
+     if(lesson.type==='subgroup')subgroupCount++;
+     missing-=hours;additions++;
+    }
+    if(additions)compactAnnualWeek(state.lessons,cfg,events,2);
+   }
+  }
+ }
  for(const d of regularDemands){
   const missing=(d.requiredHours??d.requiredPairs*2)-(covered.get(d.id)||0);
   if(missing>0){
