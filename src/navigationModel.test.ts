@@ -5,7 +5,7 @@ import { NAV_SECTIONS, PREVIEW_SCREENS, menuContainsScreen, sectionForScreen } f
 describe('dispatcher navigation model',()=>{
  it('includes the separate decision center and keeps all existing job areas',()=>{
   expect(NAV_SECTIONS.map(x=>x.label)).toEqual([
-   'Обзор','Центр решений','Расписание','Учебный календарь','Планирование',
+   'Обзор','Центр решений','Сценарии и последствия','Расписание','Учебный календарь','Планирование',
    'Замены','Отчёты','Справочники','Настройки']);
  });
  it('retains every old route exactly once without a destructive migration',()=>{

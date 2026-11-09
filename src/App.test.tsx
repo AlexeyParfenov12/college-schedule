@@ -54,11 +54,12 @@ describe('React interface smoke checks',()=>{
   render(<App/>);
   expect(screen.getByRole('heading',{name:'Расписание'})).toBeTruthy();
   const nav=within(document.querySelector('aside.nav nav')!);
-  expect(NAV_SECTIONS).toHaveLength(9);
+  expect(NAV_SECTIONS).toHaveLength(10);
   for(const section of NAV_SECTIONS)expect(nav.getByRole('button',{name:section.label})).toBeTruthy();
   for(const [key] of NAV)expect(menuContainsScreen(key)).toBe(true);
   expect(nav.getByRole('button',{name:'Шаблоны расписания'})).toBeTruthy();
   expect(nav.getByRole('button',{name:'Центр решений'})).toBeTruthy();
+  expect(nav.getByRole('button',{name:'Сценарии и последствия'})).toBeTruthy();
   expect(nav.getByRole('button',{name:'Развернуть Планирование'})).toBeTruthy();
   expect(nav.queryByRole('button',{name:'Автосоставление на неделю'})).toBeNull();
   expect(document.querySelector('.timetable')).toBeTruthy();

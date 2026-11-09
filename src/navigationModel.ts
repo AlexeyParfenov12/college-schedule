@@ -8,6 +8,7 @@ export type ScheduleScreen=typeof NAV[number][0];
 export const NAV_SECTIONS=[
  {key:'overview',label:'Обзор',children:[]},
  {key:'decisions',label:'Центр решений',children:[]},
+ {key:'scenarios',label:'Сценарии и последствия',children:[]},
  {key:'schedule',label:'Расписание',children:[
   ['templates','Шаблоны расписания'],['streams','Потоки'],['parallels','Параллели'],
   ['distance','Дистант и гибрид']

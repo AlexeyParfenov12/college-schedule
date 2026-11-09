@@ -84,7 +84,7 @@ export const NAV=[
  ['resources','Аудитории'],['distance','Дистант и гибрид'],['workload','Нагрузка и часы'],
  ['publication','Публикация'],['reports','Отчёты'],['academic','Академические данные'],
  ['settings','Настройки'],['teacher','Преподаватель'],['student','Студент'],
- ['decisions','Центр решений']
+ ['decisions','Центр решений'],['scenarios','Сценарии и последствия']
 ] as const;
 export const totalDatasetDays=16;
 export function buildSeed(weeks=16):Lesson[]{

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode, DragEvent, MouseEvent } from 'react';
-import { ClipboardCheck, CalendarDays, LayoutDashboard, ArrowLeftRight, Users, Building2, Settings2, FileText, Clock3, Plus, Download, Check, AlertTriangle, ChevronLeft, ChevronRight, ChevronDown, Menu, BookOpen, Monitor, Network, GitFork, WandSparkles, Save, X, Pencil, Trash2, Copy, Bell, Layers3, BarChart3, RotateCcw, Eye, SlidersHorizontal, Send, School, Filter } from 'lucide-react';
+import { GitCompareArrows, ClipboardCheck, CalendarDays, LayoutDashboard, ArrowLeftRight, Users, Building2, Settings2, FileText, Clock3, Plus, Download, Check, AlertTriangle, ChevronLeft, ChevronRight, ChevronDown, Menu, BookOpen, Monitor, Network, GitFork, WandSparkles, Save, X, Pencil, Trash2, Copy, Bell, Layers3, BarChart3, RotateCcw, Eye, SlidersHorizontal, Send, School, Filter } from 'lucide-react';
 import { DAYS, TIMES, GROUPS, TEACHERS, SUBJECTS, ROOMS, TYPES, MODES, INITIAL, NAV, CALENDAR, buildSeed } from './data';
 import type { Lesson, Type, Mode } from './data';
 import AdvancedWorkflows from './AdvancedWorkflows';
@@ -10,6 +10,10 @@ import SmartLessonEditor from './SmartLessonEditor';
 import LessonWeekMove from './LessonWeekMove';
 import AnnualPlanner from './AnnualPlanner';
 import DecisionCenter from './DecisionCenter';
+import ScenarioLab from './ScenarioLab';
+import { readDispatcherSources } from './decisionCenterDomain';
+import { verifyScenarioVariant } from './scenarioEngine';
+import type { ScenarioInput, ScenarioVariant } from './scenarioEngine';
 import type { DecisionProposal } from './decisionCenterDomain';
 import MobileSchedule from './MobileSchedule';
 import PolishedSelect from './PolishedSelect';
@@ -476,6 +480,20 @@ export default function App(){
       setNotice('Решение сохранено только в черновик. Публикация не выполнялась.');
       return true;
      }}/>
+  : screen==='scenarios'?<ScenarioLab lessons={items} week={week} days={days} notify={setNotice}
+     onApply={(variant:ScenarioVariant,input:ScenarioInput)=>{
+      const fresh=readDispatcherSources();
+      const check=verifyScenarioVariant(items,input,fresh,days,variant);
+      if(!check.ok){setNotice('Пакет не сохранён: '+check.reason);return false}
+      const ids=variant.changes.map(c=>c.before.id);
+      const before=items.filter(l=>ids.includes(l.id));
+      const changed=new Map(variant.changes.map(c=>[c.before.id,c.after]));
+      setLastChange({before,changedIds:ids});
+      setItems(previous=>previous.map(l=>changed.get(l.id)||l));
+      setStatus('draft');setSelected(null);setMoveMode(false);setPreview(null);
+      setNotice('Пакет из '+ids.length+' занятий добавлен в черновик. Публикации не было. Ctrl+Z отменяет последнее изменение.');
+      return true;
+     }}/>
   : screen==='year'?<AnnualPlanner lessons={items} days={days} practiceAssignments={(()=>{
      try{const v=JSON.parse((localStorage.getItem('college-schedule-extras-v2')||'{}'));return Array.isArray(v.practiceAssignments)?v.practiceAssignments:[]}
      catch{return []}
@@ -512,7 +530,7 @@ export default function App(){
    <nav aria-label="Разделы College Schedule">
     {NAV_SECTIONS.map(section=>{
      const index=NAV.findIndex(([key])=>key===section.key);
-     const Icon=section.key==='decisions'?ClipboardCheck:iconSet[index]||CalendarDays;
+     const Icon=section.key==='decisions'?ClipboardCheck:section.key==='scenarios'?GitCompareArrows:iconSet[index]||CalendarDays;
      const active=screen===section.key||section.children.some(([key])=>key===screen);
      const open=expandedNav.includes(section.key);
      return <div className={'nav-section'+(active?' current':'')} key={section.key}>
