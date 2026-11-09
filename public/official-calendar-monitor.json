@@ -1,7 +1,7 @@
 {
   "version": 1,
   "source": "publication.pravo.gov.ru",
-  "checkedAt": "2026-11-08T16:07:50Z",
+  "checkedAt": "2026-11-09T13:00:59Z",
   "status": "unavailable",
   "daysChecked": 0,
   "daysFailed": 4,
@@ -22,9 +22,9 @@
   ],
   "candidates": [],
   "failures": [
-    "2026-10-26: <urlopen error timed out>",
     "2026-10-27: <urlopen error timed out>",
     "2026-10-28: <urlopen error timed out>",
+    "2026-10-29: <urlopen error timed out>",
     "Официальный портал недоступен три проверки подряд; остальные даты не подтверждены"
   ]
 }
