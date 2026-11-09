@@ -50,14 +50,15 @@ describe('non-destructive academic-week migration',()=>{
  },20000);
 });
 describe('React interface smoke checks',()=>{
- it('shows eight task sections while retaining links to every legacy screen',()=>{
+ it('shows the separate decisions center and retains every legacy screen',()=>{
   render(<App/>);
   expect(screen.getByRole('heading',{name:'Расписание'})).toBeTruthy();
   const nav=within(document.querySelector('aside.nav nav')!);
-  expect(NAV_SECTIONS).toHaveLength(8);
+  expect(NAV_SECTIONS).toHaveLength(9);
   for(const section of NAV_SECTIONS)expect(nav.getByRole('button',{name:section.label})).toBeTruthy();
   for(const [key] of NAV)expect(menuContainsScreen(key)).toBe(true);
   expect(nav.getByRole('button',{name:'Шаблоны расписания'})).toBeTruthy();
+  expect(nav.getByRole('button',{name:'Центр решений'})).toBeTruthy();
   expect(nav.getByRole('button',{name:'Развернуть Планирование'})).toBeTruthy();
   expect(nav.queryByRole('button',{name:'Автосоставление на неделю'})).toBeNull();
   expect(document.querySelector('.timetable')).toBeTruthy();

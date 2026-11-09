@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode, DragEvent, MouseEvent } from 'react';
-import { CalendarDays, LayoutDashboard, ArrowLeftRight, Users, Building2, Settings2, FileText, Clock3, Plus, Download, Check, AlertTriangle, ChevronLeft, ChevronRight, ChevronDown, Menu, BookOpen, Monitor, Network, GitFork, WandSparkles, Save, X, Pencil, Trash2, Copy, Bell, Layers3, BarChart3, RotateCcw, Eye, SlidersHorizontal, Send, School, Filter } from 'lucide-react';
+import { ClipboardCheck, CalendarDays, LayoutDashboard, ArrowLeftRight, Users, Building2, Settings2, FileText, Clock3, Plus, Download, Check, AlertTriangle, ChevronLeft, ChevronRight, ChevronDown, Menu, BookOpen, Monitor, Network, GitFork, WandSparkles, Save, X, Pencil, Trash2, Copy, Bell, Layers3, BarChart3, RotateCcw, Eye, SlidersHorizontal, Send, School, Filter } from 'lucide-react';
 import { DAYS, TIMES, GROUPS, TEACHERS, SUBJECTS, ROOMS, TYPES, MODES, INITIAL, NAV, CALENDAR, buildSeed } from './data';
 import type { Lesson, Type, Mode } from './data';
 import AdvancedWorkflows from './AdvancedWorkflows';
@@ -9,6 +9,8 @@ import LessonQuickActions from './LessonQuickActions';
 import SmartLessonEditor from './SmartLessonEditor';
 import LessonWeekMove from './LessonWeekMove';
 import AnnualPlanner from './AnnualPlanner';
+import DecisionCenter from './DecisionCenter';
+import type { DecisionProposal } from './decisionCenterDomain';
 import MobileSchedule from './MobileSchedule';
 import PolishedSelect from './PolishedSelect';
 import { moveOptions, explainCandidate, readBlockedRooms, swapOptions } from './scheduleAssist';
@@ -464,6 +466,16 @@ export default function App(){
  const month=<div className="calendar-grid">{['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(v=><b key={v}>{v}</b>)}{Array.from({length:6},(_,i)=><span key={'o'+i}/>)}{Array.from({length:30},(_,i)=><button className={i+1>=9&&i+1<=14?'week-day':''} key={i}>{i+1}</button>)}</div>;
  const render=()=>screen==='schedule'
   ? <>{weekHeader}{schedule}</>
+  : screen==='decisions'?<DecisionCenter lessons={items} week={week} days={days}
+     onNavigate={show} notify={setNotice} onApply={(proposal:DecisionProposal)=>{
+      const source=items.find(x=>x.id===proposal.source.id);
+      if(!source||source.status==='held'||source.status==='cancelled'||
+       JSON.stringify(source)!==JSON.stringify(proposal.source))return false;
+      setItems(previous=>previous.map(x=>x.id===source.id?proposal.after:x));
+      setStatus('draft');setLastChange(null);setSelected(null);
+      setNotice('Решение сохранено только в черновик. Публикация не выполнялась.');
+      return true;
+     }}/>
   : screen==='year'?<AnnualPlanner lessons={items} days={days} practiceAssignments={(()=>{
      try{const v=JSON.parse((localStorage.getItem('college-schedule-extras-v2')||'{}'));return Array.isArray(v.practiceAssignments)?v.practiceAssignments:[]}
      catch{return []}
@@ -500,7 +512,7 @@ export default function App(){
    <nav aria-label="Разделы College Schedule">
     {NAV_SECTIONS.map(section=>{
      const index=NAV.findIndex(([key])=>key===section.key);
-     const Icon=iconSet[index]||CalendarDays;
+     const Icon=section.key==='decisions'?ClipboardCheck:iconSet[index]||CalendarDays;
      const active=screen===section.key||section.children.some(([key])=>key===screen);
      const open=expandedNav.includes(section.key);
      return <div className={'nav-section'+(active?' current':'')} key={section.key}>
