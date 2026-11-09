@@ -352,3 +352,7 @@
 .kug-tools .kug-actions>.kug-primary:hover{background:#15584d}
 @media(max-width:780px){.kug-template-guide{padding:9px}.kug-template-codes>span{white-space:normal}}
 @media print{.kug-template-guide{display:none!important}}
+
+/* Named practice code can occupy an entire week cell, even on mixed weeks. */
+.kug-cell-practice{display:block;font-size:8px;line-height:1.05;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:inherit;opacity:.88}
+.kug-cell-label{overflow-wrap:anywhere}

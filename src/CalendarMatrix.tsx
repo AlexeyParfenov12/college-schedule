@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Check, ChevronDown, ChevronRight, ClipboardCopy, Download, RotateCcw, Search, Table2, Users } from 'lucide-react';
 import { GROUPS } from './data';
+import { academicPractice, isPracticePhase, practicesOfPhase } from './academicPracticeCatalog';
 import type { CalendarEvent, Lesson } from './data';
 import { assignPeriod, calendarChangeImpact, CALENDAR_PHASES, calendarWeeks, checkCalendar, copyGroupCalendar, importMatrixCSV, kugWeekDays, matrixCSV, matrixTemplateCSV, parseCalendarBackup, phaseInfo, weekCell } from './calendarMatrixDomain';
 import type { MatrixImport } from './calendarMatrixDomain';
@@ -56,6 +57,7 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
  const [selection,setSelection]=useState<Selected|null>(null);
  const [rows,setRows]=useState<string[]>([group]);
  const [phase,setPhase]=useState<CalendarPhase>('training');
+ const [practiceCode,setPracticeCode]=useState('УП.05.01');
  const [title,setTitle]=useState('');
  const [preview,setPreview]=useState(false);
  const [showCheck,setShowCheck]=useState(false);
@@ -123,10 +125,11 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
  const end=selection?Math.max(selection.anchor,selection.end):0;
  const from=exactFrom||weeks[start]?.start||'',to=exactTo||weeks[end]?.end||'';
  const academicStart=year+'-09-01',academicEnd=(year+1)+'-08-31';
- const validRange=Boolean(selection&&selectedGroups.length&&from&&to&&from<=to&&from>=academicStart&&to<=academicEnd);
+ const validRange=Boolean(selection&&selectedGroups.length&&from&&to&&from<=to&&from>=academicStart&&to<=academicEnd&&
+  (!isPracticePhase(phase)||academicPractice(practiceCode)?.phase===phase));
  const projected=useMemo(()=>preview&&validRange?
-  assignPeriod(events,selectedGroups,from,to,phase,title):null,
-  [preview,validRange,events,selectedGroups.join('|'),from,to,phase,title]);
+  assignPeriod(events,selectedGroups,from,to,phase,title,isPracticePhase(phase)?practiceCode:undefined):null,
+  [preview,validRange,events,selectedGroups.join('|'),from,to,phase,title,practiceCode]);
  const impact=useMemo(()=>projected?calendarChangeImpact(events,projected,lessons,selectedGroups,from,to):null,
   [projected,events,lessons,selectedGroups.join('|'),from,to]);
  const copyReceiver=copyTarget===group?(GROUPS.find(g=>g.id!==group)?.id||copyTarget):copyTarget;
@@ -240,16 +243,19 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    {visibleWeeks.map(w=>{
     const cell=cells.get(g.id+':'+w.index)!;
     const picked=Boolean(rows.includes(g.id)&&selection&&w.index>=start&&w.index<=end);
-    const chosen=phaseInfo(cell.phase);
+    const chosen=phaseInfo(cell.phase),coded=cell.practiceCodes.map(x=>academicPractice(x)?.code||x);
     const special=events.some(e=>e.kind==='holiday'&&e.groups.includes(g.id)&&e.from<=w.end&&e.to>=w.start);
     return <td key={w.index}><button type="button" aria-label={g.id+', неделя '+(w.index+1)+': '+(cell.mixed?'Смешанная неделя':chosen.name)}
-     title={g.id+' · '+w.start+' — '+w.end+'\n'+(cell.mixed?cell.parts.map(p=>phaseInfo(p).name).join(' / '):chosen.name)}
+     title={g.id+' · '+w.start+' — '+w.end+'\n'+(cell.mixed?cell.parts.map(p=>phaseInfo(p).name).join(' / '):chosen.name)+
+      (cell.practiceCodes.length?'\n'+cell.practiceCodes.map(code=>code+' — '+(academicPractice(code)?.title||'Неизвестная практика')).join('; '):'')}
      className={'kug-cell kug-'+chosen.color+(cell.mixed?' kug-mixed':'')+(picked?' kug-picked':'')+(special?' kug-group-exception':'')}
      onClick={e=>selectCell(g.id,w.index,e.shiftKey)}
      onMouseDown={()=>{dragging.current=true}}
      onMouseEnter={e=>{if(e.buttons===1)markRange(g.id,w.index)}}
      onMouseUp={()=>dragging.current=false}>
-     <span className="kug-cell-label">{cell.mixed?'◐':chosen.short}</span>
+     <span className="kug-cell-label">{cell.mixed?'◐':coded[0]||chosen.short}</span>
+     {cell.mixed&&coded.length===1&&<small className="kug-cell-practice">{coded[0]}</small>}
+     {coded.length>1&&<small className="kug-cell-practice">{coded.length} практики</small>}
      {mode==='large'&&<span className="kug-day-strip kug-large-weekdays" aria-label="Дни недели">
       {(largeWeekDays.get(g.id+':'+w.index)||[]).map(day=>
        <i key={day.date} title={day.dayName+': '+day.label}
@@ -295,6 +301,7 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
       Для дней с разными периодами используй семь кодов, разделённых знаком <b>|</b> (с понедельника по воскресенье).</p>
      <div className="kug-template-codes" aria-label="Допустимые коды периодов">
       {CALENDAR_PHASES.map(p=><span key={p.id}><b>{p.short}</b> — {p.name}</span>)}
+      {practicesOfPhase('training').concat(practicesOfPhase('industrial'),practicesOfPhase('prediploma')).map(p=><span key={p.code}><b>{p.code}</b> — {p.title}</span>)}
      </div>
      <p>Не меняй заголовки с датами и названия групп. В шаблоне можно удалить строки групп, которые не требуется импортировать. Праздники и выходные учитываются системой отдельно.</p>
     </div>
@@ -432,7 +439,7 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
         (cell.mixed?' kug-mixed':'')+(selection&&w.index>=start&&w.index<=end?' kug-picked':'')}
        onClick={e=>selectCell(group,w.index,e.shiftKey)}>
        <b>{w.index+1}-я неделя · {dateText(w.start)}–{dateText(w.end)}</b>
-       <span>{cell.mixed?cell.parts.map(p=>phaseInfo(p).name).join(' / '):phaseInfo(cell.phase).name}</span>
+       <span>{cell.mixed?cell.parts.map(p=>phaseInfo(p).name).join(' / '):phaseInfo(cell.phase).name}{cell.practiceCodes.length?' · '+cell.practiceCodes.join(', '):''}</span>
        <span className="kug-day-strip kug-single-strip" aria-label="Отметки дней недели">
         {days.map(day=><i key={day.date} title={day.dayName+': '+day.label}
          className={'kug-day-dot '+(day.withinYear?'kug-day-'+day.kind:'kug-day-outside')}/>)}
@@ -462,7 +469,7 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    </div>
    {detailDays.some(day=>day.withinYear&&!day.confirmedTransfers)&&
     <p className="kug-day-pending">Переносы выходных для этого года ещё не подтверждены. Показаны известные федеральные праздники и обычные выходные; переносы требуют проверки.</p>}
-   <p className="kug-day-note">Праздники и выходные не меняют вид учебного периода группы. Пяти- и шестидневная неделя учитывается по настройкам колледжа.</p>
+   <p className="kug-day-note">Код конкретной практики (УП.05.01, ПП.02.01 и т. д.) берётся из общего академического справочника; даты остаются в КУГ. Праздники и выходные не меняют вид учебного периода группы. Пяти- и шестидневная неделя учитывается по настройкам колледжа.</p>
   </section>}
   <div className="kug-editor" aria-label="Быстрое заполнение учебных недель">
    <div className="kug-editor-title"><b>Быстрое заполнение</b><span>{selectedGroups.length} групп · {selection?'Недели '+(start+1)+'–'+(end+1):'Выбери неделю'} · {selection?from+' — '+to:''}</span></div>
@@ -471,9 +478,14 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
      {weeks.map(w=><option key={w.index} value={w.index}>{w.index+1} · {dateText(w.start)}</option>)}</select></label>
     <label>По неделю<select aria-label="Конец диапазона КУГ" value={end} onChange={e=>{const n=Number(e.target.value);setSelection({anchor:Math.min(start,n),end:n,group});setExactFrom('');setExactTo('');setPreview(false)}}>
      {weeks.map(w=><option key={w.index} value={w.index}>{w.index+1} · {dateText(w.end)}</option>)}</select></label>
-    <label>Вид периода<select aria-label="Вид периода КУГ" value={phase} onChange={e=>{setPhase(e.target.value as CalendarPhase);setTitle('');setPreview(false)}}>
+    <label>Вид периода<select aria-label="Вид периода КУГ" value={phase} onChange={e=>{const next=e.target.value as CalendarPhase;setPhase(next);setPracticeCode(practicesOfPhase(next)[0]?.code||'');setTitle('');setPreview(false)}}>
      {CALENDAR_PHASES.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-    <label>Уточнение названия<input aria-label="Название периода КУГ" value={title} onChange={e=>{setTitle(e.target.value);setPreview(false)}} placeholder={phaseName}/></label>
+    {isPracticePhase(phase)&&<label>Конкретная практика (Academic Core)<select aria-label="Код практики КУГ" value={practiceCode} onChange={e=>{setPracticeCode(e.target.value);setPreview(false)}}>
+     {practicesOfPhase(phase).map(p=><option key={p.code} value={p.code}>{p.code} — {p.title}</option>)}
+    </select></label>}
+    <label>{isPracticePhase(phase)?'Название из Academic Core':'Уточнение названия'}<input aria-label="Название периода КУГ"
+     value={isPracticePhase(phase)?academicPractice(practiceCode)?.title||'':title} disabled={isPracticePhase(phase)}
+     onChange={e=>{setTitle(e.target.value);setPreview(false)}} placeholder={phaseName}/></label>
      <label>Точная дата начала<input aria-label="Точная дата начала периода" type="date" min={academicStart} max={academicEnd} value={from} onChange={e=>{setExactFrom(e.target.value);setPreview(false)}}/></label>
      <label>Точная дата окончания<input aria-label="Точная дата окончания периода" type="date" min={academicStart} max={academicEnd} value={to} onChange={e=>{setExactTo(e.target.value);setPreview(false)}}/></label>
    </div>
@@ -485,7 +497,7 @@ export default function CalendarMatrix({events,lessons,group,setGroup,replace}:P
    </div>
    {preview&&<div className="kug-preview" role="status">
     <strong>Предварительный просмотр</strong>
-    <p>Период «{title||phaseName}» для {selectedGroups.length} групп; {from} — {to} ({Math.round((Date.parse(to+'T00:00:00Z')-Date.parse(from+'T00:00:00Z'))/86400000)+1} календарных дней).</p>
+    <p>Период «{isPracticePhase(phase)?practiceCode+' — '+(academicPractice(practiceCode)?.title||''):title||phaseName}» для {selectedGroups.length} групп; {from} — {to} ({Math.round((Date.parse(to+'T00:00:00Z')-Date.parse(from+'T00:00:00Z'))/86400000)+1} календарных дней).</p>
     <p>Занятий в этом периоде: <b>{impact?.affected.length||0}</b>.
      Новых конфликтов после изменения: <b>{impact?.newlyBlocked.length||0}</b>.
      Ранее проблемных занятий: <b>{impact?.alreadyBlocked.length||0}</b>.

@@ -245,7 +245,7 @@ export default function AdvancedWorkflows(p:Props){
      {!period?<p className="muted">В КУГ этой группы нет рабочих дней практики. Выберите другую группу или заполните учебный календарь.</p>:
       <div className="studio-form">
        <Field title="Период практики из КУГ"><Select value={period.id} onChange={choosePeriod}
-        items={periods.map(x=>({id:x.id,label:x.from+' — '+x.to+' · '+x.phase+' · неделя '+(x.week+1)}))}/></Field>
+        items={periods.map(x=>({id:x.id,label:x.from+' — '+x.to+' · '+(x.practiceCode||x.phase+' (уточнить практику)')+' · неделя '+(x.week+1)}))}/></Field>
        <div className="studio-duo">
         <Field title="Руководитель практики"><Select value={practiceSupervisor||existing?.supervisor||''} onChange={setPracticeSupervisor}
          items={[{id:'',label:'Не назначен'},...TEACHERS.map(t=>({id:t,label:t}))]}/></Field>
