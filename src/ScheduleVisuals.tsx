@@ -23,7 +23,7 @@ export function MiniSchedule({lessons,week,group,teacher,room,highlightIds=[],on
     const special=found.some(x=>x.type!=='regular');
     return <div className={'viz-cell '+(found.length?'occupied ':'')+(change?'candidate ':'')+(special?'special':'')} key={d+'-'+slot}
       title={found.length?found.map(x=>x.subject+' · '+x.groups.join(', ')).join('\n'):'Свободно'}>
-      {found.slice(0,2).map(l=><button type="button" key={l.id} onClick={()=>onSelect?.(l)} disabled={!onSelect} className="viz-event" title={l.subject+' — '+l.room}><span>{l.subject}</span>{found.length>1&&<small>{l.groups[0]}</small>}</button>)}
+      {found.slice(0,2).map(l=><button type="button" key={l.id} onClick={()=>onSelect?.(l)} disabled={!onSelect} className="viz-event" title={l.subject+' — '+l.room+' · '+(l.hours??2)+' акад. ч'}><span>{l.subject}{l.hours===1?' · 1 ч':''}</span>{found.length>1&&<small>{l.groups[0]}</small>}</button>)}
       {found.length>2&&<small className="viz-more">+{found.length-2}</small>}
     </div>;
    })

@@ -130,7 +130,7 @@ export default function AnnualPlanner({lessons,calendar,practiceAssignments=[],d
  const groupStats=academicGroupStats(demands,group);
  const selected=variants[active];
  const issues=(selected?.unplaced||[]).filter(x=>(x.group+x.subject+x.teacher+x.reason).toLowerCase().includes(issueSearch.toLowerCase()));
- const totalHours=demands.reduce((s,d)=>s+d.requiredPairs*2,0);
+ const totalHours=demands.reduce((s,d)=>s+(d.requiredHours??d.requiredPairs*2),0);
  const applyTeacher=(changes:Partial<TeacherPreference>)=>change(c=>({
   ...c,teacherPreferences:{...c.teacherPreferences,[teacher]:{
    ...(c.teacherPreferences[teacher]||{daysOff:[],fromSlot:1,toSlot:6,forbidden:[],preferDays:[],maxOnlinePct:c.defaultOnlinePct}),
@@ -189,12 +189,15 @@ export default function AnnualPlanner({lessons,calendar,practiceAssignments=[],d
     <span>{groupStats.plannedHours} академических часов по демоплану</span>
    </div>
    <div className="year-table-scroll"><table><thead><tr>
-    <th>Дисциплина</th><th>Преподаватель</th><th>Осень, ч</th><th>Весна, ч</th><th>Всего, ч</th>
+    <th>Дисциплина</th><th>Преподаватель</th><th>Осень, ч</th><th>Темп, ч/нед</th><th>Весна, ч</th><th>Темп, ч/нед</th><th>Всего, ч</th>
    </tr></thead><tbody>{selectedDemands.map(d=><tr key={d.id}>
     <td>{d.subject}</td><td>{d.teacher}</td><td>{(d.semesters?.autumnPairs||0)*2}</td>
-    <td>{(d.semesters?.springPairs||0)*2}</td><td><strong>{d.requiredPairs*2}</strong></td>
+    <td>{d.periodAllocations?.find(p=>p.id==='autumn')?.weeklyTargetHours??'Гибко'}</td>
+    <td>{(d.semesters?.springPairs||0)*2}</td>
+    <td>{d.periodAllocations?.find(p=>p.id==='spring')?.weeklyTargetHours??'Гибко'}</td>
+    <td><strong>{d.requiredHours??d.requiredPairs*2}</strong></td>
    </tr>)}</tbody></table></div>
-   <div className="year-note">Часы не редактируются в расписании: изменения утверждённого учебного плана выполняются в Academic Core. Демонстрационные назначения охватывают {DEMO_SEMESTERS.length} учебных периода; периоды можно настроить в учебном календаре.</div>
+   <div className="year-note">Темп часов в неделю — предпочтение, а не запрет: возможны отклонения при строгом сохранении часов каждого семестра. Нечётные часы в демостенде занимают отдельную ячейку расписания. Часы не редактируются в расписании: изменения утверждённого учебного плана выполняются в Academic Core. Демонстрационные назначения охватывают {DEMO_SEMESTERS.length} учебных периода; периоды можно настроить в учебном календаре.</div>
    </section><section className="year-card"><h3><Clock3 size={16}/> Общие ограничения</h3><div className="year-fields">
     <F name="Учебная неделя колледжа"><div className="year-workweek-source" role="status"><strong>{days===6?"Пн–Сб · шестидневка":"Пн–Пт · пятидневка"}</strong><small>Из общих настроек колледжа. Действует для годового расчёта и правил преподавателей.</small></div></F>
     <F name="Пар в день"><PolishedSelect value={cfg.slotsPerDay} onChange={e=>change(c=>({...c,slotsPerDay:Number(e.target.value)}))}>{[3,4,5,6].map(x=><option key={x} value={x}>{x}</option>)}</PolishedSelect></F></div>
@@ -290,10 +293,11 @@ export default function AnnualPlanner({lessons,calendar,practiceAssignments=[],d
    </section></div>}
   {tab==='results'&&<div className="year-results">
    {working?<section className="year-card"><h3>Расчёт выполняется отдельно от интерфейса</h3><p>{progress}</p><button className="year-next" onClick={stop}>Остановить</button></section>:!variants.length?<section className="year-card"><h3>Сравни четыре варианта до применения</h3><p>Расчёт пока не выполнен. Измени настройки или запусти подбор вариантов.</p><button className="year-next" onClick={run}><Play size={14}/> Рассчитать</button></section>:<>
-    <div className="year-note">Сравнение выполняется по фактическим метрикам. «Меньше всего окон» означает лучший показатель только среди четырёх рассчитанных эвристических вариантов, а не абсолютный оптимум. После первоначального размещения решатель выполняет безопасное уплотнение пар.</div><div className="year-variants">{variants.map((v,i)=><button key={v.id} className={active===i?'chosen':''} onClick={()=>setActive(i)}><b>{v.name}</b><span>Теория: {Math.round(v.coveredHours/Math.max(1,v.requiredHours)*100)}% размещено</span><small>{v.groupWindows} окон у групп · {v.teacherWindows} у преподавателей · {v.onlinePercent}% онлайн</small><small>Практика: {v.practiceAssignedPeriods}/{v.practicePeriodCount} назначений подтверждено · {v.practiceIssues.length} проблем · {v.practiceUnknownPeriods} без часов</small><em>{v.unplaced.length||v.practiceIssues.length?'Требует доработки':'Теория и практика обеспечены назначениями'}</em></button>)}</div>
+    <div className="year-note">Сравнение выполняется по фактическим метрикам. «Меньше всего окон» означает лучший показатель только среди четырёх рассчитанных эвристических вариантов, а не абсолютный оптимум. После первоначального размещения решатель выполняет безопасное уплотнение пар.</div><div className="year-variants">{variants.map((v,i)=><button key={v.id} className={active===i?'chosen':''} onClick={()=>setActive(i)}><b>{v.name}</b><span>Теория: {Math.round(v.coveredHours/Math.max(1,v.requiredHours)*100)}% размещено</span><small>{v.groupWindows} окон у групп · {v.teacherWindows} у преподавателей · {v.onlinePercent}% онлайн · {v.paceDeviationHours} ч отклонения от темпа</small><small>Практика: {v.practiceAssignedPeriods}/{v.practicePeriodCount} назначений подтверждено · {v.practiceIssues.length} проблем · {v.practiceUnknownPeriods} без часов</small><em>{v.unplaced.length||v.practiceIssues.length?'Требует доработки':'Теория и практика обеспечены назначениями'}</em></button>)}</div>
     <div className="year-cols"><section className="year-card">
      <h3>Выбранный вариант: {selected?.name}</h3>
      <div className="year-result-kpis"><div><b>{selected?.coveredHours.toLocaleString('ru-RU')}</b><small>размещено теории, ч</small></div><div><b>{selected?.requiredHours.toLocaleString('ru-RU')}</b><small>теория по демоплану</small></div><div><b>{selected?.unplaced.length}</b><small>неполных назначений</small></div><div><b>{selected?.practiceIssues.length}</b><small>проблем назначений практик</small></div></div>
+     <div className="year-note"><strong>Недельный темп — гибкая цель:</strong> {selected?.paceDeviations.length||0} отклонений, суммарно {selected?.paceDeviationHours||0} акад. ч. Пропущенные часы переносим в пределах своего семестра, но не в другой семестр.</div>
      <div className="year-note"><strong>Практика — отдельно от теоретической нагрузки:</strong> подтверждённые назначения: {selected?.practiceAssignedPeriods}/{selected?.practicePeriodCount} периодов. Академические часы практики по имеющимся назначениям: {selected?.practiceAssignedHours} из {selected?.practiceKnownHours}. Для {selected?.practiceUnknownPeriods} периодов часы ещё не переданы. Это плановые назначения, а не факт проведения занятий.</div>
      <div className="year-fields"><F name="Группа"><PolishedSelect value={viewGroup} onChange={e=>setViewGroup(e.target.value)}>{GROUPS.map(g=><option key={g.id} value={g.id}>{g.id}</option>)}</PolishedSelect></F><F name="Неделя"><PolishedSelect value={viewWeek} onChange={e=>setViewWeek(Number(e.target.value))}>{periodOptions(cfg.weeks)}</PolishedSelect></F></div>
      <MiniSchedule lessons={selected?.lessons||[]} week={viewWeek} group={viewGroup} title={'Предложенное расписание · '+viewGroup}/>
@@ -303,6 +307,7 @@ export default function AnnualPlanner({lessons,calendar,practiceAssignments=[],d
      <div className="year-search"><Search size={14}/><input aria-label="Поиск неразмещённых часов" value={issueSearch} placeholder="Группа, предмет, преподаватель..." onChange={e=>setIssueSearch(e.target.value)}/></div>
      <div className="year-list issues">{issues.slice(0,100).map(x=><div key={x.id}><b>{x.group} · {x.subject}</b><small>{x.teacher}</small><span>{x.reason}</span></div>)}
       {selected?.practiceIssues.slice(0,50).map((x,i)=><div key={i}><b>{x.group} · практика · неделя {x.week+1}</b><span>{x.reason}</span></div>)}
+      {selected?.paceDeviations.length? <details className="year-note"><summary>Отклонения от недельного темпа ({selected.paceDeviations.length})</summary><div className="year-list">{selected.paceDeviations.slice(0,50).map((x,i)=><div key={i}><b>{x.group} · {x.subject} · неделя {x.week+1}</b><span>Цель: {x.targetHours} ч · поставлено: {x.actualHours} ч · отклонение {x.deviationHours>0?'+':''}{x.deviationHours} ч</span></div>)}</div></details>:null}
       {!issues.length&&!selected?.practiceIssues.length&&<div className="year-success"><CheckCircle2 size={16}/> Для рассчитанной демонстрационной нагрузки ошибок покрытия не обнаружено</div>}</div>
      <div className="year-note">Дополни назначения практик в Academic Core, затем пересчитай. Теоретическая нагрузка и периоды КУГ имеют разные источники. Это эвристические варианты, а не доказательство глобального оптимума.</div>
      <button className="year-primary" disabled={!selected} onClick={applyVariant}><Check size={15}/> Применить весь вариант к демочерновику</button>

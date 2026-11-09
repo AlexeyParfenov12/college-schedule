@@ -9,6 +9,8 @@ import type { ScopeOverride } from './scheduleConstraints';
 import { practicePeriodsFromKug, practicePhaseLabel } from './kugPractice';
 import { practiceAssignmentIndex, practiceAssignmentProblems, practiceMeetings } from './practiceAssignments';
 import type { AcademicPracticeAssignment } from './practiceAssignments';
+import { splitAcademicHours, cumulativeWeeklyGoal, auditWeeklyPace } from './weeklyPace';
+import type { WeeklyPaceDeviation } from './weeklyPace';
 
 export type TeacherPreference={
  daysOff:number[]; fromSlot:number; toSlot:number;
@@ -18,7 +20,7 @@ export type TeacherPreference={
 export type PracticeAudit={blockId:string;group:string;week:number;reason:string};
 export type AnnualConfig={
  weeks:number; days:5|6; slotsPerDay:number; commuteGap:1|2;
- defaultOnlinePct:number; groupGapWeight:number; teacherGapWeight:number;
+ defaultOnlinePct:number; groupGapWeight:number; teacherGapWeight:number; paceWeight?:number;
  activeRooms:string[]; allowStreams:string[]; allowSubgroups:string[]; assistedSubgroups:string[];
  teacherPreferences:Record<string,TeacherPreference>;
  collegeRules?:ScopeOverride;
@@ -26,8 +28,8 @@ export type AnnualConfig={
  groupRules?:Record<string,ScopeOverride>;
 };
 export type YearDemand={id:string;group:string;teacher:string;subject:string;pairsPerWeek:number;requiredPairs:number;
- availableWeeks?:number[];
- periodAllocations?:{id:string;weeks:number[];requiredPairs:number}[];
+ requiredHours?:number;availableWeeks?:number[];
+ periodAllocations?:{id:string;weeks:number[];requiredPairs:number;requiredHours?:number;weeklyTargetHours?:number}[];
  semesters?:{autumnPairs:number;springPairs:number};};
 export type Unplaced={id:string;week:number;group:string;subject:string;teacher:string;reason:string};
 export type AnnualVariant={id:string;name:string;lessons:Lesson[];unplaced:Unplaced[];
@@ -35,12 +37,13 @@ export type AnnualVariant={id:string;name:string;lessons:Lesson[];unplaced:Unpla
  groupWindows:number;teacherWindows:number;onlinePercent:number;score:number;streamCount:number;subgroupCount:number;
  practicePairs:number;practiceIssues:PracticeAudit[];
  practicePeriodCount:number;practiceAssignedPeriods:number;practiceUnknownPeriods:number;
- practiceKnownHours:number;practiceAssignedHours:number};
+ practiceKnownHours:number;practiceAssignedHours:number;
+ paceDeviations:WeeklyPaceDeviation[];paceDeviationHours:number};
 export const ANNUAL_WEEK_LIMIT=53;
 export function defaultAnnualConfig():AnnualConfig{
  return {
   weeks:ANNUAL_WEEK_LIMIT,days:readCollegeWorkweek(),slotsPerDay:6,commuteGap:1,
-  defaultOnlinePct:20,groupGapWeight:90,teacherGapWeight:65,
+  defaultOnlinePct:20,groupGapWeight:90,teacherGapWeight:65,paceWeight:35,
   activeRooms:ROOMS.filter(r=>r.active).map(r=>r.id),allowStreams:[],
   allowSubgroups:[],assistedSubgroups:[],teacherPreferences:{},collegeRules:{},departmentRules:{},groupRules:{}
  };
@@ -108,7 +111,7 @@ export const hasSlotConflict=(state:WeekState,l:Lesson):boolean=>
  l.groups.some(g=>state.groupBusy.has(busyKey(g,l.day,l.slot)))||
  state.teacherBusy.has(busyKey(l.teacher,l.day,l.slot))||
  (l.mode!=='online'&&(l.room.match(/\b\d{3}\b/g)||[]).some(room=>state.roomBusy.has(busyKey(room,l.day,l.slot))));
-type Task={demand:YearDemand;group:string;teacher:string;subject:string;week:number;periodId?:string;members?:Task[]};
+type Task={demand:YearDemand;group:string;teacher:string;subject:string;week:number;hours:1|2;periodId?:string;members?:Task[]};
 function hardReason(task:Task,state:WeekState,cfg:AnnualConfig,calendar:CalendarEvent[],roomCandidates:typeof ROOMS,teacherOnline:number,onlineQuota:number,variant:number){
  const rule=teacherRule(cfg,task.teacher);
  if(rule.daysOff.length>=cfg.days)return 'Преподаватель исключил все доступные дни';
@@ -263,10 +266,11 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
  const placed:Lesson[]=[],unplaced:Unplaced[]=[];
  const regularDemands=demands; // Practice is linked by academic demand ID, never guessed from a discipline title.
  const quota=new Map<string,number>(),usedOnline=new Map<string,number>();
- for(const d of regularDemands){const limit=quota.get(d.teacher)||0;quota.set(d.teacher,limit+d.requiredPairs)}
+ for(const d of regularDemands){const limit=quota.get(d.teacher)||0;quota.set(d.teacher,limit+(d.requiredHours??d.requiredPairs*2)/2)}
  for(const [teacher,total] of quota)quota.set(teacher,Math.floor(total*Math.max(0,Math.min(100,teacherRule(cfg,teacher).maxOnlinePct))/100));
  const covered=new Map<string,number>();
  const coveredByPeriod=new Map<string,number>();
+ const coveredByWeek=new Map<string,number>();
  const practices=practicePeriodsFromKug(events,cfg.weeks,cfg.days);
  const assignmentsByPeriod=practiceAssignmentIndex(assignments);
  const practiceIssues:PracticeAudit[]=[];
@@ -320,28 +324,32 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
   const tasks:Task[]=[];
   for(const d of regularDemands){
    if(d.availableWeeks&&!d.availableWeeks.includes(week))continue;
-   const done=covered.get(d.id)||0;
-   let due=0;
-   let periodId:string|undefined;
+   const done=covered.get(d.id)||0,totalHours=d.requiredHours??d.requiredPairs*2;
+   let dueHours=0,periodId:string|undefined;
    if(d.periodAllocations){
     const period=d.periodAllocations.find(p=>p.weeks.includes(week));
     if(!period)continue;
     periodId=period.id;
     const eligible=period.weeks.filter(w=>w>=0&&w<cfg.weeks);
-    const elapsed=eligible.filter(w=>w<=week).length;
-    const assigned=coveredByPeriod.get(d.id+'|'+period.id)||0;
-    const expected=eligible.length?Math.ceil(elapsed*period.requiredPairs/eligible.length):0;
-    due=Math.max(0,Math.min(3,expected-assigned));
+    const approvedHours=period.requiredHours??period.requiredPairs*2;
+    const already=coveredByPeriod.get(d.id+'|'+period.id)||0;
+    const expected=cumulativeWeeklyGoal({
+     id:period.id,weeks:eligible,requiredHours:approvedHours,weeklyTargetHours:period.weeklyTargetHours
+    },week);
+    // Soft pace. A missing week becomes a backlog in the SAME semester.
+    dueHours=Math.max(0,Math.min(approvedHours-already,expected-already));
    }else{
-    let quotaNow=Math.ceil((week+1)*d.requiredPairs/cfg.weeks);
+    let quotaNow=Math.ceil((week+1)*totalHours/cfg.weeks);
     if(d.availableWeeks){
      const eligible=d.availableWeeks.filter(w=>w>=0&&w<cfg.weeks);
      const elapsed=eligible.filter(w=>w<=week).length;
-     quotaNow=eligible.length?Math.ceil(elapsed*d.requiredPairs/eligible.length):0;
+     quotaNow=eligible.length?Math.ceil(elapsed*totalHours/eligible.length):0;
     }
-    due=Math.max(0,Math.min(3,quotaNow-done));
+    dueHours=Math.max(0,Math.min(totalHours-done,quotaNow-done));
    }
-   for(let j=0;j<due;j++)tasks.push({demand:d,group:d.group,teacher:d.teacher,subject:d.subject,week,periodId});
+   const remaining=Math.max(0,totalHours-done),capacity=cfg.days*cfg.slotsPerDay*2;
+   for(const hours of splitAcademicHours(Math.floor(Math.min(remaining,capacity,dueHours))))
+    tasks.push({demand:d,group:d.group,teacher:d.teacher,subject:d.subject,week,periodId,hours});
   }
   tasks.sort((a,b)=>Number(needsComputers(b.subject))-Number(needsComputers(a.subject))||
    teacherRule(cfg,a.teacher).daysOff.length-teacherRule(cfg,b.teacher).daysOff.length||
@@ -353,7 +361,7 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
    const task=tasks[i];
    if(cfg.allowStreams.includes(streamKey(task.teacher,task.subject))){
     const partner=tasks.findIndex((other,j)=>j>i&&!absorbed.has(j)&&other.teacher===task.teacher&&
-     other.subject===task.subject&&other.group!==task.group&&other.periodId===task.periodId);
+     other.subject===task.subject&&other.group!==task.group&&other.periodId===task.periodId&&other.hours===task.hours);
     if(partner>=0){
      const a=GROUPS.find(g=>g.id===task.group),b=GROUPS.find(g=>g.id===tasks[partner].group);
      const count=(a?.count||0)+(b?.count||0);
@@ -386,7 +394,7 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
      for(const option of modes){
       const l:Lesson={id:'year-'+variant+'-'+week+'-'+task.demand.id+'-'+day+'-'+slot,
        week,day,slot,groups:taskGroups,teacher:task.teacher,subject:task.subject,
-       room:option.room,mode:option.mode,type:task.members?'stream':option.type,hours:2,
+       room:option.room,mode:option.mode,type:task.members?'stream':option.type,hours:task.hours,
        notes:option.type==='subgroup'?'Демонстрация: одобрено разделение, сопровождающий необходим':undefined};
       if(calendarIssues(l,events,cfg.days).length)continue;
       if(task.demand.availableWeeks&&events.some(event=>event.kind==='study')&&taskGroups.some(group=>!isTeachingDate(lessonDate(week,day),group,events,cfg.days)))continue;
@@ -402,10 +410,12 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
    if(choices.length){
     const l=choices[0].l;append(state,l);placed.push(l);
     for(const member of task.members||[task]){
-      covered.set(member.demand.id,(covered.get(member.demand.id)||0)+1);
+      covered.set(member.demand.id,(covered.get(member.demand.id)||0)+member.hours);
+      const wk=member.demand.id+'|'+week;
+      coveredByWeek.set(wk,(coveredByWeek.get(wk)||0)+member.hours);
       if(member.periodId){
        const key=member.demand.id+'|'+member.periodId;
-       coveredByPeriod.set(key,(coveredByPeriod.get(key)||0)+1);
+       coveredByPeriod.set(key,(coveredByPeriod.get(key)||0)+member.hours);
       }
      }
     if(l.type==='stream')streamCount++;
@@ -419,7 +429,7 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
   // Remaining due is carried over into later weeks.
  }
  for(const d of regularDemands){
-  const missing=d.requiredPairs-(covered.get(d.id)||0);
+  const missing=(d.requiredHours??d.requiredPairs*2)-(covered.get(d.id)||0);
   if(missing>0){
    const group=GROUPS.find(g=>g.id===d.group);
    const noTeachingPeriod=Boolean(d.availableWeeks&&!d.availableWeeks.some(w=>w>=0&&w<cfg.weeks));
@@ -431,15 +441,15 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
     : 'Недостаточно доступных дней, пар или совместимых аудиторий с учётом ограничений';
    if(d.periodAllocations?.length){
     for(const period of d.periodAllocations){
-     const periodMissing=period.requiredPairs-(coveredByPeriod.get(d.id+'|'+period.id)||0);
+     const periodMissing=(period.requiredHours??period.requiredPairs*2)-(coveredByPeriod.get(d.id+'|'+period.id)||0);
      if(periodMissing<=0)continue;
      const periodName=period.id==='autumn'?'Осенний период':period.id==='spring'?'Весенний период':period.id;
      const week=period.weeks.length?period.weeks[period.weeks.length-1]:cfg.weeks-1;
      unplaced.push({id:d.id+'|'+period.id,week,group:d.group,subject:d.subject,teacher:d.teacher,
-      reason:periodName+': '+reason+' · остаток '+periodMissing+' пар'});
+      reason:periodName+': '+reason+' · остаток '+(period.requiredHours!==undefined?periodMissing+' акад. ч':periodMissing/2+' пар')});
     }
    }else{
-    unplaced.push({id:d.id,week:cfg.weeks-1,group:d.group,subject:d.subject,teacher:d.teacher,reason:reason+' · остаток '+missing+' пар'});
+    unplaced.push({id:d.id,week:cfg.weeks-1,group:d.group,subject:d.subject,teacher:d.teacher,reason:reason+' · остаток '+(d.requiredHours!==undefined?missing+' акад. ч':missing/2+' пар')});
    }
   }
  }
@@ -451,13 +461,22 @@ export function solveAnnualVariant(demands:YearDemand[],cfg:AnnualConfig,events:
  }
  for(const entries of groupMap.values())groupWindows+=avoidableWindows(entries,cfg.commuteGap);
  for(const entries of teacherMap.values())teacherWindows+=avoidableWindows(entries,cfg.commuteGap);
- const totalPairs=regularDemands.reduce((sum,d)=>sum+d.requiredPairs,0);
+ const totalHours=regularDemands.reduce((sum,d)=>sum+(d.requiredHours??d.requiredPairs*2),0);
+ const totalPairs=totalHours/2;
  const theoryLessons=placed.filter(l=>!l.practiceBlockId);
- const placedPairs=theoryLessons.reduce((sum,l)=>sum+l.groups.length,0);
+ const placedHours=theoryLessons.reduce((sum,l)=>sum+(l.hours??2)*l.groups.length,0);
+ const placedPairs=placedHours/2;
+ const paceDemands=regularDemands.map(d=>({...d,periodAllocations:d.periodAllocations?.map(p=>({
+  id:p.id,weeks:p.weeks,requiredHours:p.requiredHours??p.requiredPairs*2,weeklyTargetHours:p.weeklyTargetHours
+ }))}));
+ const paceDeviations=auditWeeklyPace(paceDemands,(id,week)=>coveredByWeek.get(id+'|'+week)||0);
+ const paceDeviationHours=paceDeviations.reduce((sum,d)=>sum+Math.abs(d.deviationHours),0);
  const online=theoryLessons.filter(l=>l.mode==='online').length;
- const score=Math.round((placedPairs/Math.max(1,totalPairs))*10000-groupWindows*cfg.groupGapWeight*.22-teacherWindows*cfg.teacherGapWeight*.12);
+ const score=Math.round((placedPairs/Math.max(1,totalPairs))*10000-groupWindows*cfg.groupGapWeight*.22-
+  teacherWindows*cfg.teacherGapWeight*.12-paceDeviationHours*(cfg.paceWeight??35)*.08);
  return {id:'variant-'+variant,name:label,lessons:placed,unplaced,
-  totalPairs,placedPairs,requiredHours:totalPairs*2,coveredHours:placedPairs*2,
+  totalPairs,placedPairs,requiredHours:totalHours,coveredHours:placedHours,
   groupWindows,teacherWindows,onlinePercent:Math.round(online/Math.max(1,theoryLessons.length)*100),score,streamCount,subgroupCount,practicePairs,practiceIssues,
-  practicePeriodCount:practices.length,practiceAssignedPeriods,practiceUnknownPeriods,practiceKnownHours,practiceAssignedHours};
+  practicePeriodCount:practices.length,practiceAssignedPeriods,practiceUnknownPeriods,practiceKnownHours,practiceAssignedHours,
+  paceDeviations,paceDeviationHours};
 }
