@@ -22,7 +22,7 @@ describe('KUG annual matrix: user interaction',()=>{
   expect(screen.getByText(/2 групп · Недели 1–3/)).toBeTruthy();
   fireEvent.click(screen.getByRole('button',{name:'Рассчитать изменения'}));
   expect(replace).not.toHaveBeenCalled();
-  expect(screen.getByText(/Период «Учебная практика» для 2 групп/)).toBeTruthy();
+  expect(screen.getByText(/Период «УП\.05\.01/)).toBeTruthy();
   fireEvent.click(screen.getByRole('button',{name:'Подтвердить и сохранить'}));
   expect(replace).toHaveBeenCalledTimes(1);
   const updated=replace.mock.calls[0][0];

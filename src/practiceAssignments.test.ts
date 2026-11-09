@@ -7,7 +7,7 @@ import { practiceAssignmentProblems, practiceMeetings, practicePeriodStamp } fro
 import type { AcademicPracticeAssignment } from './practiceAssignments';
 const cfg=()=>{const c=defaultAnnualConfig();c.days=5;c.weeks=3;c.slotsPerDay=6;return c};
 const training:CalendarEvent={id:'training',kind:'practice',periodCode:'training',title:'Учебная практика',
- from:'2026-09-08',to:'2026-09-09',groups:['П-21']};
+ from:'2026-09-08',to:'2026-09-09',groups:['П-21'],practiceCode:'УП.05.01'};
 const allocation=(p:ReturnType<typeof practicePeriodsFromKug>[number],hours=4):AcademicPracticeAssignment=>({
  periodId:p.id,group:p.group,phase:p.phase,supervisor:TEACHERS[0],location:'109',
  approvedHours:hours,startSlot:1,calendarStamp:practicePeriodStamp(p),approved:true
@@ -58,7 +58,7 @@ describe('Academic Core practice assignment boundary',()=>{
  });
  it('confirms PP/PDP enterprise resources without generating fake classroom sessions',()=>{
   const event:CalendarEvent={id:'pp',kind:'practice',periodCode:'industrial',title:'ПП',
-   from:'2026-09-08',to:'2026-09-09',groups:['П-31']};
+   from:'2026-09-08',to:'2026-09-09',groups:['П-31'],practiceCode:'ПП.02.01'};
   const p=practicePeriodsFromKug([event],3,5)[0];
   const a={...allocation(p,12),location:'Предприятие (подтверждённое место)'};
   const result=solveAnnualVariant([],cfg(),[event],0,[],[a]);
