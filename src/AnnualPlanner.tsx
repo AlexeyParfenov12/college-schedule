@@ -16,8 +16,11 @@ import { effectiveGroupRules } from './scheduleConstraints';
 import { practicePeriodsFromKug } from './kugPractice';
 import type { AcademicPracticeAssignment } from './practiceAssignments';
 import type { ScopeOverride } from './scheduleConstraints';
+import { auditAnnualDraft } from './yearAudit';
+import type { AnnualApplyScope, YearAudit } from './yearAudit';
+import { readBlockedRooms } from './roomAvailability';
 
-type Props={lessons:Lesson[];calendar:CalendarEvent[];practiceAssignments?:AcademicPracticeAssignment[];days:5|6;onApply:(variant:AnnualVariant,weeks:number,workweek:5|6)=>void;notify:(s:string)=>void};
+type Props={lessons:Lesson[];calendar:CalendarEvent[];practiceAssignments?:AcademicPracticeAssignment[];days:5|6;status:'draft'|'published';onApply:(variant:AnnualVariant,scope:AnnualApplyScope,workweek:5|6,fingerprint:string)=>boolean;notify:(s:string)=>void};
 type Tab='load'|'teachers'|'scope'|'rooms'|'groups'|'distance'|'results';
 const tabs:{id:Tab;name:string}[]=[
  {id:'load',name:'Нагрузка'},{id:'teachers',name:'Преподаватели'},{id:'scope',name:'Правила групп'},{id:'rooms',name:'Кабинеты'},
@@ -38,7 +41,7 @@ const read=():AnnualConfig=>{try{
 }catch{}return defaultAnnualConfig()};
 const key=(name:string,subject:string)=>streamKey(name,subject);
 const periodOptions=(weeks:number)=>Array.from({length:weeks},(_,w)=><option key={w} value={w}>{w+1}-я · {w===0?ACADEMIC_START:lessonDate(w,0)}</option>);
-export default function AnnualPlanner({lessons,calendar,practiceAssignments=[],days,onApply,notify}:Props){
+export default function AnnualPlanner({lessons,calendar,practiceAssignments=[],days,status,onApply,notify}:Props){
  const production=useProductionCalendarState();
  const collegeRevision=useCollegeOverrideRevision();
  const horizon=useMemo(()=>demoAcademicHorizon(calendar),[calendar]);
@@ -68,12 +71,27 @@ export default function AnnualPlanner({lessons,calendar,practiceAssignments=[],d
  const [variants,setVariants]=useState<AnnualVariant[]>([]),[active,setActive]=useState(0);
  const [viewWeek,setViewWeek]=useState(0),[viewGroup,setViewGroup]=useState('П-21'),[issueSearch,setIssueSearch]=useState('');
  const [working,setWorking]=useState(false),[progress,setProgress]=useState('');
+ const [applyGroup,setApplyGroup]=useState('');
+ const [applyStart,setApplyStart]=useState(0),[applyEnd,setApplyEnd]=useState(0);
+ const [applyPreview,setApplyPreview]=useState<{scope:AnnualApplyScope;audit:YearAudit;variantId:string;sourceStamp:string}|null>(null);
+ const [applyReviewed,setApplyReviewed]=useState(false);
+ const [calculationSourceStamp,setCalculationSourceStamp]=useState('');
+ const sourceStamp=JSON.stringify({lessons,calendar,practiceAssignments,days,cfg});
+ const scopeGroups=applyGroup==='ALL'?GROUPS.map(g=>g.id):applyGroup?[applyGroup]:[];
+ const scopeSelected:AnnualApplyScope={groups:scopeGroups,fromWeek:applyStart,toWeek:applyEnd,
+  horizonWeeks:cfg.weeks,publicationStatus:status};
+ const sourceIsStale=Boolean(calculationSourceStamp&&calculationSourceStamp!==sourceStamp);
+ const previewIsStale=Boolean(applyPreview&&
+  (applyPreview.sourceStamp!==sourceStamp||applyPreview.variantId!==variants[active]?.id||
+   JSON.stringify(applyPreview.scope)!==JSON.stringify(scopeSelected)));
+ const resetApplyPreview=()=>{setApplyPreview(null);setApplyReviewed(false)};
  const worker=useRef<Worker|null>(null);
  const lastProductionRevision=useRef(production.revision+'-'+collegeRevision);
  const [calculationRevision,setCalculationRevision]=useState<string|null>(null);
  const change=(next:(config:AnnualConfig)=>AnnualConfig)=>{
   setCfg(current=>{const value=next(current);try{localStorage.setItem('college-year-preferences-v3',JSON.stringify(value))}catch{}return value});
   setVariants([]);
+  resetApplyPreview();
  };
  useEffect(()=>()=>{worker.current?.terminate()},[]);
  useEffect(()=>{
@@ -81,7 +99,7 @@ export default function AnnualPlanner({lessons,calendar,practiceAssignments=[],d
   if(lastProductionRevision.current===updated)return;
   lastProductionRevision.current=updated;
   worker.current?.terminate();worker.current=null;
-  setWorking(false);setVariants([]);setCalculationRevision(null);
+  setWorking(false);setVariants([]);setCalculationRevision(null);resetApplyPreview();
   setProgress('Производственный календарь обновлён. Пересчитайте варианты расписания.');
  },[production.revision,collegeRevision]);
  useEffect(()=>{
@@ -138,6 +156,7 @@ export default function AnnualPlanner({lessons,calendar,practiceAssignments=[],d
   }}
  }));
  const run=()=>{
+  resetApplyPreview();setCalculationSourceStamp(sourceStamp);
   worker.current?.terminate();setWorking(true);setProgress('Вычисление вариантов...');setVariants([]);setCalculationRevision(production.revision+':'+collegeRevision);setTab('results');
   const w=new Worker(new URL('./yearPlanner.worker.ts',import.meta.url),{type:'module'});worker.current=w;
   w.onmessage=(e:MessageEvent<{type:string;current?:number;name?:string;variants?:AnnualVariant[];message?:string}>)=>{
@@ -154,15 +173,31 @@ export default function AnnualPlanner({lessons,calendar,practiceAssignments=[],d
   const blob=new Blob([JSON.stringify({kind:'college-annual-demo-v1',variant:selected,configuration:cfg},null,2)],{type:'application/json'});
   const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download='college-year-'+selected.id+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);
  };
+ const previewAnnualScope=()=>{
+  if(!selected||!scopeGroups.length)return notify('Выберите конкретную группу или явно все группы.');
+  if(applyStart>applyEnd||applyStart<0||applyEnd>=cfg.weeks)
+   return notify('Проверьте начальную и конечную недели области изменения.');
+  if(calculationRevision!==production.revision+':'+collegeRevision||sourceIsStale)
+   return notify('Исходное расписание или календарь изменились. Пересчитайте 4 варианта.');
+  const scope={...scopeSelected};
+  const audit=auditAnnualDraft(lessons,selected.lessons,scope,calendar,readBlockedRooms(),cfg.days);
+  setApplyPreview({scope,audit,variantId:selected.id,sourceStamp});
+  setApplyReviewed(false);
+ };
  const applyVariant=()=>{
-  if(!selected)return;
-  if(calculationRevision!==production.revision+':'+collegeRevision)return notify('Производственный календарь изменился. Сначала пересчитайте 4 варианта.');
-  const gaps=selected.unplaced.length,practice=selected.practiceIssues.length;
-  const details=gaps||practice
-   ?'ВНИМАНИЕ: вариант НЕ ПОЛНОСТЬЮ УКОМПЛЕКТОВАН. Не размещено теории: '+gaps+'; отсутствуют назначения практик: '+practice+'. Черновик не подтверждает полное покрытие учебного плана. '
-   :'Теория размещена; назначения практик укомплектованы, но факт их проведения требует электронного журнала. ';
-  if(!window.confirm(details+'Применить расписание на '+cfg.weeks+' недель к черновику? Проведённые занятия сохраняются, предыдущий вариант можно восстановить.'))return;
-  onApply(selected,cfg.weeks,cfg.days);
+  if(!selected||!applyPreview||previewIsStale||sourceIsStale||!applyReviewed)
+   return notify('Сначала проверьте текущую область изменений и подтвердите предпросмотр.');
+  if(applyPreview.audit.hardIssues.length||status==='published'||!applyPreview.audit.changed)
+   return notify('Применение запрещено: опубликованное расписание, конфликты или пустая область.');
+  const {scope,audit}=applyPreview;
+  const groupText=scope.groups.length===GROUPS.length?'ВСЕ ГРУППЫ':scope.groups.join(', ');
+  const message='Проверено: '+audit.changed+' новых занятий, '+audit.removed+
+   ' непроведённых будут заменены, '+audit.protectedCount+' проведённых сохранены.\n'+
+   'Группы: '+groupText+'\nНедели: '+(scope.fromWeek+1)+'–'+(scope.toWeek+1)+
+   '\nПрименить ТОЛЬКО к черновику? Отдельная публикация не выполняется.';
+  if(!window.confirm(message))return;
+  const ok=onApply(selected,scope,cfg.days,audit.fingerprint);
+  if(ok){resetApplyPreview();notify('Изменения ограниченной области применены к черновику. Остальные занятия сохранены.');}
  };
  const nextTab=()=>{const i=tabs.findIndex(t=>t.id===tab);setTab(tabs[Math.min(i+1,tabs.length-1)].id)};
  return <div className="year-planner" data-testid="year-planner">
@@ -293,7 +328,7 @@ export default function AnnualPlanner({lessons,calendar,practiceAssignments=[],d
    </section></div>}
   {tab==='results'&&<div className="year-results">
    {working?<section className="year-card"><h3>Расчёт выполняется отдельно от интерфейса</h3><p>{progress}</p><button className="year-next" onClick={stop}>Остановить</button></section>:!variants.length?<section className="year-card"><h3>Сравни четыре варианта до применения</h3><p>Расчёт пока не выполнен. Измени настройки или запусти подбор вариантов.</p><button className="year-next" onClick={run}><Play size={14}/> Рассчитать</button></section>:<>
-    <div className="year-note">Сравнение выполняется по фактическим метрикам. «Меньше всего окон» означает лучший показатель только среди четырёх рассчитанных эвристических вариантов, а не абсолютный оптимум. После первоначального размещения решатель выполняет безопасное уплотнение пар.</div><div className="year-variants">{variants.map((v,i)=><button key={v.id} className={active===i?'chosen':''} onClick={()=>setActive(i)}><b>{v.name}</b><span>Теория: {Math.round(v.coveredHours/Math.max(1,v.requiredHours)*100)}% размещено</span><small>{v.groupWindows} окон у групп · {v.teacherWindows} у преподавателей · {v.onlinePercent}% онлайн · {v.paceDeviationHours} ч отклонения от темпа</small><small>Практика: {v.practiceAssignedPeriods}/{v.practicePeriodCount} назначений подтверждено · {v.practiceIssues.length} проблем · {v.practiceUnknownPeriods} без часов</small><em>{v.unplaced.length||v.practiceIssues.length?'Требует доработки':'Теория и практика обеспечены назначениями'}</em></button>)}</div>
+    <div className="year-note">Сравнение выполняется по фактическим метрикам. «Меньше всего окон» означает лучший показатель только среди четырёх рассчитанных эвристических вариантов, а не абсолютный оптимум. После первоначального размещения решатель выполняет безопасное уплотнение пар.</div><div className="year-variants">{variants.map((v,i)=><button key={v.id} className={active===i?'chosen':''} onClick={()=>{setActive(i);resetApplyPreview()}}><b>{v.name}</b><span>Теория: {Math.round(v.coveredHours/Math.max(1,v.requiredHours)*100)}% размещено</span><small>{v.groupWindows} окон у групп · {v.teacherWindows} у преподавателей · {v.onlinePercent}% онлайн · {v.paceDeviationHours} ч отклонения от темпа</small><small>Практика: {v.practiceAssignedPeriods}/{v.practicePeriodCount} назначений подтверждено · {v.practiceIssues.length} проблем · {v.practiceUnknownPeriods} без часов</small><em>{v.unplaced.length||v.practiceIssues.length?'Требует доработки':'Теория и практика обеспечены назначениями'}</em></button>)}</div>
     <div className="year-cols"><section className="year-card">
      <h3>Выбранный вариант: {selected?.name}</h3>
      <div className="year-result-kpis"><div><b>{selected?.coveredHours.toLocaleString('ru-RU')}</b><small>размещено теории, ч</small></div><div><b>{selected?.requiredHours.toLocaleString('ru-RU')}</b><small>теория по демоплану</small></div><div><b>{selected?.unplaced.length}</b><small>неполных назначений</small></div><div><b>{selected?.practiceIssues.length}</b><small>проблем назначений практик</small></div></div>
@@ -310,10 +345,53 @@ export default function AnnualPlanner({lessons,calendar,practiceAssignments=[],d
       {selected?.paceDeviations.length? <details className="year-note"><summary>Отклонения от недельного темпа ({selected.paceDeviations.length})</summary><div className="year-list">{selected.paceDeviations.slice(0,50).map((x,i)=><div key={i}><b>{x.group} · {x.subject} · неделя {x.week+1}</b><span>Цель: {x.targetHours} ч · поставлено: {x.actualHours} ч · отклонение {x.deviationHours>0?'+':''}{x.deviationHours} ч</span></div>)}</div></details>:null}
       {!issues.length&&!selected?.practiceIssues.length&&<div className="year-success"><CheckCircle2 size={16}/> Для рассчитанной демонстрационной нагрузки ошибок покрытия не обнаружено</div>}</div>
      <div className="year-note">Дополни назначения практик в Academic Core, затем пересчитай. Теоретическая нагрузка и периоды КУГ имеют разные источники. Это эвристические варианты, а не доказательство глобального оптимума.</div>
-     <button className="year-primary" disabled={!selected} onClick={applyVariant}><Check size={15}/> Применить весь вариант к демочерновику</button>
+     <section className="year-apply-scope" aria-label="Безопасная область годового применения">
+      <h3>Применить выбранный вариант только в указанных границах</h3>
+      <p>Годовой расчёт охватывает все группы, но заменять занятия можно только в явно выбранной области. Все остальные группы и недели, проведённые занятия и опубликованные версии защищены.</p>
+      <div className="year-fields">
+       <F name="Группы для применения"><PolishedSelect aria-label="Группы для годового применения" value={applyGroup} onChange={e=>{setApplyGroup(e.target.value);resetApplyPreview()}}>
+        <option value="">Не выбраны — изменения запрещены</option>
+        {GROUPS.map(g=><option key={g.id} value={g.id}>{g.id}</option>)}
+        <option value="ALL">Все группы · массовое изменение</option>
+       </PolishedSelect></F>
+       <F name="С учебной недели"><PolishedSelect aria-label="Неделя начала применения" value={applyStart} onChange={e=>{const n=Number(e.target.value);setApplyStart(n);if(n>applyEnd)setApplyEnd(n);resetApplyPreview()}}>
+        {periodOptions(cfg.weeks)}</PolishedSelect></F>
+       <F name="По учебную неделю"><PolishedSelect aria-label="Неделя окончания применения" value={applyEnd} onChange={e=>{const n=Number(e.target.value);setApplyEnd(n);if(n<applyStart)setApplyStart(n);resetApplyPreview()}}>
+        {periodOptions(cfg.weeks)}</PolishedSelect></F>
+      </div>
+      {status==='published'&&<div className="year-apply-error" role="alert">Расписание опубликовано. Годовое массовое изменение запрещено, пока не создан отдельный черновик согласованным способом.</div>}
+      {sourceIsStale&&<div className="year-apply-error" role="alert">После расчёта изменились исходные занятия или правила. Пересчитайте варианты.</div>}
+      <button className="year-next" disabled={!applyGroup||sourceIsStale} onClick={previewAnnualScope}>
+       <Search size={14}/> Проверить область и показать последствия
+      </button>
+      {applyPreview&&!previewIsStale&&<div className="year-apply-preview" role="region" aria-label="Предпросмотр годового применения">
+       <strong>Предварительная проверка · недели {applyPreview.scope.fromWeek+1}–{applyPreview.scope.toWeek+1}</strong>
+       <div className="year-apply-kpis">
+        <span><b>{applyPreview.audit.removed}</b> непроведённых заменить</span>
+        <span><b>{applyPreview.audit.changed}</b> новых добавить</span>
+        <span><b>{applyPreview.audit.protectedCount}</b> проведённых сохранить</span>
+        <span><b>{applyPreview.audit.untouchedCount}</b> вне области без изменений</span>
+       </div>
+       <p><b>Затронутые группы:</b> {applyPreview.audit.affectedGroups.join(', ')||'нет'}.
+        <b> Затронутые недели:</b> {applyPreview.audit.affectedWeeks.map(n=>n+1).join(', ')||'нет'}.</p>
+       {!!applyPreview.audit.hardIssues.length&&<div className="year-apply-error" role="alert">
+        <b>Применение заблокировано: {applyPreview.audit.hardIssues.length} проблем.</b>
+        {applyPreview.audit.hardIssues.slice(0,4).map((issue,i)=><p key={i}>{issue.reason}</p>)}
+       </div>}
+       {!applyPreview.audit.hardIssues.length&&applyPreview.audit.changed>0&&status==='draft'&&<>
+        <label className="year-apply-agree"><input type="checkbox" checked={applyReviewed} onChange={e=>setApplyReviewed(e.target.checked)}/>
+         Подтверждаю просмотр количества заменяемых занятий, групп и недель. Остальные данные останутся без изменений.</label>
+        <button className="year-primary" disabled={!applyReviewed} onClick={applyVariant}>
+         <Check size={15}/> Подтвердить изменения только в выбранной области
+        </button>
+       </>}
+       {!applyPreview.audit.changed&&<p>В выбранной области нет новых занятий. Применение недоступно.</p>}
+      </div>}
+      {applyPreview&&previewIsStale&&<div className="year-apply-error">Предпросмотр устарел. Выполните проверку области повторно.</div>}
+     </section>
     </section></div>
    </>}
   </div>}
-  <p className="year-footer">Демонстрационный модуль работает на синтетических данных и не изменяет Academic Core. При массовом применении изменяется только черновик в браузере; проведённые занятия сохраняются. Полные требования, тарифные правила и аудит требуют серверного решателя.</p>
+  <p className="year-footer">Демонстрационный модуль работает на синтетических данных и не изменяет Academic Core. Годовое применение требует явной области групп и недель, предварительной проверки, отдельного подтверждения и разрешено только для черновика; проведённые и остальные занятия сохраняются. Полные требования, тарифные правила и аудит требуют серверного решателя.</p>
  </div>;
 }

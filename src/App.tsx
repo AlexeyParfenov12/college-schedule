@@ -494,32 +494,40 @@ export default function App(){
       setNotice('Пакет из '+ids.length+' занятий добавлен в черновик. Публикации не было. Ctrl+Z отменяет последнее изменение.');
       return true;
      }}/>
-  : screen==='year'?<AnnualPlanner lessons={items} days={days} practiceAssignments={(()=>{
+  : screen==='year'?<AnnualPlanner lessons={items} days={days} status={status} practiceAssignments={(()=>{
      try{const v=JSON.parse((localStorage.getItem('college-schedule-extras-v2')||'{}'));return Array.isArray(v.practiceAssignments)?v.practiceAssignments:[]}
      catch{return []}
     })()} calendar={(()=>{
       try{const v=JSON.parse((localStorage.getItem('college-schedule-extras-v2')||localStorage.getItem('college-schedule-extras-v1'))||'{}');return Array.isArray(v.calendar)?v.calendar:CALENDAR}
       catch{return CALENDAR}
-    })()} notify={setNotice} onApply={(variant,weeks,workweek)=>{
+    })()} notify={setNotice} onApply={(variant,scope,workweek,previewFingerprint)=>{
       const calendar=(()=>{
         try{const value=JSON.parse((localStorage.getItem('college-schedule-extras-v2')||localStorage.getItem('college-schedule-extras-v1'))||'{}');return Array.isArray(value.calendar)?value.calendar:CALENDAR}
         catch{return CALENDAR}
       })();
-      const audit=auditAnnualDraft(items,variant.lessons,weeks,calendar,readBlockedRooms(),workweek);
-      if(audit.hardIssues.length){
-       setNotice('Годовой вариант не применён: '+audit.hardIssues.length+' обязательных конфликтов. Первый: '+audit.hardIssues[0].reason);return
+      if(status==='published'||scope.publicationStatus!=='draft'){
+       setNotice('Годовое применение запрещено для опубликованного расписания.');return false
       }
+      const audit=auditAnnualDraft(items,variant.lessons,scope,calendar,readBlockedRooms(),workweek);
+      if(audit.fingerprint!==previewFingerprint){
+       setNotice('Годовой вариант не применён: исходные данные изменились после предпросмотра.');return false
+      }
+      if(audit.hardIssues.length){
+       setNotice('Годовой вариант не применён: '+audit.hardIssues.length+' обязательных конфликтов. Первый: '+audit.hardIssues[0].reason);return false
+      }
+      if(!audit.changed){setNotice('Нет занятий для применения в выбранной области.');return false}
       if(JSON.stringify(audit.next).length>4_600_000){
-       setNotice('Годовой черновик превышает безопасный размер браузерного хранилища. Скачай JSON варианта.');return
+       setNotice('Годовой черновик превышает безопасный размер браузерного хранилища. Скачай JSON варианта.');return false
       }
       try{
        localStorage.setItem('college-year-unplaced-v2',JSON.stringify({
-        at:new Date().toISOString(),weeks,unplaced:variant.unplaced,practiceIssues:variant.practiceIssues
+        at:new Date().toISOString(),weeks:scope.horizonWeeks,scope,unplaced:variant.unplaced,practiceIssues:variant.practiceIssues
        }));
-      }catch{setNotice('Не удалось сохранить остатки нагрузки в браузере');return}
+      }catch{setNotice('Не удалось сохранить остатки нагрузки в браузере');return false}
       setYearBackup({items,status});
       setItems(audit.next);setStatus('draft');setLastChange(null);setSelected(null);setWeek(LEGACY_WEEK_OFFSET);setScreen('schedule');
-      setNotice('Вариант применён к черновику: '+audit.changed+' занятий. Неразмещённых назначений: '+variant.unplaced.length+'. Доступен возврат.');
+      setNotice('Частичный годовой вариант применён к черновику: '+audit.changed+' занятий в выбранных группах и неделях. Остальные сохранены.');
+      return true;
     }}/>
   : <AdvancedWorkflows screen={screen} items={items} setItems={setItems} week={week} setWeek={setWeek} group={group} setGroup={setGroup} teacher={teacher} setTeacher={setTeacher} room={room} setRoom={setRoom} onNavigate={show} onEdit={setSelected} onFocusLesson={focusLesson} notify={setNotice} markDraft={()=>setStatus('draft')} status={status} setStatus={setStatus} density={density} setDensity={setDensity} days={days} setDays={v=>setDays(v===5?5:6)}/>;
  return <div className="app">

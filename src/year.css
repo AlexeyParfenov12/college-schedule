@@ -20,3 +20,19 @@
 .year-workweek-source{display:flex;flex-direction:column;gap:4px;min-height:39px;border-radius:6px;border:1px solid #d4e7db;padding:7px 10px;background:#f2faf5;overflow-wrap:anywhere}
 .year-workweek-source strong{font-size:11px;color:#2b6656}
 .year-workweek-source small{font-size:10px;line-height:1.45;color:#6e8b7a}
+
+/* Explicit, reviewable impact scope for the annual draft. */
+.year-apply-scope{padding:13px;border:1px solid #cddfd7;border-radius:10px;background:#f5faf7;margin-top:12px;display:flex;flex-direction:column;gap:11px;min-width:0}
+.year-apply-scope h3{font-size:13px;margin:0}
+.year-apply-scope p{font-size:11px;line-height:1.6;margin:0;color:#59776f}
+.year-apply-scope .year-fields{display:grid;grid-template-columns:minmax(0,1fr);gap:9px}
+.year-apply-preview{border:1px solid #acd3bb;border-radius:9px;padding:12px;background:#fff;display:flex;flex-direction:column;gap:9px;min-width:0}
+.year-apply-preview>strong{font-size:12px;color:#285e4e}
+.year-apply-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.year-apply-kpis span{padding:9px;border:1px solid #dce9e3;border-radius:7px;font-size:10.5px;display:flex;flex-direction:column;gap:4px}
+.year-apply-kpis b{font-size:18px;color:#215d50}
+.year-apply-error{border-radius:7px;border:1px solid #eec9b2;background:#fff6ef;color:#9b582d;padding:10px;font-size:11px;line-height:1.5}
+.year-apply-error p{margin-top:6px;color:#9b582d}
+.year-apply-agree{display:flex;align-items:flex-start;gap:8px;font-size:11px;line-height:1.6;cursor:pointer}
+.year-apply-agree input{margin-top:3px;flex:none}
+@media(max-width:720px){.year-apply-kpis{grid-template-columns:1fr 1fr}}
